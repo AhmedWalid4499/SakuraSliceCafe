@@ -609,7 +609,148 @@
     text-align: right;
   }
 
-  /* ── RESPONSIVE ── */
+  /* ── STORY MODAL ── */
+  .story-btn {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    z-index: 100;
+    background: var(--sakura-dark);
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    padding: 13px 22px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 32px rgba(212,103,138,0.35);
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .story-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 40px rgba(212,103,138,0.45);
+    background: #b84d72;
+  }
+  .story-btn .btn-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    opacity: 0.7;
+    animation: pulseDot 2s ease infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.4); opacity: 1; }
+  }
+
+  .story-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(25, 12, 18, 0.75);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .story-overlay.open { display: flex; }
+
+  .story-modal {
+    background: var(--warm-white);
+    border-radius: 28px;
+    max-width: 680px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.3);
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sakura) transparent;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(24px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .story-cover {
+    width: 100%;
+    height: 280px;
+    object-fit: cover;
+    object-position: center;
+    border-radius: 28px 28px 0 0;
+    display: block;
+  }
+
+  .story-body {
+    padding: 36px 40px 40px;
+  }
+  .story-date {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--sakura-dark);
+    margin-bottom: 10px;
+  }
+  .story-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1.2;
+    margin-bottom: 24px;
+  }
+  .story-text {
+    font-size: 15.5px;
+    color: var(--text-mid);
+    line-height: 1.85;
+  }
+  .story-text p {
+    margin-bottom: 16px;
+  }
+  .story-text p:last-child { margin-bottom: 0; }
+  .story-text .dialogue {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    color: var(--text-dark);
+  }
+  .story-divider {
+    width: 40px;
+    height: 2px;
+    background: var(--sakura);
+    border-radius: 2px;
+    margin: 28px 0;
+  }
+  .story-close {
+    position: sticky;
+    top: 16px;
+    float: right;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid var(--border);
+    color: var(--text-dark);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    margin: 14px 14px 0 0;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .story-close:hover { background: #fff; }
+  @media (max-width: 600px) {
+    .story-body { padding: 24px 22px 28px; }
+    .story-cover { height: 200px; }
+    .story-btn { bottom: 20px; right: 20px; padding: 11px 18px; font-size: 13px; }
+  }
   @media (max-width: 900px) {
     .bento { grid-template-columns: repeat(6, 1fr); }
     .card-tagline, .card-story, .card-location,
@@ -868,6 +1009,43 @@
   </div>
 </footer>
 
+<!-- ── TODAY'S STORY BUTTON ── -->
+<button class="story-btn" onclick="openStory()">
+  <div class="btn-dot"></div>
+  Today's café story
+</button>
+
+<!-- ── STORY MODAL ── -->
+<div class="story-overlay" id="storyOverlay" onclick="closeOnOverlay(event)">
+  <div class="story-modal" id="storyModal">
+    <button class="story-close" onclick="closeStory()">✕</button>
+    <img class="story-cover"
+      src="https://drive.google.com/thumbnail?id=1DZ9YH1wtwJTIVBHLDypoWYzqd7507hc0&sz=w1200"
+      onerror="this.src='https://drive.google.com/uc?export=view&id=1DZ9YH1wtwJTIVBHLDypoWYzqd7507hc0'"
+      alt="Eid Morning at Sakura Slice">
+    <div class="story-body">
+      <div class="story-date" id="storyDate"></div>
+      <h2 class="story-title">Eid Morning at Sakura Slice</h2>
+      <div class="story-divider"></div>
+      <div class="story-text">
+        <p>The café smelled like cardamom and matcha the morning of Eid.</p>
+        <p>Yuto had come in an hour early to hang paper lanterns along the window — little pink ones that swayed whenever the door opened. Yuki had stayed up the night before baking maamoul-shaped mochi, dusted in powdered sugar, lined up on the counter like tiny moons.</p>
+        <p>By nine, the corner table was already full.</p>
+        <p>Hana had pushed two tables together without being asked — she always knew. Nour and her cousins arrived in matching white kaftans, laughing before they were even through the door. Kareem came with his grandmother, who held her handbag in both hands and looked around the café slowly, the way people do when something is more beautiful than they expected. She sat down and said nothing for a moment, then smiled and said: <span class="dialogue">this place feels like a hug.</span></p>
+        <p>The morning letters had gone out at sunrise. A few people came in clutching their phones, showing the email to Yuki like it was something they wanted to keep. <span class="dialogue">That line made me cry a little,</span> one of them said. Yuki handed her a mochi and said, <span class="dialogue">that's what they're for.</span></p>
+        <p>Outside, the streets were loud with Eid greetings. Inside, it was the softer kind of celebration — the kind that happens between sips, between catching up, between someone refilling your cup before you even noticed it was empty.</p>
+        <p>Me3temed sat at the bar for a moment, watching it all. Old friends finding new seats. A grandmother trying matcha for the first time. Two kids sharing one waffle, neither willing to admit the other got the bigger half.</p>
+        <p>He thought: <span class="dialogue">this is exactly what I imagined.</span></p>
+        <p>Hana appeared beside him and set down a small cup. <span class="dialogue">Your order,</span> she said.</p>
+        <p><span class="dialogue">I didn't order anything.</span></p>
+        <p><span class="dialogue">I know.</span> She smiled and walked back to the tables.</p>
+        <p>He held the cup with both hands.</p>
+        <p>Outside, the lanterns swayed.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   // ── Petals
   const petalsContainer = document.getElementById('petals');
@@ -929,6 +1107,24 @@
   document.getElementById('emailInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') submitEmail();
   });
+
+  // ── Story modal
+  function openStory() {
+    const overlay = document.getElementById('storyOverlay');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    // Set today's date
+    const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    document.getElementById('storyDate').textContent = '🌸 Today · ' + date;
+  }
+  function closeStory() {
+    document.getElementById('storyOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function closeOnOverlay(e) {
+    if (e.target === document.getElementById('storyOverlay')) closeStory();
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeStory(); });
 </script>
 </body>
 </html>
