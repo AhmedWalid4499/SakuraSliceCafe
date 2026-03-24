@@ -576,7 +576,7 @@
     z-index: 1;
     background: var(--cream);
     border-top: 1px solid var(--border);
-    padding: 36px 40px;
+    padding: 36px 220px 36px 40px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -759,13 +759,129 @@
     .tc-me3temed, .tc-yuto, .tc-yuki, .tc-hana { grid-column: span 1; grid-row: auto; }
     .hero-content { padding: 0 28px 48px; }
     .section { padding: 60px 24px; }
+    .book-card-img, .book-card-info, .book-card-quote, .book-card-who {
+      grid-column: span 6; grid-row: auto;
+    }
   }
   @media (max-width: 600px) {
     .team-bento { grid-template-columns: 1fr; }
     .tc-me3temed, .tc-yuto, .tc-yuki, .tc-hana { grid-column: span 1; }
     .bento { gap: 12px; }
-    .footer { flex-direction: column; align-items: flex-start; }
+    .footer { flex-direction: column; align-items: flex-start; padding: 36px 40px 100px; }
     .footer-right { text-align: left; }
+    .book-card-img, .book-card-info, .book-card-quote, .book-card-who {
+      grid-column: span 12;
+    }
+    .bookshelf-inner { padding: 0 24px; }
+  }
+
+  /* ── BOOKSHELF ── */
+  .bookshelf-section {
+    position: relative;
+    z-index: 1;
+    background: var(--sakura-light);
+    padding: 80px 0;
+  }
+  .bookshelf-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(to right, transparent, var(--sakura-dark), transparent);
+  }
+  .bookshelf-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+  .bookshelf-inner .section-label { color: var(--sakura-dark); }
+  .bookshelf-inner .section-title { margin-bottom: 48px; }
+
+  .book-bento {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-auto-rows: 80px;
+    gap: 16px;
+  }
+  .book-card-img   { grid-column: span 5; grid-row: span 5; }
+  .book-card-info  { grid-column: span 4; grid-row: span 3; }
+  .book-card-quote { grid-column: span 3; grid-row: span 3; }
+  .book-card-who   { grid-column: span 7; grid-row: span 2; }
+
+  .book-card {
+    background: var(--warm-white);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .book-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+
+  .book-card-img { padding: 0; }
+  .book-card-img img {
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: center;
+    display: block; border-radius: 20px;
+    filter: brightness(0.95) saturate(1.05);
+    transition: filter 0.4s;
+  }
+  .book-card-img:hover img { filter: brightness(1) saturate(1.1); }
+
+  .book-card-info {
+    padding: 26px 28px;
+    display: flex; flex-direction: column; justify-content: center; gap: 10px;
+    background: linear-gradient(135deg, #f9e0ea 0%, #fdf5f8 100%);
+    border: 1.5px solid rgba(212,103,138,0.2);
+  }
+  .book-genre {
+    font-size: 10px; font-weight: 700; letter-spacing: 4px;
+    text-transform: uppercase; color: var(--sakura-dark);
+  }
+  .book-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px; font-weight: 700;
+    color: var(--text-dark); line-height: 1.25;
+  }
+  .book-author { font-size: 13px; color: var(--text-soft); font-style: italic; }
+  .book-desc { font-size: 13px; color: var(--text-mid); line-height: 1.65; margin-top: 4px; }
+
+  .book-card-quote {
+    padding: 24px 26px;
+    display: flex; flex-direction: column; justify-content: center; gap: 10px;
+    background: linear-gradient(135deg, #2d1f1f 0%, #3d2525 100%);
+  }
+  .book-quote-mark {
+    font-family: 'Playfair Display', serif;
+    font-size: 48px; color: var(--sakura); line-height: 0.8; opacity: 0.6;
+  }
+  .book-quote-text {
+    font-family: 'Dancing Script', cursive;
+    font-size: 16px; color: var(--sakura-light); line-height: 1.6;
+  }
+
+  .book-card-who {
+    padding: 22px 28px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .book-who-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--text-soft); flex-shrink: 0;
+  }
+  .book-who-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .book-who-tag {
+    background: var(--sakura-light);
+    border: 1px solid rgba(212,103,138,0.2);
+    color: var(--sakura-dark);
+    font-size: 12px; font-weight: 600;
+    padding: 5px 13px; border-radius: 20px;
+  }
+  .book-who-tag.first-picker {
+    background: var(--sakura-dark); color: #fff; border-color: var(--sakura-dark);
+  }
+  .book-shelf-note {
+    margin-left: auto; font-size: 12px;
+    color: var(--text-soft); font-style: italic;
   }
 </style>
 </head>
@@ -989,6 +1105,51 @@
   </div>
 </section>
 
+<!-- ── OUR BOOKSHELF ── -->
+<section class="bookshelf-section">
+  <div class="bookshelf-inner">
+    <p class="section-label">Our Bookshelf</p>
+    <h2 class="section-title">Books we love &<br><em>will always recommend.</em></h2>
+
+    <div class="book-bento">
+
+      <!-- Photo card -->
+      <div class="book-card book-card-img">
+        <img
+          src="https://drive.google.com/thumbnail?id=1uHKSU0iqMQOPF78ZMqVNf2MhGB3Nsgwe&sz=w800"
+          alt="The team with Project Hail Mary">
+      </div>
+
+      <!-- Book info card -->
+      <div class="book-card book-card-info">
+        <span class="book-genre">🚀 Sci-Fi · Adventure</span>
+        <div class="book-title">Project Hail Mary</div>
+        <div class="book-author">Andy Weir</div>
+        <div class="book-desc">A man wakes up alone in space with no memory of who he is or how he got there. What follows is one of the most extraordinary friendships ever written — across species, across language, across everything.</div>
+      </div>
+
+      <!-- Quote card -->
+      <div class="book-card book-card-quote">
+        <div class="book-quote-mark">"</div>
+        <div class="book-quote-text">About the kind of friendship that needs no language. About what it means to be the only one left and choose, anyway, to keep going.</div>
+      </div>
+
+      <!-- Who loves it card -->
+      <div class="book-card book-card-who">
+        <span class="book-who-label">Loved by</span>
+        <div class="book-who-tags">
+          <span class="book-who-tag first-picker">🌟 Yuto — first pick</span>
+          <span class="book-who-tag">Hana</span>
+          <span class="book-who-tag">Yuki</span>
+          <span class="book-who-tag">Me3temed</span>
+        </div>
+        <span class="book-shelf-note">More books coming soon 🌸</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
 <!-- ── FOOTER ── -->
 <footer class="footer">
   <div class="footer-left">
@@ -1005,7 +1166,7 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
       @sakuraslicecafe
     </a><br>
-    © 2024 Ahmed El-Bourgy &nbsp;·&nbsp; Made with 🌸 & matcha
+    © 2026 Ahmed El-Bourgy &nbsp;·&nbsp; Made with 🌸 & matcha
   </div>
 </footer>
 
