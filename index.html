@@ -775,6 +775,194 @@
     .bookshelf-inner { padding: 0 24px; }
   }
 
+  /* ── THIS MONTH'S READ ── */
+  .monthly-section {
+    position: relative;
+    z-index: 1;
+    background: var(--warm-white);
+    padding: 80px 0;
+  }
+  .monthly-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(to right, transparent, var(--matcha), transparent);
+  }
+  .monthly-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+  .monthly-inner .section-label { color: var(--matcha-dark); }
+
+  /* Top strip: book cover + countdown + month badge */
+  .monthly-hero {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 32px;
+    align-items: start;
+    margin-bottom: 40px;
+  }
+  .monthly-cover-wrap {
+    position: relative;
+  }
+  .monthly-cover {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+    display: block;
+  }
+  .monthly-badge {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    background: var(--matcha-dark);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(77,122,77,0.3);
+  }
+  .monthly-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+    padding-top: 8px;
+  }
+  .monthly-month-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--matcha-dark);
+  }
+  .monthly-book-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1.15;
+  }
+  .monthly-book-author {
+    font-size: 15px;
+    color: var(--text-soft);
+    font-style: italic;
+  }
+  .monthly-book-desc {
+    font-size: 14.5px;
+    color: var(--text-mid);
+    line-height: 1.75;
+    max-width: 560px;
+  }
+
+  /* Countdown */
+  .monthly-countdown {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .countdown-number {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(64px, 8vw, 100px);
+    font-weight: 700;
+    color: var(--matcha-dark);
+    line-height: 1;
+  }
+  .countdown-label {
+    font-size: 13px;
+    color: var(--text-soft);
+    font-weight: 600;
+    padding-bottom: 14px;
+    line-height: 1.4;
+  }
+
+  /* Reviews bento */
+  .monthly-reviews {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .review-card {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: var(--shadow);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .review-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+  }
+  .review-card.dark {
+    background: linear-gradient(135deg, #2d1f1f 0%, #3d2525 100%);
+    border-color: rgba(255,255,255,0.06);
+  }
+  .review-card.matcha {
+    background: linear-gradient(135deg, #e8f5e8 0%, #f4faf4 100%);
+    border: 1.5px solid rgba(77,122,77,0.2);
+  }
+  .review-card.sakura {
+    background: linear-gradient(135deg, #f9e0ea 0%, #fdf5f8 100%);
+    border: 1.5px solid rgba(212,103,138,0.2);
+  }
+  .review-who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .review-emoji { font-size: 22px; }
+  .review-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+  .review-card.dark .review-name { color: #fff; }
+  .review-role {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    font-weight: 600;
+  }
+  .review-card.dark .review-role { color: rgba(255,255,255,0.45); }
+  .review-text {
+    font-size: 13.5px;
+    color: var(--text-mid);
+    line-height: 1.7;
+    flex: 1;
+  }
+  .review-card.dark .review-text { color: rgba(255,255,255,0.65); }
+  .review-stars {
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: var(--sakura-dark);
+  }
+  .review-card.dark .review-stars { color: var(--sakura); }
+
+  @media (max-width: 900px) {
+    .monthly-hero { grid-template-columns: 160px 1fr; }
+    .monthly-reviews { grid-template-columns: repeat(2, 1fr); }
+    .monthly-inner { padding: 0 24px; }
+  }
+  @media (max-width: 600px) {
+    .monthly-hero { grid-template-columns: 1fr; }
+    .monthly-cover-wrap { max-width: 200px; }
+    .monthly-reviews { grid-template-columns: 1fr; }
+  }
+
   /* ── BOOKSHELF ── */
   .bookshelf-section {
     position: relative;
@@ -882,6 +1070,42 @@
   .book-shelf-note {
     margin-left: auto; font-size: 12px;
     color: var(--text-soft); font-style: italic;
+  }
+
+  /* Tabs */
+  .shelf-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 36px;
+  }
+  .shelf-tab {
+    background: var(--warm-white);
+    border: 1.5px solid var(--border);
+    border-radius: 50px;
+    padding: 8px 20px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .shelf-tab:hover {
+    border-color: var(--sakura-dark);
+    color: var(--sakura-dark);
+  }
+  .shelf-tab.active {
+    background: var(--sakura-dark);
+    border-color: var(--sakura-dark);
+    color: #fff;
+  }
+
+  /* Book grid — stacked entries */
+  .book-grid { display: flex; flex-direction: column; gap: 24px; }
+  .book-item { transition: opacity 0.3s ease, transform 0.3s ease; }
+  .book-item.hidden {
+    display: none;
   }
 </style>
 </head>
@@ -1105,48 +1329,183 @@
   </div>
 </section>
 
+<!-- ── THIS MONTH'S READ ── -->
+<section class="monthly-section">
+  <div class="monthly-inner">
+    <p class="section-label">This Month's Read</p>
+    <h2 class="section-title">What we're all<br><em>reading right now.</em></h2>
+
+    <div class="monthly-hero">
+
+      <!-- Book cover -->
+      <div class="monthly-cover-wrap">
+        <img class="monthly-cover"
+          src="https://drive.google.com/thumbnail?id=1fmn3arpxSqyb0dWZn6gk8sjGDy_16qGo&sz=w600"
+          alt="Immortal Consequences">
+        <span class="monthly-badge" id="monthBadge">April's Read</span>
+      </div>
+
+      <!-- Book details + countdown -->
+      <div class="monthly-details">
+        <span class="monthly-month-label" id="monthLabel">April 2026</span>
+        <div class="monthly-book-title">Immortal Consequences</div>
+        <div class="monthly-book-author">This month's café pick</div>
+        <div class="monthly-book-desc">A book that found its way onto the shelf and refused to leave. We're reading it together — in the mornings before opening, in the quiet hours between orders, in the way all good books get read: slowly, and then all at once.</div>
+
+        <!-- Countdown -->
+        <div class="monthly-countdown">
+          <div class="countdown-number" id="countdownNumber">—</div>
+          <div class="countdown-label">days left<br>till we finish reading</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Character reviews -->
+    <div class="monthly-reviews">
+
+      <!-- Yuto -->
+      <div class="review-card matcha">
+        <div class="review-who">
+          <span class="review-emoji">🌿</span>
+          <div>
+            <div class="review-name">Yuto</div>
+            <div class="review-role">Founder & Soul</div>
+          </div>
+        </div>
+        <div class="review-text">The kind of book that asks you to sit with questions that don't resolve. I read the first chapter twice — not because I didn't understand it, but because I wanted to stay inside it a little longer. There's something in here about what we carry forward and what we're allowed to let go. I think about it between sessions.</div>
+        <div class="review-stars">★★★★★</div>
+      </div>
+
+      <!-- Me3temed -->
+      <div class="review-card dark">
+        <div class="review-who">
+          <span class="review-emoji">🦉</span>
+          <div>
+            <div class="review-name">Me3temed</div>
+            <div class="review-role">Founder & Soul</div>
+          </div>
+        </div>
+        <div class="review-text">He sat with it for three evenings without moving except to occasionally shift his weight from one foot to the other. On the fourth evening he made the sound he makes when something has genuinely surprised him. We have not been able to get him to elaborate. We think this is the review.</div>
+        <div class="review-stars">★★★★★</div>
+      </div>
+
+      <!-- Hana -->
+      <div class="review-card sakura">
+        <div class="review-who">
+          <span class="review-emoji">🦊</span>
+          <div>
+            <div class="review-name">Hana</div>
+            <div class="review-role">Head Barista</div>
+          </div>
+        </div>
+        <div class="review-text">I recommended it to three regulars before I'd even finished it myself. That should tell you everything. The characters feel like people you've already met — not in a familiar way, in a remembered way. Like running into someone you didn't realise you'd been missing.</div>
+        <div class="review-stars">★★★★★</div>
+      </div>
+
+      <!-- Yuki -->
+      <div class="review-card">
+        <div class="review-who">
+          <span class="review-emoji">🐇</span>
+          <div>
+            <div class="review-name">Yuki</div>
+            <div class="review-role">Pastry Chef</div>
+          </div>
+        </div>
+        <div class="review-text">I stayed at table four until closing to finish it and then sat in the dark for a few minutes afterward just to be somewhere quiet. I don't want to say too much. I think it needs to find you the way it found me — unexpectedly, at exactly the right moment. Just read it. 🌸</div>
+        <div class="review-stars">★★★★★</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
 <!-- ── OUR BOOKSHELF ── -->
 <section class="bookshelf-section">
   <div class="bookshelf-inner">
     <p class="section-label">Our Bookshelf</p>
     <h2 class="section-title">Books we love &<br><em>will always recommend.</em></h2>
 
-    <div class="book-bento">
-
-      <!-- Photo card -->
-      <div class="book-card book-card-img">
-        <img
-          src="https://drive.google.com/thumbnail?id=1uHKSU0iqMQOPF78ZMqVNf2MhGB3Nsgwe&sz=w800"
-          alt="The team with Project Hail Mary">
-      </div>
-
-      <!-- Book info card -->
-      <div class="book-card book-card-info">
-        <span class="book-genre">🚀 Sci-Fi · Adventure</span>
-        <div class="book-title">Project Hail Mary</div>
-        <div class="book-author">Andy Weir</div>
-        <div class="book-desc">A man wakes up alone in space with no memory of who he is or how he got there. What follows is one of the most extraordinary friendships ever written — across species, across language, across everything.</div>
-      </div>
-
-      <!-- Quote card -->
-      <div class="book-card book-card-quote">
-        <div class="book-quote-mark">"</div>
-        <div class="book-quote-text">About the kind of friendship that needs no language. About what it means to be the only one left and choose, anyway, to keep going.</div>
-      </div>
-
-      <!-- Who loves it card -->
-      <div class="book-card book-card-who">
-        <span class="book-who-label">Loved by</span>
-        <div class="book-who-tags">
-          <span class="book-who-tag first-picker">🌟 Yuto — first pick</span>
-          <span class="book-who-tag">Hana</span>
-          <span class="book-who-tag">Yuki</span>
-          <span class="book-who-tag">Me3temed</span>
-        </div>
-        <span class="book-shelf-note">More books coming soon 🌸</span>
-      </div>
-
+    <!-- Staff tabs -->
+    <div class="shelf-tabs" id="shelfTabs">
+      <button class="shelf-tab active" onclick="filterShelf('all')">✨ All</button>
+      <button class="shelf-tab" onclick="filterShelf('yuto')">Yuto</button>
+      <button class="shelf-tab" onclick="filterShelf('yuki')">Yuki</button>
+      <button class="shelf-tab" onclick="filterShelf('hana')">Hana</button>
+      <button class="shelf-tab" onclick="filterShelf('me3temed')">Me3temed</button>
     </div>
+
+    <!-- Book grid -->
+    <div class="book-grid" id="bookGrid">
+
+      <!-- ── PROJECT HAIL MARY ── -->
+      <div class="book-item" data-recommender="yuto" data-loved="yuto,hana,yuki,me3temed">
+        <div class="book-bento">
+
+          <div class="book-card book-card-img">
+            <img
+              src="https://drive.google.com/thumbnail?id=1uHKSU0iqMQOPF78ZMqVNf2MhGB3Nsgwe&sz=w800"
+              alt="The team with Project Hail Mary">
+          </div>
+
+          <div class="book-card book-card-info">
+            <span class="book-genre">🚀 Sci-Fi · Adventure</span>
+            <div class="book-title">Project Hail Mary</div>
+            <div class="book-author">Andy Weir</div>
+            <div class="book-desc">A man wakes up alone in space with no memory of who he is or how he got there. What follows is one of the most extraordinary friendships ever written — across species, across language, across everything.</div>
+          </div>
+
+          <div class="book-card book-card-quote">
+            <div class="book-quote-mark">"</div>
+            <div class="book-quote-text">About the kind of friendship that needs no language. About what it means to be the only one left and choose, anyway, to keep going.</div>
+          </div>
+
+          <div class="book-card book-card-who">
+            <span class="book-who-label">Loved by</span>
+            <div class="book-who-tags">
+              <span class="book-who-tag first-picker">🌟 Yuto — first pick</span>
+              <span class="book-who-tag">Hana</span>
+              <span class="book-who-tag">Yuki</span>
+              <span class="book-who-tag">Me3temed</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── A STUDY IN DROWNING ── -->
+      <div class="book-item" data-recommender="yuki" data-loved="yuki">
+        <div class="book-bento">
+
+          <div class="book-card book-card-img">
+            <img
+              src="https://drive.google.com/thumbnail?id=1YM0tX8bSudEE4UloqWO4UZXgHRImqG_B&sz=w800"
+              alt="A Study in Drowning">
+          </div>
+
+          <div class="book-card book-card-info">
+            <span class="book-genre">🌊 Dark Fantasy · Literary</span>
+            <div class="book-title">A Study in Drowning</div>
+            <div class="book-author">Ava Reid</div>
+            <div class="book-desc">A young woman travels to the crumbling estate of a legendary author to catalog his manuscripts — and finds herself tangled in folklore, obsession, and a story that may not be finished with her. Haunting, lush, and impossible to put down.</div>
+          </div>
+
+          <div class="book-card book-card-quote">
+            <div class="book-quote-mark">"</div>
+            <div class="book-quote-text">The kind of book that follows you home and rearranges the furniture while you sleep.</div>
+          </div>
+
+          <div class="book-card book-card-who">
+            <span class="book-who-label">Loved by</span>
+            <div class="book-who-tags">
+              <span class="book-who-tag first-picker">🌟 Yuki — chain recommended</span>
+            </div>
+            <span class="book-shelf-note">More books coming soon 🌸</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- end book-grid -->
   </div>
 </section>
 
@@ -1181,29 +1540,47 @@
   <div class="story-modal" id="storyModal">
     <button class="story-close" onclick="closeStory()">✕</button>
     <img class="story-cover"
-      src="https://drive.google.com/thumbnail?id=18PqAasBIc5pJSMW5RSzBnzlloPApCvAN&sz=w1200"
-      onerror="this.src='https://drive.google.com/uc?export=view&id=18PqAasBIc5pJSMW5RSzBnzlloPApCvAN'"
-      alt="Table Four at Sakura Slice">
+      src="https://drive.google.com/thumbnail?id=1qcnY-7Q5ZHpSjhT_vnHKLrsM6TB4bTHy&sz=w1200"
+      onerror="this.src='https://drive.google.com/uc?export=view&id=1qcnY-7Q5ZHpSjhT_vnHKLrsM6TB4bTHy'"
+      alt="The Tuesday Morning Lecture">
     <div class="story-body">
       <div class="story-date" id="storyDate"></div>
-      <h2 class="story-title">Table Four.</h2>
+      <h2 class="story-title">The Tuesday Morning Lecture.</h2>
       <div class="story-divider"></div>
       <div class="story-text">
-        <p>there is a table at Sakura Slice — table four, the one by the sakura tree window — that has never once been empty on a spring Saturday morning. 🌸</p>
-        <p>we've talked about this amongst ourselves.</p>
-        <p>the café opens at eight on Saturdays. table four is always claimed by eight-oh-three. sometimes earlier.</p>
-        <p>it's not always the same people. 🌿</p>
-        <p>a grandmother and her granddaughter reading together. a man with a crossword who comes every week and always orders the same thing. two friends with laptops who don't actually look at them much. a woman who brings knitting and a thermos of her own tea and just sits — which we have decided is completely fine.</p>
-        <p>the table has seen proposals. one that worked, one that very clearly didn't — that Saturday was difficult. it has seen first dates and last ones. thesis chapters written and abandoned and written again.</p>
-        <p>I asked Yuto once why he thought that particular table was so beloved.</p>
-        <p>he looked at it for a long time.</p>
-        <p><span class="dialogue">"the light,"</span> he said finally. <span class="dialogue">"on spring Saturday mornings, the light hits it differently. it makes everything look a little more possible."</span> ☀️</p>
-        <p>we believe him. we've seen the effect ourselves.</p>
-        <p>Me3temed never sits anywhere else on Saturday mornings. 🦉</p>
-        <p>nobody assigned him table four. he just knows.</p>
-        <p>if you ever come in on a spring Saturday morning and table four is empty — you should know that you are the first person to find it that way in a very long time.</p>
-        <p>sit down. 🌸</p>
-        <p><em>the light will find you.</em></p>
+        <p>Yuto's alarm goes off at 6:45 on Tuesday mornings.</p>
+        <p>Me3temed is always already awake.</p>
+        <p>He doesn't explain how. He is simply there — perched on the edge of the desk, watching the room with his soft half-open eyes, waiting for the morning to be officially acknowledged. When the alarm goes off and Yuto reaches to turn it off, Me3temed makes a small sound that means: <em>finally.</em></p>
+        <p>By 7:15 they are both ready. Yuto in jeans and a clean shirt — the specific clothes of someone who is not quite a student and not quite a professor but something warmer than either. Me3temed in his café apron, which he refuses to remove even on university days, plus — for occasions of academic seriousness — a tiny pair of glasses that Yuto found for him in a curiosity shop in Khan el Khalili and which fit, against all reasonable expectation, perfectly.</p>
+        <p>They match. They have been told this. They do not disagree.</p>
+        <p>The drive to the university takes twenty minutes on a good Cairo morning, thirty-five on a Tuesday. They take it without complaint. Me3temed watches Cairo through the window the way he watches everything — quietly, completely, missing nothing. 🌿</p>
+        <p>The classroom smells like old books and whiteboard marker and the specific dusty warmth of a room that has held a lot of thinking.</p>
+        <p>Yuto loves it immediately, every time.</p>
+        <p>He sets his bag down. Opens his laptop. Writes one thing on the board before anyone arrives — not a topic, not an agenda. Just a question. The kind that doesn't have a clean answer and knows it.</p>
+        <p>The students come in slowly, the way students do at 9am — some still carrying coffee, some clearly having decided that presence counts as participation, a few already looking at him with the expression of people who came ready and are glad to be here.</p>
+        <p>Me3temed settles on Yuto's left shoulder. Adjusts his glasses. Surveys the room.</p>
+        <p>He has decided he is co-teaching. Yuto has not corrected this. 🦉</p>
+        <p>What Yuto loves about teaching — the thing he couldn't have explained before he started but now couldn't unknow — is the moment a room changes.</p>
+        <p>It doesn't always happen. Some sessions are good and practical and useful and that is enough. But sometimes — maybe once in a few weeks, maybe more — something shifts. A student says something that reframes the whole discussion. A question opens a door everyone was standing in front of without noticing. The room stops being a room full of people who showed up and becomes something else: a room full of people who are thinking together, following something, pulled forward by the same thread.</p>
+        <p>Those moments, Yuto has learned, cannot be manufactured. They can only be created conditions for.</p>
+        <p>So he creates conditions. He asks the strange questions. He leaves space after them. He doesn't fill the silence too quickly because he has learned that silence, attended to carefully, is often just a thought finishing its sentence.</p>
+        <p>Me3temed, on his shoulder, watches all of it with his steady eyes. Occasionally a student notices the small owl in the tiny glasses and loses their train of thought entirely. Yuto has factored this into the pacing. 🌸</p>
+        <p>By eleven the session is done. The students gather their things slowly — the ones who are in no rush to leave are, in Yuto's experience, always the ones who got something from it, even if they couldn't say what yet.</p>
+        <p>One student stops at the door.</p>
+        <p><span class="dialogue">I've been thinking about that question you asked last week,</span> she says. <span class="dialogue">I think I finally have something like an answer.</span></p>
+        <p><span class="dialogue">Tell me next time,</span> Yuto says. <span class="dialogue">I want to hear it.</span></p>
+        <p>She nods and goes. Me3temed watches her leave.</p>
+        <p><em>Good one,</em> Me3temed says, in the way he says things — which is not in words, but in the specific stillness that means: yes. that was the right thing.</p>
+        <p>They stop at the café on the way back.</p>
+        <p>Not because they have to. Because it is where the day makes sense when they get back to it. Yuto unlocks the door. Puts the kettle on. Sits at table four for ten minutes before anyone arrives — the way Yuki does on Fridays, giving the space its five minutes to remember what it is.</p>
+        <p>Me3temed removes his academic glasses. Returns to his corner stool. Looks out the window at the Cairo afternoon with the expression of someone who has had a full morning and is exactly where he is supposed to be.</p>
+        <p>Yuto writes one thing in his notebook — not notes from the session, not a task, just a sentence. Something one of the students said that he wants to keep.</p>
+        <p>The café begins to fill.</p>
+        <p>The Tuesday continues.</p>
+        <p>Some days, Yuto thinks, are the kind that remind you why you chose everything you chose. The university in the morning, the café in the afternoon, the questions in between. The students who stop at the door. The small owl in the tiny glasses who watches it all and says nothing and means everything.</p>
+        <p>Those days, he has learned, are not rare.</p>
+        <p>They are Tuesdays.</p>
+        <p><em>They are always Tuesdays.</em> 🌿🌸</p>
       </div>
     </div>
   </div>
@@ -1271,7 +1648,41 @@
     if (e.key === 'Enter') submitEmail();
   });
 
-  // ── Story modal
+  // ── This Month's Read countdown
+  (function() {
+    const now = new Date();
+
+    // Target: end of April 2026 (month 3 = April, day 0 of May = last day of April)
+    const readEnd = new Date(2026, 4, 0, 23, 59, 59); // April 30 23:59:59
+    const daysLeft = Math.ceil((readEnd - now) / (1000 * 60 * 60 * 24));
+
+    document.getElementById('countdownNumber').textContent = daysLeft;
+    document.getElementById('monthLabel').textContent = 'April 2026';
+    document.getElementById('monthBadge').textContent = "April's Read";
+  })();
+
+  // ── Bookshelf filter
+  function filterShelf(person) {
+    // Update active tab
+    document.querySelectorAll('.shelf-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+
+    // Show/hide books
+    document.querySelectorAll('.book-item').forEach(item => {
+      if (person === 'all') {
+        item.classList.remove('hidden');
+      } else {
+        const recommender = item.dataset.recommender;
+        const loved = item.dataset.loved.split(',');
+        // Only show books this person specifically recommended (first pick / chain rec)
+        if (recommender === person) {
+          item.classList.remove('hidden');
+        } else {
+          item.classList.add('hidden');
+        }
+      }
+    });
+  }
   function openStory() {
     const overlay = document.getElementById('storyOverlay');
     overlay.classList.add('open');
