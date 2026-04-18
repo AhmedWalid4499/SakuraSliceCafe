@@ -1299,11 +1299,9 @@
 
       <!-- Hana — tall, right anchor -->
       <div class="team-card tc-hana">
-        <iframe
-          src="https://drive.google.com/file/d/1VcJRZFXh402vvlGJGc0vJFyXgal83iiL/preview"
-          style="border:none; pointer-events:none; width:100%; aspect-ratio:1/1; display:block; flex-shrink:0;"
-          allow="autoplay">
-        </iframe>
+        <img class="team-card-img"
+          src="https://drive.google.com/thumbnail?id=1VcJRZFXh402vvlGJGc0vJFyXgal83iiL&sz=w600"
+          alt="Hana">
         <div class="team-card-body">
           <div class="team-card-role">Head Barista</div>
           <div class="team-card-name">Hana</div>
@@ -1605,7 +1603,7 @@
 
   // ── Email submission → Google Sheets via Apps Script
   // 🔧 REPLACE THIS URL after you deploy the Apps Script web app:
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwwmW2K_Ezb9q4CPyWkxz6Z8hU4NEXIcO4CsFqB7VqDVcTKcmdGkWwUN0pl6E648rLa/exec';
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyPx6TziWg6PjpNiW15YAa8aE5jJuElxhL6hOYpnDxKGxtQ8xF9nLZYt3Q_u0vvxbn3/exec';
 
   async function submitEmail() {
     const input = document.getElementById('emailInput');
@@ -1629,7 +1627,7 @@
       await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ email })
       });
       // no-cors means we can't read the response, so we optimistically show success
