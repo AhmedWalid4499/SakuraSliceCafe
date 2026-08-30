@@ -209,7 +209,7 @@
   .bento {
     display: grid;
     grid-template-columns: repeat(12, 1fr);
-    grid-auto-rows: 80px;
+    grid-auto-rows: minmax(80px, auto);
     gap: 16px;
   }
 
@@ -229,12 +229,135 @@
   }
 
   /* Card sizing */
+  .card-cairo     { grid-column: span 12; grid-row: span 2; }
+  .card-now       { grid-column: span 7; grid-row: span 4; }
   .card-tagline   { grid-column: span 5; grid-row: span 4; }
-  .card-story     { grid-column: span 7; grid-row: span 4; }
-  .card-location  { grid-column: span 6; grid-row: span 3; }
-  .card-vibe      { grid-column: span 6; grid-row: span 3; }
-  .card-menu-peek { grid-column: span 6; grid-row: span 4; }
-  .card-email     { grid-column: span 6; grid-row: span 4; }
+  .card-letters   { grid-column: span 7; grid-row: span 5; }
+  .card-story     { grid-column: span 5; grid-row: span 5; }
+  .card-table     { grid-column: span 7; grid-row: span 4; }
+  .card-window    { grid-column: span 5; grid-row: span 4; }
+  .card-menu-peek { grid-column: span 12; grid-row: span 2; }
+
+  /* ── Card: Cairo, right now (clock + weather) ── */
+  .card-cairo {
+    background: linear-gradient(120deg, #fff8f0 0%, #fdf0f4 55%, #f3f8f2 100%);
+    border: 1.5px solid rgba(242,167,187,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 26px;
+    flex-wrap: wrap;
+  }
+  .cairo-time { display: flex; flex-direction: column; gap: 3px; }
+  .cairo-label {
+    font-size: 10.5px; font-weight: 700;
+    letter-spacing: 4px; text-transform: uppercase;
+    color: var(--sakura-dark);
+    display: flex; align-items: center; gap: 7px;
+  }
+  .cairo-label::after {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--sakura-dark);
+    animation: pulseDot 2s ease infinite;
+  }
+  .cairo-date {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(23px, 3vw, 33px);
+    font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1.15;
+  }
+  .cairo-clock {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(19px, 2.4vw, 26px);
+    font-style: italic;
+    color: var(--sakura-dark);
+    font-variant-numeric: tabular-nums;
+  }
+  .cairo-weather {
+    display: flex; align-items: center; gap: 16px;
+    text-align: left;
+    max-width: 430px;
+  }
+  .cairo-wx-icon { font-size: 44px; line-height: 1; flex-shrink: 0; }
+  .cairo-wx-temp {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px; font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1;
+    margin-bottom: 3px;
+  }
+  .cairo-wx-cond {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 2.5px; text-transform: uppercase;
+    color: var(--matcha-dark);
+    margin-bottom: 6px;
+  }
+  .cairo-wx-note {
+    font-size: 13px; color: var(--text-mid);
+    line-height: 1.6; font-style: italic;
+  }
+
+  /* ── Card: Right Now At The Café ── */
+  .card-now {
+    background: linear-gradient(135deg, #2d1f1f 0%, #3d2525 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .now-top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .now-status {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(122,171,122,0.16);
+    border: 1px solid rgba(122,171,122,0.35);
+    color: #b9d7b9;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    padding: 5px 13px; border-radius: 20px;
+  }
+  .card-now.is-closed .now-status {
+    background: rgba(242,167,187,0.13);
+    border-color: rgba(242,167,187,0.3);
+    color: var(--sakura-light);
+  }
+  .now-live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #7aab7a;
+    animation: pulseDot 2s ease infinite;
+  }
+  .card-now.is-closed .now-live-dot { background: var(--sakura); }
+  .now-hours {
+    font-size: 12px; color: rgba(255,255,255,0.42);
+    letter-spacing: 1.5px;
+  }
+  .now-line {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(19px, 2vw, 25px);
+    font-style: italic;
+    color: #fff;
+    line-height: 1.4;
+  }
+  .now-detail {
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.75;
+    flex: 1;
+  }
+  .now-who { display: flex; flex-wrap: wrap; gap: 7px; }
+  .now-chip {
+    background: rgba(242,167,187,0.13);
+    border: 1px solid rgba(242,167,187,0.25);
+    color: var(--sakura-light);
+    font-size: 12px;
+    padding: 4px 11px;
+    border-radius: 14px;
+  }
 
   /* Card: Tagline */
   .card-tagline {
@@ -244,21 +367,21 @@
     justify-content: center;
     align-items: center;
     text-align: center;
-    gap: 12px;
+    gap: 14px;
     border: 1.5px solid rgba(212,103,138,0.2);
   }
-  .card-tagline .big-emoji { font-size: 48px; display: block; margin-bottom: 4px; }
+  .card-tagline .big-emoji { font-size: 44px; display: block; }
   .card-tagline h2 {
     font-family: 'Playfair Display', serif;
-    font-size: 26px;
+    font-size: clamp(21px, 2.2vw, 26px);
     font-style: italic;
     color: var(--sakura-dark);
-    line-height: 1.3;
+    line-height: 1.35;
   }
   .card-tagline p {
     font-size: 14px;
     color: var(--text-mid);
-    line-height: 1.6;
+    line-height: 1.7;
   }
 
   /* Card: Story */
@@ -298,81 +421,300 @@
     margin-top: 8px;
   }
 
-  /* Card: Location */
-  .card-location {
-    background: linear-gradient(135deg, #e8f5e8 0%, #f4faf4 100%);
-    display: flex; flex-direction: column; justify-content: space-between;
-    border: 1.5px solid rgba(77,122,77,0.15);
+  /* ── Card: The Window Seat ── */
+  .card-window {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
-  .card-location .card-icon { font-size: 28px; }
-  .card-location h4 {
+  .window-pane {
+    position: relative;
+    flex: 1;
+    min-height: 150px;
+    background: var(--sky, linear-gradient(to bottom, #b9d3e8 0%, #f3dfe4 100%));
+    transition: background 1.2s ease;
+    overflow: hidden;
+  }
+  .window-orb {
+    position: absolute;
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    background: var(--orb, #fff3d6);
+    box-shadow: 0 0 50px 18px var(--orb-glow, rgba(255,243,214,0.55));
+    top: var(--orb-top, 30%);
+    right: 18%;
+    transition: top 1.2s ease, background 1.2s ease, box-shadow 1.2s ease;
+  }
+  /* Weather sits over the sky so the window agrees with the Cairo bar */
+  .window-weather {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    background: var(--wx, transparent);
+    transition: background 1.2s ease;
+  }
+  .window-mullion {
+    position: absolute; inset: 0;
+    pointer-events: none;
+  }
+  .window-mullion::before,
+  .window-mullion::after {
+    content: '';
+    position: absolute;
+    background: var(--warm-white);
+    box-shadow: 0 0 0 1px rgba(180,140,150,0.12);
+  }
+  .window-mullion::before { left: 50%; top: 0; bottom: 0; width: 7px; transform: translateX(-50%); }
+  .window-mullion::after  { top: 52%; left: 0; right: 0; height: 7px; transform: translateY(-50%); }
+  .window-sill {
+    padding: 20px 24px 22px;
+    background: var(--warm-white);
+    border-top: 1px solid var(--border);
+  }
+  .window-sill h4 {
     font-family: 'Playfair Display', serif;
-    font-size: 16px;
-    color: var(--matcha-dark);
-    margin: 4px 0 6px;
+    font-size: 17px;
+    color: var(--text-dark);
+    margin-bottom: 7px;
   }
-  .card-location p { font-size: 13px; color: var(--text-mid); line-height: 1.6; }
-  .map-badge {
-    display: inline-block;
-    background: var(--matcha-dark);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    padding: 5px 12px;
-    border-radius: 20px;
-    margin-top: 10px;
+  .window-sill p {
+    font-size: 13.5px;
+    color: var(--text-mid);
+    line-height: 1.7;
+  }
+  .window-hour {
+    display: block;
+    font-family: 'Dancing Script', cursive;
+    font-size: 16px;
+    color: var(--sakura-dark);
+    margin-top: 8px;
+  }
+
+  /* ── Card: The Letters ── */
+  .card-letters {
+    background: linear-gradient(135deg, #fff8f0 0%, #fef5f8 100%);
+    display: flex; flex-direction: column;
+    border: 1.5px solid rgba(242,167,187,0.3);
+    gap: 12px;
+  }
+  .email-header { display: flex; align-items: center; gap: 10px; }
+  .email-icon { font-size: 32px; flex-shrink: 0; }
+  .email-header h4 {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    color: var(--text-dark);
+  }
+  .email-header p { font-size: 12px; color: var(--text-soft); }
+
+  .letter-toggle {
+    display: flex;
+    gap: 6px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    padding: 4px;
     width: fit-content;
   }
-
-  /* Card: Vibe */
-  .card-vibe {
-    background: linear-gradient(135deg, #2d1f1f 0%, #3d2525 100%);
-    color: #fff;
-    display: flex; flex-direction: column; justify-content: space-between;
-  }
-  .card-vibe .card-icon { font-size: 28px; }
-  .card-vibe h4 {
-    font-family: 'Playfair Display', serif;
-    font-size: 16px;
-    color: var(--sakura-light);
-    margin: 4px 0 8px;
-  }
-  .vibe-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .vibe-tag {
-    background: rgba(242,167,187,0.2);
-    border: 1px solid rgba(242,167,187,0.3);
-    color: var(--sakura-light);
+  .letter-toggle button {
+    border: none;
+    background: transparent;
+    font-family: 'Nunito', sans-serif;
     font-size: 12px;
-    padding: 4px 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text-soft);
+    padding: 6px 16px;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: background 0.25s, color 0.25s;
+  }
+  .letter-toggle button.active { background: var(--sakura-dark); color: #fff; }
+  .letter-toggle button:not(.active):hover { color: var(--sakura-dark); }
+
+  .letter-stack {
+    flex: 1;
+    min-height: 120px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sakura) transparent;
+  }
+  .letter-stack::-webkit-scrollbar { width: 6px; }
+  .letter-stack::-webkit-scrollbar-thumb { background: var(--sakura); border-radius: 10px; }
+  .letter {
+    background: #fff;
+    border: 1px solid var(--border);
     border-radius: 12px;
+    padding: 14px 16px;
+    animation: fadeIn 0.4s ease;
+  }
+  .letter-meta {
+    font-size: 10.5px;
+    color: var(--sakura-dark);
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .letter-subject {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-style: italic;
+    color: var(--text-dark);
+    margin-bottom: 7px;
+  }
+  .letter-body {
+    font-size: 12.5px;
+    color: var(--text-mid);
+    line-height: 1.7;
+  }
+  .letter-sign {
+    font-family: 'Dancing Script', cursive;
+    font-size: 15px;
+    color: var(--sakura-dark);
+    margin-top: 8px;
+    display: block;
+  }
+  .letter-cta {
+    font-size: 12px;
+    color: var(--text-soft);
+    font-style: italic;
+    margin-bottom: 2px;
   }
 
-  /* Card: Menu Peek */
-  .card-menu-peek { display: flex; flex-direction: column; gap: 16px; }
+  /* ── Card: Table Four ── */
+  .card-table {
+    background: var(--warm-white);
+    display: flex; flex-direction: column;
+    gap: 12px;
+  }
+  .table-head { display: flex; align-items: flex-start; gap: 12px; }
+  .table-icon { font-size: 30px; flex-shrink: 0; line-height: 1; }
+  .table-head h4 {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    color: var(--text-dark);
+    margin-bottom: 5px;
+  }
+  .table-head p { font-size: 13px; color: var(--text-mid); line-height: 1.65; }
+  .notes-strip {
+    flex: 1;
+    min-height: 92px;
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sakura) transparent;
+  }
+  .notes-strip::-webkit-scrollbar { height: 6px; }
+  .notes-strip::-webkit-scrollbar-thumb { background: var(--sakura); border-radius: 10px; }
+  .note {
+    flex: 0 0 208px;
+    background: var(--sakura-light);
+    border: 1px solid rgba(212,103,138,0.18);
+    border-radius: 14px;
+    padding: 13px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    transform: rotate(var(--tilt, 0deg));
+    transition: transform 0.25s ease;
+  }
+  .note:hover { transform: rotate(0deg) translateY(-3px); }
+  .note.mine { background: var(--matcha-light); border-color: rgba(77,122,77,0.25); }
+  .note-text {
+    font-family: 'Dancing Script', cursive;
+    font-size: 16.5px;
+    color: var(--text-dark);
+    line-height: 1.45;
+    flex: 1;
+    overflow-wrap: anywhere;
+  }
+  .note-who {
+    font-size: 10.5px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    font-weight: 700;
+  }
+  .table-form { display: flex; gap: 8px; flex-wrap: wrap; }
+  .table-form input {
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-family: 'Nunito', sans-serif;
+    background: #fff;
+    color: var(--text-dark);
+    outline: none;
+    transition: border 0.2s;
+  }
+  .table-form input:focus { border-color: var(--sakura-dark); }
+  .table-form input.note-input { flex: 1; min-width: 160px; }
+  .table-form input.name-input { width: 118px; }
+  .table-form button {
+    background: var(--sakura-dark);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+    white-space: nowrap;
+  }
+  .table-form button:hover { background: #b84d72; transform: translateY(-1px); }
+  .table-form button:disabled { opacity: 0.55; cursor: default; transform: none; }
+  .table-note-msg {
+    font-size: 12px;
+    color: var(--matcha-dark);
+    font-weight: 600;
+    display: none;
+  }
+  .table-note-msg.err { color: #c0392b; }
+
+  /* ── Card: Menu strip ── */
+  .card-menu-peek {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    flex-wrap: wrap;
+    background: linear-gradient(135deg, #f9e0ea 0%, #fdf5f8 100%);
+    border: 1.5px solid rgba(212,103,138,0.2);
+  }
   .card-menu-peek h4 {
     font-family: 'Playfair Display', serif;
     font-size: 18px;
     color: var(--text-dark);
-    margin-bottom: 4px;
+    flex-shrink: 0;
   }
-  .menu-items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .menu-items {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
   .menu-item {
-    background: var(--sakura-light);
-    border-radius: 12px;
-    padding: 10px 14px;
+    background: rgba(255,255,255,0.75);
+    border: 1px solid rgba(212,103,138,0.15);
+    border-radius: 50px;
+    padding: 7px 14px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     font-size: 13px;
     color: var(--text-dark);
-    transition: background 0.2s;
+    transition: background 0.2s, transform 0.2s;
   }
-  .menu-item:hover { background: rgba(242,167,187,0.4); }
-  .menu-item .mi-emoji { font-size: 18px; }
+  .menu-item:hover { background: #fff; transform: translateY(-2px); }
+  .menu-item .mi-emoji { font-size: 16px; }
   .menu-item .mi-name { font-weight: 600; font-size: 13px; }
-  .menu-item .mi-desc { font-size: 11px; color: var(--text-soft); }
   .menu-cta {
     display: inline-block;
     background: var(--sakura-dark);
@@ -381,58 +723,16 @@
     font-weight: 600;
     letter-spacing: 1px;
     text-transform: uppercase;
-    padding: 8px 18px;
+    padding: 10px 20px;
     border-radius: 20px;
     border: none;
     cursor: pointer;
     width: fit-content;
+    flex-shrink: 0;
     transition: background 0.2s, transform 0.2s;
-    margin-top: 4px;
   }
   .menu-cta:hover { background: #b84d72; transform: translateY(-1px); }
 
-  /* Card: Email */
-  .card-email {
-    background: linear-gradient(135deg, #fff8f0 0%, #fef5f8 100%);
-    display: flex; flex-direction: column; justify-content: space-between;
-    border: 1.5px solid rgba(242,167,187,0.3);
-  }
-  .email-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-  .email-icon { font-size: 32px; }
-  .email-header h4 {
-    font-family: 'Playfair Display', serif;
-    font-size: 18px;
-    color: var(--text-dark);
-  }
-  .email-header p { font-size: 12px; color: var(--text-soft); }
-  .email-preview {
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px;
-    margin-bottom: 14px;
-    flex: 1;
-  }
-  .email-preview .ep-time {
-    font-size: 11px;
-    color: var(--sakura-dark);
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
-  .email-preview .ep-subject {
-    font-family: 'Playfair Display', serif;
-    font-size: 15px;
-    color: var(--text-dark);
-    margin-bottom: 8px;
-    font-style: italic;
-  }
-  .email-preview .ep-body {
-    font-size: 12.5px;
-    color: var(--text-mid);
-    line-height: 1.65;
-  }
   .email-input-row {
     display: flex;
     gap: 8px;
@@ -752,9 +1052,22 @@
     .story-btn { bottom: 20px; right: 20px; padding: 11px 18px; font-size: 13px; }
   }
   @media (max-width: 900px) {
-    .bento { grid-template-columns: repeat(6, 1fr); }
-    .card-tagline, .card-story, .card-location,
-    .card-vibe, .card-menu-peek, .card-email { grid-column: span 6; }
+    /* Stay a bento at tablet: 4 columns, with the two short cards pairing up. */
+    .bento { grid-template-columns: repeat(4, 1fr); }
+    .card-cairo, .card-now, .card-tagline, .card-letters, .card-story,
+    .card-table, .card-window, .card-menu-peek { grid-row: auto; }
+    .card-cairo, .card-now, .card-letters, .card-story,
+    .card-table, .card-menu-peek { grid-column: span 4; }
+    .card-tagline, .card-window { grid-column: span 2; }
+    .card-cairo    { order: 0; }
+    .card-now      { order: 1; }
+    .card-tagline  { order: 2; }
+    .card-window   { order: 3; }
+    .card-letters  { order: 4; }
+    .card-story    { order: 5; }
+    .card-table    { order: 6; }
+    .card-menu-peek{ order: 7; }
+    .card-menu-peek { align-items: flex-start; flex-direction: column; gap: 14px; }
     .team-bento { grid-template-columns: repeat(2, 1fr); }
     .tc-me3temed, .tc-yuto, .tc-yuki, .tc-hana { grid-column: span 1; grid-row: auto; }
     .hero-content { padding: 0 28px 48px; }
@@ -766,7 +1079,15 @@
   @media (max-width: 600px) {
     .team-bento { grid-template-columns: 1fr; }
     .tc-me3temed, .tc-yuto, .tc-yuki, .tc-hana { grid-column: span 1; }
-    .bento { gap: 12px; }
+    .bento { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .card-cairo, .card-now, .card-tagline, .card-letters, .card-story,
+    .card-table, .card-window, .card-menu-peek { grid-column: span 2; }
+    .card-cairo { align-items: flex-start; gap: 20px; }
+    .cairo-weather { max-width: none; }
+    .bento-card { padding: 22px; }
+    .card-window { padding: 0; }
+    .note { flex-basis: 180px; }
+    .table-form input.name-input { width: 100%; }
     .footer { flex-direction: column; align-items: flex-start; padding: 36px 40px 100px; }
     .footer-right { text-align: left; }
     .book-card-img, .book-card-info, .book-card-quote, .book-card-who {
@@ -775,192 +1096,234 @@
     .bookshelf-inner { padding: 0 24px; }
   }
 
-  /* ── THIS MONTH'S READ ── */
-  .monthly-section {
+  /* ── THE MENU ── */
+  .menu-section {
     position: relative;
     z-index: 1;
     background: var(--warm-white);
     padding: 80px 0;
   }
-  .monthly-section::before {
+  .menu-section::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
     height: 2px;
     background: linear-gradient(to right, transparent, var(--matcha), transparent);
   }
-  .monthly-inner {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 0 40px;
+  .menu-inner { max-width: 1280px; margin: 0 auto; padding: 0 40px; }
+  .menu-inner .section-label { color: var(--matcha-dark); }
+  .menu-inner .section-title { margin-bottom: 14px; }
+  .menu-intro {
+    font-size: 15px;
+    color: var(--text-mid);
+    line-height: 1.8;
+    max-width: 560px;
+    margin-bottom: 44px;
   }
-  .monthly-inner .section-label { color: var(--matcha-dark); }
 
-  /* Top strip: book cover + countdown + month badge */
-  .monthly-hero {
-    display: grid;
-    grid-template-columns: 220px 1fr;
-    gap: 32px;
-    align-items: start;
-    margin-bottom: 40px;
-  }
-  .monthly-cover-wrap {
-    position: relative;
-  }
-  .monthly-cover {
-    width: 100%;
-    aspect-ratio: 2/3;
-    object-fit: cover;
-    border-radius: 16px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
-    display: block;
-  }
-  .monthly-badge {
-    position: absolute;
-    top: -12px;
-    right: -12px;
-    background: var(--matcha-dark);
+  /* Mood picker */
+  .mood-box {
+    background: linear-gradient(135deg, #2d1f1f 0%, #3d2525 100%);
+    border-radius: 24px;
+    padding: 34px 36px;
+    margin-bottom: 48px;
     color: #fff;
-    font-size: 10px;
+  }
+  .mood-box h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(21px, 2.4vw, 27px);
+    font-style: italic;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .mood-box > p {
+    font-size: 13.5px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.7;
+    margin-bottom: 22px;
+  }
+  .mood-options { display: flex; flex-wrap: wrap; gap: 9px; }
+  .mood-btn {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(242,167,187,0.28);
+    color: var(--sakura-light);
+    font-family: 'Nunito', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: background 0.25s, transform 0.2s, border-color 0.25s;
+  }
+  .mood-btn:hover { background: rgba(242,167,187,0.18); transform: translateY(-2px); }
+  .mood-btn.active {
+    background: var(--sakura-dark);
+    border-color: var(--sakura-dark);
+    color: #fff;
+  }
+  .mood-answer {
+    display: none;
+    margin-top: 26px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    animation: fadeIn 0.45s ease;
+  }
+  .mood-answer.show { display: block; }
+  .mood-answer-label {
+    font-size: 10.5px;
     font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--sakura);
+    margin-bottom: 9px;
+  }
+  .mood-answer-drink {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(24px, 3vw, 34px);
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 12px;
+    line-height: 1.2;
+  }
+  .mood-answer-note {
+    font-family: 'Dancing Script', cursive;
+    font-size: 19px;
+    color: var(--sakura-light);
+    line-height: 1.6;
+    max-width: 620px;
+  }
+  .mood-answer-from {
+    font-size: 11px;
     letter-spacing: 2px;
     text-transform: uppercase;
-    padding: 6px 12px;
-    border-radius: 20px;
-    box-shadow: 0 4px 12px rgba(77,122,77,0.3);
-  }
-  .monthly-details {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 14px;
-    padding-top: 8px;
-  }
-  .monthly-month-label {
-    font-size: 11px;
+    color: rgba(255,255,255,0.4);
     font-weight: 700;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    color: var(--matcha-dark);
-  }
-  .monthly-book-title {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(28px, 4vw, 44px);
-    font-weight: 700;
-    color: var(--text-dark);
-    line-height: 1.15;
-  }
-  .monthly-book-author {
-    font-size: 15px;
-    color: var(--text-soft);
-    font-style: italic;
-  }
-  .monthly-book-desc {
-    font-size: 14.5px;
-    color: var(--text-mid);
-    line-height: 1.75;
-    max-width: 560px;
+    margin-top: 12px;
   }
 
-  /* Countdown */
-  .monthly-countdown {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .countdown-number {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(64px, 8vw, 100px);
-    font-weight: 700;
-    color: var(--matcha-dark);
-    line-height: 1;
-  }
-  .countdown-label {
-    font-size: 13px;
-    color: var(--text-soft);
-    font-weight: 600;
-    padding-bottom: 14px;
-    line-height: 1.4;
-  }
-
-  /* Reviews bento */
-  .monthly-reviews {
+  /* Menu columns */
+  .menu-cols {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
   }
-  .review-card {
+  .menu-col {
     background: var(--cream);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 24px 22px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    border-radius: 22px;
+    padding: 30px 32px;
     box-shadow: var(--shadow);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
-  .review-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-hover);
+  .menu-col-head {
+    display: flex; align-items: center; gap: 10px;
+    padding-bottom: 16px;
+    margin-bottom: 6px;
+    border-bottom: 1.5px solid var(--border);
   }
-  .review-card.dark {
-    background: linear-gradient(135deg, #2d1f1f 0%, #3d2525 100%);
-    border-color: rgba(255,255,255,0.06);
-  }
-  .review-card.matcha {
-    background: linear-gradient(135deg, #e8f5e8 0%, #f4faf4 100%);
-    border: 1.5px solid rgba(77,122,77,0.2);
-  }
-  .review-card.sakura {
-    background: linear-gradient(135deg, #f9e0ea 0%, #fdf5f8 100%);
-    border: 1.5px solid rgba(212,103,138,0.2);
-  }
-  .review-who {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .review-emoji { font-size: 22px; }
-  .review-name {
+  .menu-col-head span { font-size: 24px; }
+  .menu-col-head h3 {
     font-family: 'Playfair Display', serif;
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 21px;
     color: var(--text-dark);
   }
-  .review-card.dark .review-name { color: #fff; }
-  .review-role {
-    font-size: 10px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--text-soft);
-    font-weight: 600;
+  .menu-entry {
+    padding: 17px 0;
+    border-bottom: 1px dashed rgba(242,167,187,0.3);
   }
-  .review-card.dark .review-role { color: rgba(255,255,255,0.45); }
-  .review-text {
+  .menu-entry:last-child { border-bottom: none; padding-bottom: 2px; }
+  .menu-entry-top {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 5px;
+  }
+  .menu-entry-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 16.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+  .menu-entry-desc {
     font-size: 13.5px;
     color: var(--text-mid);
     line-height: 1.7;
-    flex: 1;
+    margin-bottom: 6px;
   }
-  .review-card.dark .review-text { color: rgba(255,255,255,0.65); }
-  .review-stars {
-    font-size: 14px;
-    letter-spacing: 2px;
-    color: var(--sakura-dark);
+  .menu-entry-by {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    font-weight: 700;
   }
-  .review-card.dark .review-stars { color: var(--sakura); }
 
+  /* How it's made — native <details>, no JS */
+  .menu-method { margin-top: 12px; }
+  .menu-method summary {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--sakura-dark);
+    background: var(--sakura-light);
+    border: 1px solid rgba(212,103,138,0.22);
+    border-radius: 50px;
+    padding: 6px 15px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .menu-method summary::-webkit-details-marker { display: none; }
+  .menu-method summary::marker { content: ''; }
+  .menu-method summary:hover { background: rgba(242,167,187,0.42); }
+  .menu-method summary .chev { transition: transform 0.25s ease; font-size: 13px; }
+  .menu-method[open] summary { background: var(--sakura-dark); color: #fff; border-color: var(--sakura-dark); }
+  .menu-method[open] summary .chev { transform: rotate(180deg); }
+  .method-body {
+    margin-top: 12px;
+    padding: 16px 18px;
+    background: var(--warm-white);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--sakura);
+    border-radius: 0 14px 14px 0;
+    animation: fadeIn 0.35s ease;
+  }
+  .method-body ol {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .method-body li {
+    font-size: 13px;
+    color: var(--text-mid);
+    line-height: 1.7;
+    padding-left: 3px;
+  }
+  .method-body li::marker { color: var(--sakura-dark); font-weight: 700; }
+  .method-body p {
+    font-size: 13px;
+    color: var(--text-mid);
+    line-height: 1.75;
+    font-style: italic;
+  }
+  .menu-foot {
+    margin-top: 26px;
+    font-size: 13px;
+    color: var(--text-soft);
+    font-style: italic;
+    text-align: center;
+    line-height: 1.7;
+  }
   @media (max-width: 900px) {
-    .monthly-hero { grid-template-columns: 160px 1fr; }
-    .monthly-reviews { grid-template-columns: repeat(2, 1fr); }
-    .monthly-inner { padding: 0 24px; }
+    .menu-inner { padding: 0 24px; }
+    .menu-cols { grid-template-columns: 1fr; }
+    .mood-box { padding: 28px 24px; }
   }
   @media (max-width: 600px) {
-    .monthly-hero { grid-template-columns: 1fr; }
-    .monthly-cover-wrap { max-width: 200px; }
-    .monthly-reviews { grid-template-columns: 1fr; }
+    .menu-col { padding: 24px 22px; }
   }
 
   /* ── BOOKSHELF ── */
@@ -1145,11 +1508,62 @@
 
   <div class="bento">
 
+    <!-- Cairo right now — real local time + the day's weather -->
+    <div class="bento-card card-cairo">
+      <div class="cairo-time">
+        <span class="cairo-label">Cairo, right now</span>
+        <span class="cairo-date" id="cairoDate">—</span>
+        <span class="cairo-clock" id="cairoClock">—</span>
+      </div>
+      <div class="cairo-weather">
+        <span class="cairo-wx-icon" id="wxIcon">🌸</span>
+        <div>
+          <div class="cairo-wx-temp" id="wxTemp">—</div>
+          <div class="cairo-wx-cond" id="wxCond">—</div>
+          <div class="cairo-wx-note" id="wxNote">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right now at the café — runs on Cairo time -->
+    <div class="bento-card card-now" id="cardNow">
+      <div class="now-top">
+        <span class="now-status"><span class="now-live-dot"></span><span id="nowStatus">Open</span></span>
+        <span class="now-hours">Open daily · 10am – 10pm</span>
+      </div>
+      <div class="now-line" id="nowLine">—</div>
+      <div class="now-detail" id="nowDetail">—</div>
+      <div class="now-who" id="nowWho"></div>
+    </div>
+
     <!-- Tagline card -->
     <div class="bento-card card-tagline">
       <span class="big-emoji">🌸</span>
-      <h2>"Life is too short for bad coffee."</h2>
-      <p>Sakura Slice is a sanctuary — where you belong exactly as you are.</p>
+      <h2>"This is for every soul that needed a place to land."</h2>
+      <p>Come as you are. Stay as long as you like. Nobody here is counting the minutes.</p>
+    </div>
+
+    <!-- The Letters — real, readable -->
+    <div class="bento-card card-letters" id="emailSection">
+      <div class="email-header">
+        <span class="email-icon">💌</span>
+        <div>
+          <h4>Morning &amp; Evening Letters</h4>
+          <p>One at sunrise, one at closing. Read a few of ours.</p>
+        </div>
+      </div>
+      <div class="letter-toggle">
+        <button class="active" onclick="showLetters('morning', this)">☀️ Morning</button>
+        <button onclick="showLetters('evening', this)">🌙 Evening</button>
+      </div>
+      <div class="letter-stack" id="letterStack"></div>
+      <p class="letter-cta">Have them arrive on their own, every day.</p>
+      <div class="email-input-row" id="emailInputRow">
+        <input type="email" id="emailInput" placeholder="your@email.com" />
+        <button id="joinBtn" onclick="submitEmail()">Join ✨</button>
+      </div>
+      <div class="email-success" id="emailSuccess">🌸 You're in! Warm letters on their way.</div>
+      <div class="email-error" id="emailError">Something went wrong. Please try again.</div>
     </div>
 
     <!-- Story card -->
@@ -1163,102 +1577,351 @@
       <span class="story-sig">— Ahmed El-Bourgy, Dreamer</span>
     </div>
 
-    <!-- Hours card removed -->
-
-    <!-- Location card -->
-    <div class="bento-card card-location">
-      <span class="card-icon">💭</span>
-      <h4>A Place in the Mind</h4>
-      <p>Not a real address — but a feeling. Somewhere warm, unhurried, and softly lit. You'd know it the moment you walked in.</p>
-      <span class="map-badge">Imagined in Cairo</span>
-    </div>
-
-    <!-- Vibe card -->
-    <div class="bento-card card-vibe">
-      <span class="card-icon">🎐</span>
-      <h4>The Sakura Vibe</h4>
-      <div class="vibe-tags">
-        <span class="vibe-tag">🌿 Matcha everything</span>
-        <span class="vibe-tag">🌸 Sakura aesthetic</span>
-        <span class="vibe-tag">🎵 Lo-fi sounds</span>
-        <span class="vibe-tag">📖 Cozy corners</span>
-        <span class="vibe-tag">🕯️ Soft lighting</span>
-        <span class="vibe-tag">✨ Good energy</span>
-      </div>
-    </div>
-
-    <!-- Menu peek card -->
-    <div class="bento-card card-menu-peek">
-      <h4>🍃 A Taste of the Menu</h4>
-      <div class="menu-items">
-        <div class="menu-item">
-          <span class="mi-emoji">🍵</span>
-          <div>
-            <div class="mi-name">Matcha Latte</div>
-            <div class="mi-desc">Ceremonial grade</div>
-          </div>
-        </div>
-        <div class="menu-item">
-          <span class="mi-emoji">🌸</span>
-          <div>
-            <div class="mi-name">Sakura Cold Brew</div>
-            <div class="mi-desc">Floral & smooth</div>
-          </div>
-        </div>
-        <div class="menu-item">
-          <span class="mi-emoji">🍡</span>
-          <div>
-            <div class="mi-name">Mochi Waffle</div>
-            <div class="mi-desc">Chewy & golden</div>
-          </div>
-        </div>
-        <div class="menu-item">
-          <span class="mi-emoji">🍰</span>
-          <div>
-            <div class="mi-name">Hojicha Cake</div>
-            <div class="mi-desc">Roasted tea notes</div>
-          </div>
-        </div>
-        <div class="menu-item">
-          <span class="mi-emoji">🥐</span>
-          <div>
-            <div class="mi-name">Miso Croissant</div>
-            <div class="mi-desc">Savory & flaky</div>
-          </div>
-        </div>
-        <div class="menu-item">
-          <span class="mi-emoji">🍓</span>
-          <div>
-            <div class="mi-name">Seasonal Special</div>
-            <div class="mi-desc">Ask us today!</div>
-          </div>
-        </div>
-      </div>
-      <button class="menu-cta" onclick="document.getElementById('emailSection').scrollIntoView({behavior:'smooth'})">Check our daily emails ✉️</button>
-    </div>
-
-    <!-- Email card -->
-    <div class="bento-card card-email" id="emailSection">
-      <div class="email-header">
-        <span class="email-icon">💌</span>
+    <!-- Table Four — the guestbook -->
+    <div class="bento-card card-table">
+      <div class="table-head">
+        <span class="table-icon">🪑</span>
         <div>
-          <h4>Morning & Evening Letters</h4>
-          <p>Daily notes to warm your day, from our table to yours</p>
+          <h4>Table Four</h4>
+          <p>The one by the window. People leave things behind here — a line from a notebook, a folded receipt, a thought they weren't ready to carry home. Leave yours.</p>
         </div>
       </div>
-      <div class="email-preview">
-        <div class="ep-time">☀️ Morning Letter</div>
-        <div class="ep-subject">"Good morning, lovely soul..."</div>
-        <div class="ep-body">Today's a brand new page. Before the world asks anything of you, we wanted to say: you're doing beautifully. Your matcha is waiting. Come as you are. 🍵</div>
+      <div class="notes-strip" id="notesStrip"></div>
+      <div class="table-form">
+        <input class="name-input" id="noteName" maxlength="18" placeholder="Name (optional)" />
+        <input class="note-input" id="noteText" maxlength="140" placeholder="Leave a note on the table…" />
+        <button id="noteBtn" onclick="leaveNote()">Leave it 🌸</button>
       </div>
-      <div class="email-input-row" id="emailInputRow">
-        <input type="email" id="emailInput" placeholder="your@email.com" />
-        <button id="joinBtn" onclick="submitEmail()">Join ✨</button>
-      </div>
-      <div class="email-success" id="emailSuccess">🌸 You're in! Warm letters on their way.</div>
-      <div class="email-error" id="emailError">Something went wrong. Please try again.</div>
+      <div class="table-note-msg" id="noteMsg"></div>
     </div>
 
+    <!-- The window seat — sky shifts with the hour -->
+    <div class="bento-card card-window">
+      <div class="window-pane" id="windowPane">
+        <div class="window-orb"></div>
+        <div class="window-weather" id="windowWeather"></div>
+        <div class="window-mullion"></div>
+      </div>
+      <div class="window-sill">
+        <h4>The window seat</h4>
+        <p>The light lands here first in the morning and leaves last in the evening. We've never advertised it. People find it anyway.</p>
+        <span class="window-hour" id="windowHour">—</span>
+      </div>
+    </div>
+
+    <!-- Menu strip -->
+    <div class="bento-card card-menu-peek">
+      <h4>🍃 A taste of the menu</h4>
+      <div class="menu-items">
+        <div class="menu-item"><span class="mi-emoji">🍵</span><span class="mi-name">Matcha Latte</span></div>
+        <div class="menu-item"><span class="mi-emoji">🌸</span><span class="mi-name">Sakura Cold Brew</span></div>
+        <div class="menu-item"><span class="mi-emoji">🍡</span><span class="mi-name">Mochi Waffle</span></div>
+        <div class="menu-item"><span class="mi-emoji">🍰</span><span class="mi-name">Hojicha Cake</span></div>
+        <div class="menu-item"><span class="mi-emoji">🥐</span><span class="mi-name">Miso Croissant</span></div>
+        <div class="menu-item"><span class="mi-emoji">🍓</span><span class="mi-name">Seasonal</span></div>
+      </div>
+      <button class="menu-cta" onclick="document.getElementById('menuSection').scrollIntoView({behavior:'smooth'})">See the full menu</button>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── THE MENU ── -->
+<section class="menu-section" id="menuSection">
+  <div class="menu-inner">
+    <p class="section-label">The Menu</p>
+    <h2 class="section-title">Everything we'd<br><em>make for you.</em></h2>
+    <p class="menu-intro">Nothing here has a price, because the café doesn't exist yet and you can't buy anything from a place that isn't there. What it has instead is a method for everything. Open any of them. Someday somebody should be able to make these.</p>
+
+    <!-- Mood picker -->
+    <div class="mood-box">
+      <h3>What do you need today?</h3>
+      <p>Tell Hana how you arrived. She has been doing this a long time and she has never once guessed wrong.</p>
+      <div class="mood-options" id="moodOptions">
+        <button class="mood-btn" onclick="pickMood('tired', this)">I'm tired</button>
+        <button class="mood-btn" onclick="pickMood('heartbroken', this)">I'm heartbroken</button>
+        <button class="mood-btn" onclick="pickMood('sleepless', this)">I can't sleep</button>
+        <button class="mood-btn" onclick="pickMood('celebrating', this)">I'm celebrating</button>
+        <button class="mood-btn" onclick="pickMood('overwhelmed', this)">It's all too much</button>
+        <button class="mood-btn" onclick="pickMood('new', this)">I just got here</button>
+      </div>
+      <div class="mood-answer" id="moodAnswer">
+        <div class="mood-answer-label">Then you're having</div>
+        <div class="mood-answer-drink" id="moodDrink"></div>
+        <div class="mood-answer-note" id="moodNote"></div>
+        <div class="mood-answer-from">— Hana, Head Barista</div>
+      </div>
+    </div>
+
+    <!-- Menu -->
+    <div class="menu-cols">
+
+      <div class="menu-col">
+        <div class="menu-col-head"><span>🍵</span><h3>Matcha &amp; Tea</h3></div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Matcha Latte</span></div>
+          <p class="menu-entry-desc">Ceremonial grade, whisked by hand, never rushed. Hana will ask how sweet you want it and then make it slightly less sweet than you said, because she is usually right.</p>
+          <div class="menu-entry-by">Made by Hana</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Sift 2g of matcha through a fine strainer. Always sift — it's the whole difference between silk and lumps.</li>
+              <li>Add 60ml of water at 80°C. Never boiling; boiling water makes matcha bitter and there is no fixing it afterward.</li>
+              <li>Whisk in a brisk <em>W</em> shape, not a circle, for about 20 seconds — until the foam is fine-bubbled and holds its shape.</li>
+              <li>Warm 180ml of milk to just under scalding and pour it down the inside of the cup so the foam survives.</li>
+              <li>Sweeten only if asked, and then slightly less than they asked.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Hojicha Latte</span></div>
+          <p class="menu-entry-desc">Roasted, low in caffeine, the colour of an old photograph. What we drink after four when we want the feeling of coffee without the consequences of it.</p>
+          <div class="menu-entry-by">Made by Hana</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Steep 5g of roasted hojicha leaf in 80ml of water at 90°C for 90 seconds.</li>
+              <li>Strain it out properly. The leaves keep giving and it turns papery past two minutes.</li>
+              <li>Steam 200ml of milk and pour it in slowly — hojicha is delicate and a fast pour flattens it.</li>
+              <li>No sugar. It doesn't need any, and Hana will tell you so if you ask.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Sakura Blossom Tea</span></div>
+          <p class="menu-entry-desc">Salt-preserved blossoms that open again in hot water. It tastes faintly of almond and slightly of spring. It is the most beautiful thing we serve and it takes four minutes.</p>
+          <div class="menu-entry-by">Made by Hana</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Rinse two salt-preserved blossoms briefly under cool water — take the edge off the salt, not all of it.</li>
+              <li>Pour over 200ml of water at 80°C.</li>
+              <li>Wait four minutes while the blossoms open. This part is not optional and cannot be hurried, which is arguably the point of the drink.</li>
+              <li>Serve with the blossoms still floating in the cup. Never strain them out.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Genmaicha</span></div>
+          <p class="menu-entry-desc">Green tea with toasted rice. Tastes like a warm kitchen. Order this if you're staying a while — it's the one that refills for free.</p>
+          <div class="menu-entry-by">Made by whoever's closest</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>4g of genmaicha, 250ml of water at 80°C, 60 seconds.</li>
+              <li>The same leaves take a second and third steep — add 10 seconds each time.</li>
+              <li>Never squeeze the leaves when you strain. Squeezing is where bitterness comes from.</li>
+              <li>Refill without being asked. That's the entire reason this one is on the menu.</li>
+            </ol></div>
+          </details>
+        </div>
+      </div>
+
+      <div class="menu-col">
+        <div class="menu-col-head"><span>☕</span><h3>Coffee</h3></div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Sakura Cold Brew</span></div>
+          <p class="menu-entry-desc">Steeped eighteen hours, finished with a whisper of blossom syrup. Floral on the way in, clean on the way out. The drink most likely to make someone ask what you're having.</p>
+          <div class="menu-entry-by">Made by Hana</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>80g of coarsely ground coffee to 1 litre of cold water, in a sealed jar, in the fridge.</li>
+              <li>Eighteen hours. Not twelve — it's thin. Not twenty-four — it's woody.</li>
+              <li>Strain twice: once through mesh to get the grounds, once through paper to get the silt.</li>
+              <li>Make the syrup by simmering 100g sugar, 100ml water and six rinsed blossoms for five minutes, then leaving it to cool with the blossoms still in.</li>
+              <li>15ml of syrup per glass, plenty of ice, stir exactly once.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">The Long Morning</span></div>
+          <p class="menu-entry-desc">A flat white, but bigger, and served in the heavy cup. Named for the mornings Yuto spends at table four with a notebook and no particular plan.</p>
+          <div class="menu-entry-by">Made by Hana</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Pull a double ristretto — 18g in, about 25g out — straight into the heavy cup.</li>
+              <li>Steam 150ml of whole milk to 60°C. Microfoam only: glossy, no visible bubbles.</li>
+              <li>Swirl the jug, then pour from high to combine, drop low at the end to float the pattern.</li>
+              <li>Serve without a spoon. It's already mixed and stirring only ruins the top.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Espresso</span></div>
+          <p class="menu-entry-desc">Standing at the counter, thirty seconds, no ceremony. Sometimes that's the correct amount of café for a person to have.</p>
+          <div class="menu-entry-by">Made by Hana</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>18g in the basket, distributed flat, tamped level. Level matters more than hard.</li>
+              <li>36g out in 27 seconds.</li>
+              <li>If it runs fast, grind finer. If it chokes, grind coarser. That is the entire conversation.</li>
+              <li>Wipe the spout and serve immediately — espresso has a shelf life of about a minute.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Turkish Coffee</span></div>
+          <p class="menu-entry-desc">Because we are, after all, in Cairo. Ask for it <em>mazbout</em>. Yuki reads the grounds afterward if it's quiet, and her readings are suspiciously kind.</p>
+          <div class="menu-entry-by">Made by Yuki</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>One heaped teaspoon of flour-fine coffee per 70ml of cold water in the kanaka.</li>
+              <li>Sugar goes in <em>now</em>, with the cold water — <em>mazbout</em> is half a teaspoon. Never sweeten afterward.</li>
+              <li>Stir once while it's still cold, then put it on low heat and don't touch it again.</li>
+              <li>Let the foam climb to the rim, pull it off the heat, let it settle. Do this twice more.</li>
+              <li>Spoon the foam into the cup first, then pour. Wait a minute for the grounds to settle before you drink.</li>
+            </ol></div>
+          </details>
+        </div>
+      </div>
+
+      <div class="menu-col">
+        <div class="menu-col-head"><span>🍰</span><h3>Sweet</h3></div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Mochi Waffle</span></div>
+          <p class="menu-entry-desc">Crisp at the edges, impossibly chewy in the middle. Yuki makes twelve a day and stops. When they're gone she says "tomorrow" and means it as a comfort.</p>
+          <div class="menu-entry-by">Made by Yuki</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Whisk 200g glutinous rice flour, 40g sugar and 1 tsp baking powder. Glutinous rice flour only — regular rice flour gives you a sad biscuit.</li>
+              <li>Beat in 1 egg and 240ml coconut milk until smooth.</li>
+              <li>Rest the batter 20 minutes. This is where the chew comes from and skipping it is pointless.</li>
+              <li>Hot, well-buttered waffle iron, 5–6 minutes — noticeably longer than feels right. You're waiting for the outside to go properly crisp.</li>
+              <li>Twelve a day. When they're gone they're gone.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Hojicha Cake</span></div>
+          <p class="menu-entry-desc">Roasted tea in the sponge, barely any sugar in the cream. The slice people order thinking they'll share and then quietly do not share.</p>
+          <div class="menu-entry-by">Made by Yuki</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Grind 8g of hojicha leaf to a powder and sift it through 120g of flour.</li>
+              <li>Cream 100g of soft butter with only 60g of sugar. The restraint <em>is</em> the recipe.</li>
+              <li>Two eggs one at a time, then the flour, folded — not beaten — until it just comes together.</li>
+              <li>160°C for 35 minutes. The sponge should barely spring back; a fully bouncy one is overbaked.</li>
+              <li>Top with 200ml cream whipped to soft peaks, with no sugar in it at all.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Sakura Slice</span></div>
+          <p class="menu-entry-desc">The one the café is named after. Pale pink, faintly salted, one preserved blossom on top. Yuki won't say what's in it. We've stopped asking.</p>
+          <div class="menu-entry-by">Made by Yuki</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body">
+              <p>Yuki has never written this one down. What we've been able to gather from watching: a pale, tight-crumbed sponge; something salted folded through the cream; one preserved blossom placed on top with a pair of tweezers she keeps for nothing else. There is a step at the end she does with her back to the room. We have asked. She has smiled. That is where the matter rests.</p>
+            </div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Seasonal Something</span></div>
+          <p class="menu-entry-desc">Whatever Yuki found at the market that morning and couldn't stop thinking about. It changes without warning. It has never once been bad.</p>
+          <div class="menu-entry-by">Made by Yuki</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Go to the market early, before it's been picked over.</li>
+              <li>Buy the thing you can't stop looking at. Not the thing on the list — there is no list.</li>
+              <li>Get it home before deciding what it's going to become.</li>
+              <li>Whatever it is, do less to it than you want to. It was already good in the crate.</li>
+              <li>The recipe is written after the shopping. Never before.</li>
+            </ol></div>
+          </details>
+        </div>
+      </div>
+
+      <div class="menu-col">
+        <div class="menu-col-head"><span>🥐</span><h3>Savory</h3></div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Miso Croissant</span></div>
+          <p class="menu-entry-desc">Laminated with miso butter, so it's salty in a way that sneaks up on you. Best at 8am when they're still warm enough to fog the plate.</p>
+          <div class="menu-entry-by">Made by Yuki</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Beat 30g of white miso into 250g of cold butter and shape it into a flat block. Keep it cold — warm butter tears the dough.</li>
+              <li>Make a standard croissant dough, chill it, then lock the miso butter inside.</li>
+              <li>Three letter folds, resting an hour in the fridge between each. The dough decides the timing, not you.</li>
+              <li>Roll, cut, shape, and prove 2½ hours at room temperature until they visibly jiggle when you nudge the tray.</li>
+              <li>200°C for 18 minutes. Eat at 8am while they still fog the plate.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Tamago Sando</span></div>
+          <p class="menu-entry-desc">Egg salad on soft milk bread, crusts off, cut clean. Absurdly simple. We have watched grown adults go quiet over this sandwich.</p>
+          <div class="menu-entry-by">Made by Yuki</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Six eggs, boiled 9 minutes, straight into ice water.</li>
+              <li>Chop them rough, not fine. You want to find pieces of egg, not paste.</li>
+              <li>Fold through 3 tbsp of kewpie mayonnaise, a pinch of sugar and salt. Nothing else — no mustard, no onion.</li>
+              <li>Pile it generously onto soft milk bread. Cut the crusts off <em>after</em> assembling, never before.</li>
+              <li>Wrap tightly and chill 20 minutes so it slices clean.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Rice &amp; Whatever's Left</span></div>
+          <p class="menu-entry-desc">A bowl of rice and whatever the kitchen has at four in the afternoon. It's what the staff eat. It is not on the printed menu. Ask anyway.</p>
+          <div class="menu-entry-by">Made by whoever's closest</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Yesterday's rice, warmed in a pan with a splash of water and a lid on. Fresh rice is wrong for this.</li>
+              <li>Open the fridge at four in the afternoon. Use what's actually there.</li>
+              <li>Aim for one thing salty, one thing sharp, one thing soft. That ratio is the only real rule.</li>
+              <li>A fried egg on top if there's an egg. There is usually an egg.</li>
+              <li>Eat standing up, near the pass, in about four minutes.</li>
+            </ol></div>
+          </details>
+        </div>
+
+        <div class="menu-entry">
+          <div class="menu-entry-top"><span class="menu-entry-name">Toast, Butter, Salt</span></div>
+          <p class="menu-entry-desc">For the people who come in at closing and say they're not hungry. They are always hungry. This is how we get around it.</p>
+          <div class="menu-entry-by">Made by Hana</div>
+          <details class="menu-method">
+            <summary>How it's made <span class="chev">⌄</span></summary>
+            <div class="method-body"><ol>
+              <li>Good bread, cut thick. Thin toast is a different food and not the point.</li>
+              <li>Toast it darker than you'd normally dare.</li>
+              <li>Cold butter, <em>sliced</em> rather than spread, laid on while the toast is still hot so it half-melts and half-doesn't.</li>
+              <li>Flaky salt. More than you think. Then a little more.</li>
+              <li>Hand it over without commenting on the fact that they said they weren't hungry.</li>
+            </ol></div>
+          </details>
+        </div>
+      </div>
+
+    </div>
+
+    <p class="menu-foot">Me3temed does not make anything. Me3temed supervises. 🦉</p>
   </div>
 </section>
 
@@ -1327,96 +1990,6 @@
   </div>
 </section>
 
-<!-- ── THIS MONTH'S READ ── -->
-<section class="monthly-section">
-  <div class="monthly-inner">
-    <p class="section-label">This Month's Read</p>
-    <h2 class="section-title">What we're all<br><em>reading right now.</em></h2>
-
-    <div class="monthly-hero">
-
-      <!-- Book cover -->
-      <div class="monthly-cover-wrap">
-        <img class="monthly-cover"
-          src="https://drive.google.com/thumbnail?id=1fmn3arpxSqyb0dWZn6gk8sjGDy_16qGo&sz=w600"
-          alt="Immortal Consequences">
-        <span class="monthly-badge" id="monthBadge">April's Read</span>
-      </div>
-
-      <!-- Book details + countdown -->
-      <div class="monthly-details">
-        <span class="monthly-month-label" id="monthLabel">April 2026</span>
-        <div class="monthly-book-title">Immortal Consequences</div>
-        <div class="monthly-book-author">This month's café pick</div>
-        <div class="monthly-book-desc">A book that found its way onto the shelf and refused to leave. We're reading it together — in the mornings before opening, in the quiet hours between orders, in the way all good books get read: slowly, and then all at once.</div>
-
-        <!-- Countdown -->
-        <div class="monthly-countdown">
-          <div class="countdown-number" id="countdownNumber">—</div>
-          <div class="countdown-label">days left<br>till we finish reading</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Character reviews -->
-    <div class="monthly-reviews">
-
-      <!-- Yuto -->
-      <div class="review-card matcha">
-        <div class="review-who">
-          <span class="review-emoji">🌿</span>
-          <div>
-            <div class="review-name">Yuto</div>
-            <div class="review-role">Founder & Soul</div>
-          </div>
-        </div>
-        <div class="review-text">The kind of book that asks you to sit with questions that don't resolve. I read the first chapter twice — not because I didn't understand it, but because I wanted to stay inside it a little longer. There's something in here about what we carry forward and what we're allowed to let go. I think about it between sessions.</div>
-        <div class="review-stars">★★★★★</div>
-      </div>
-
-      <!-- Me3temed -->
-      <div class="review-card dark">
-        <div class="review-who">
-          <span class="review-emoji">🦉</span>
-          <div>
-            <div class="review-name">Me3temed</div>
-            <div class="review-role">Founder & Soul</div>
-          </div>
-        </div>
-        <div class="review-text">He sat with it for three evenings without moving except to occasionally shift his weight from one foot to the other. On the fourth evening he made the sound he makes when something has genuinely surprised him. We have not been able to get him to elaborate. We think this is the review.</div>
-        <div class="review-stars">★★★★★</div>
-      </div>
-
-      <!-- Hana -->
-      <div class="review-card sakura">
-        <div class="review-who">
-          <span class="review-emoji">🦊</span>
-          <div>
-            <div class="review-name">Hana</div>
-            <div class="review-role">Head Barista</div>
-          </div>
-        </div>
-        <div class="review-text">I recommended it to three regulars before I'd even finished it myself. That should tell you everything. The characters feel like people you've already met — not in a familiar way, in a remembered way. Like running into someone you didn't realise you'd been missing.</div>
-        <div class="review-stars">★★★★★</div>
-      </div>
-
-      <!-- Yuki -->
-      <div class="review-card">
-        <div class="review-who">
-          <span class="review-emoji">🐇</span>
-          <div>
-            <div class="review-name">Yuki</div>
-            <div class="review-role">Pastry Chef</div>
-          </div>
-        </div>
-        <div class="review-text">I stayed at table four until closing to finish it and then sat in the dark for a few minutes afterward just to be somewhere quiet. I don't want to say too much. I think it needs to find you the way it found me — unexpectedly, at exactly the right moment. Just read it. 🌸</div>
-        <div class="review-stars">★★★★★</div>
-      </div>
-
-    </div>
-  </div>
-</section>
-
 <!-- ── OUR BOOKSHELF ── -->
 <section class="bookshelf-section">
   <div class="bookshelf-inner">
@@ -1425,11 +1998,11 @@
 
     <!-- Staff tabs -->
     <div class="shelf-tabs" id="shelfTabs">
-      <button class="shelf-tab active" onclick="filterShelf('all')">✨ All</button>
-      <button class="shelf-tab" onclick="filterShelf('yuto')">Yuto</button>
-      <button class="shelf-tab" onclick="filterShelf('yuki')">Yuki</button>
-      <button class="shelf-tab" onclick="filterShelf('hana')">Hana</button>
-      <button class="shelf-tab" onclick="filterShelf('me3temed')">Me3temed</button>
+      <button class="shelf-tab active" onclick="filterShelf('all', this)">✨ All</button>
+      <button class="shelf-tab" onclick="filterShelf('yuto', this)">Yuto</button>
+      <button class="shelf-tab" onclick="filterShelf('yuki', this)">Yuki</button>
+      <button class="shelf-tab" onclick="filterShelf('hana', this)">Hana</button>
+      <button class="shelf-tab" onclick="filterShelf('me3temed', this)">Me3temed</button>
     </div>
 
     <!-- Book grid -->
@@ -1601,6 +2174,575 @@
     petalsContainer.appendChild(p);
   }
 
+  // ══════════════════════════════════════════════════════════
+  //  CAIRO TIME
+  //  The café is in Cairo, so the clock, the weather, the scenes
+  //  and the window all run on Cairo's hour — not the visitor's.
+  //  Intl handles Egypt's DST for us.
+  // ══════════════════════════════════════════════════════════
+  const WEEKDAY_INDEX = {
+    Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3,
+    Thursday: 4, Friday: 5, Saturday: 6
+  };
+  const MONTH_INDEX = {
+    January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
+    July: 6, August: 7, September: 8, October: 9, November: 10, December: 11
+  };
+
+  function cairoNow() {
+    const d = new Date();
+    try {
+      const p = {};
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Africa/Cairo',
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).formatToParts(d).forEach(x => { p[x.type] = x.value; });
+
+      return {
+        hour: parseInt(p.hour, 10),
+        minute: parseInt(p.minute, 10),
+        day: WEEKDAY_INDEX[p.weekday],
+        weekday: p.weekday,
+        dayNum: parseInt(p.day, 10),
+        monthName: p.month,
+        monthIndex: MONTH_INDEX[p.month],
+        year: parseInt(p.year, 10)
+      };
+    } catch (e) {
+      // Ancient browser with no IANA time zones — fall back to local
+      return {
+        hour: d.getHours(), minute: d.getMinutes(),
+        day: d.getDay(), weekday: d.toLocaleDateString('en-GB', { weekday: 'long' }),
+        dayNum: d.getDate(),
+        monthName: d.toLocaleDateString('en-GB', { month: 'long' }),
+        monthIndex: d.getMonth(), year: d.getFullYear()
+      };
+    }
+  }
+
+  function ordinal(n) {
+    const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+
+  function renderClock(t) {
+    const dateEl = document.getElementById('cairoDate');
+    if (!dateEl) return;
+    dateEl.textContent = ordinal(t.dayNum) + ' of ' + t.monthName;
+    const h12 = t.hour % 12 || 12;
+    document.getElementById('cairoClock').textContent =
+      h12 + ':' + String(t.minute).padStart(2, '0') + ' ' + (t.hour < 12 ? 'AM' : 'PM');
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  CAIRO WEATHER
+  //  Not a live feed — an imagined Cairo built from the real
+  //  climate. The condition is seeded from the date, so it holds
+  //  steady all day and changes tomorrow; the temperature moves
+  //  with the hour, peaking around 4pm and bottoming out at 4am.
+  // ══════════════════════════════════════════════════════════
+  const CAIRO_CLIMATE = [ // [avg high, avg low] °C, Jan → Dec
+    [19, 9], [21, 10], [24, 12], [28, 15], [32, 18], [35, 21],
+    [35, 23], [35, 23], [33, 21], [30, 18], [25, 14], [21, 11]
+  ];
+
+  const WX = {
+    clear: {
+      icon: '☀️', nightIcon: '🌙', label: 'Clear', shift: 0, tint: 'transparent',
+      note: 'Not a cloud over the whole city. The front window is doing its best work.',
+      nightNote: 'Clear enough that you can nearly make out stars over the rooftops.'
+    },
+    hazy: {
+      icon: '🌤️', nightIcon: '🌘', label: 'Hazy', shift: 0,
+      tint: 'linear-gradient(to bottom, rgba(226,206,176,0.34), rgba(226,206,176,0.16))',
+      note: "The city has gone soft at the edges, the way it does when the air is thick.",
+      nightNote: 'Warm haze over everything. The streetlights all have rings around them.'
+    },
+    cloudy: {
+      icon: '☁️', nightIcon: '☁️', label: 'Cloudy', shift: -2,
+      tint: 'linear-gradient(to bottom, rgba(146,152,164,0.5), rgba(146,152,164,0.28))',
+      note: 'Low and grey — the good kind, where the light comes in even and nobody squints.',
+      nightNote: 'Cloud cover the whole way across. No stars tonight, but it stays warm.'
+    },
+    khamaseen: {
+      icon: '🌪️', nightIcon: '🌫️', label: 'Khamaseen', shift: +3,
+      tint: 'linear-gradient(to bottom, rgba(212,171,112,0.52), rgba(212,171,112,0.3))',
+      note: "There's sand in the air. Everyone outside is walking with their eyes half shut — we've shut the front window.",
+      nightNote: 'Dust still hanging in the air from this afternoon. The glass needs wiping again.'
+    },
+    rain: {
+      icon: '🌧️', nightIcon: '🌧️', label: 'Rain', shift: -4,
+      tint: 'linear-gradient(to bottom, rgba(88,104,126,0.52), rgba(88,104,126,0.32))',
+      note: 'Actual rain, in Cairo. Half the street has stopped to look at it and so have we.',
+      nightNote: "Raining quietly on the awning. Nobody inside is in any hurry to leave."
+    },
+    still: {
+      icon: '🌡️', nightIcon: '🌙', label: 'Warm & still', shift: +2,
+      tint: 'linear-gradient(to bottom, rgba(255,214,158,0.28), rgba(255,214,158,0.12))',
+      note: 'No wind at all. The kind of heat that just sits in the room and waits.',
+      nightNote: "Still warm out, and completely without wind. The door's propped open."
+    }
+  };
+
+  // Which conditions are plausible in which season
+  const WX_SEASONS = {
+    winter: ['clear', 'clear', 'cloudy', 'cloudy', 'rain', 'hazy'],
+    spring: ['clear', 'clear', 'hazy', 'khamaseen', 'khamaseen', 'cloudy'],
+    summer: ['clear', 'clear', 'clear', 'hazy', 'still', 'still'],
+    autumn: ['clear', 'clear', 'hazy', 'cloudy', 'still', 'clear']
+  };
+
+  function seasonOf(m) {
+    if (m === 11 || m <= 1) return 'winter';
+    if (m <= 4) return 'spring';
+    if (m <= 7) return 'summer';
+    return 'autumn';
+  }
+
+  // Stable per-day pseudo-random: same date always gives the same weather
+  function hashInt(n) {
+    let x = (n * 2654435761) % 4294967296;
+    x = (x ^ (x >>> 13)) >>> 0;
+    x = (x * 1274126177) % 4294967296;
+    return (x ^ (x >>> 16)) >>> 0;
+  }
+
+  function cairoWeather(t) {
+    const seed = t.year * 10000 + (t.monthIndex + 1) * 100 + t.dayNum;
+    const pool = WX_SEASONS[seasonOf(t.monthIndex)];
+    const key = pool[hashInt(seed) % pool.length];
+    const w = WX[key];
+
+    const [hi, lo] = CAIRO_CLIMATE[t.monthIndex];
+    const mid = (hi + lo) / 2, amp = (hi - lo) / 2;
+    const curve = mid + amp * Math.cos((t.hour - 16) * Math.PI / 12);
+    const drift = (hashInt(seed + 7) % 5) - 2; // ±2°, steady through the day
+    const night = t.hour < 6 || t.hour >= 19;
+
+    return {
+      key,
+      icon: night ? w.nightIcon : w.icon,
+      label: w.label,
+      tint: w.tint,
+      note: night ? w.nightNote : w.note,
+      temp: Math.round(curve + drift + w.shift)
+    };
+  }
+
+  function renderWeather(t) {
+    const iconEl = document.getElementById('wxIcon');
+    if (!iconEl) return;
+    const w = cairoWeather(t);
+    iconEl.textContent = w.icon;
+    document.getElementById('wxTemp').textContent = w.temp + '°';
+    document.getElementById('wxCond').textContent = w.label;
+    document.getElementById('wxNote').textContent = w.note;
+    const layer = document.getElementById('windowWeather');
+    if (layer) layer.style.setProperty('--wx', w.tint);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  RIGHT NOW AT THE CAFÉ
+  //  Reads the visitor's clock and shows the café at that hour.
+  //  Scenes are ordered; the first whose [from,to) contains the
+  //  hour wins. `day` (0=Sun … 6=Sat) narrows to a weekday variant.
+  // ══════════════════════════════════════════════════════════
+  //  Doors open at 10am, close at 10pm.
+  const CAFE_SCENES = [
+    {
+      from: 0, to: 5, open: false, status: 'Closed',
+      line: 'The chairs are on the tables. One light is still on.',
+      detail: "Nobody is here except Me3temed, who does not appear to sleep and has never explained himself. The ovens are cold. Outside, the street is doing the quiet thing Cairo only does at this hour.",
+      who: ['🦉 Me3temed, awake']
+    },
+    {
+      from: 5, to: 8, open: false, status: 'Not open yet', day: 5,
+      line: "It's Friday, so Yuki is sitting at table four doing nothing.",
+      detail: "Ten minutes before she starts, every Friday, in the dark, ovens still cold. She calls it giving the room its five minutes to remember what it is. It has never once been five minutes.",
+      who: ['🐇 Yuki, not working yet']
+    },
+    {
+      from: 5, to: 8, open: false, status: 'Not open yet',
+      line: "Yuki is here. She's been here since five.",
+      detail: "The dough was made last night and has been rising in the dark. She works with the lights half on, because the full ones feel like an interruption. First tray goes in around six. Doors at ten.",
+      who: ['🐇 Yuki', '🌾 Dough, rising']
+    },
+    {
+      from: 8, to: 10, open: false, status: 'Not open yet', day: 2,
+      line: "It's Tuesday. Yuto left for the university at 7:15.",
+      detail: "Me3temed went with him — on his shoulder, in the tiny glasses, having decided some time ago that he is co-teaching. Hana is opening up alone and quietly prefers it this way, though she'd never say so. Doors at ten.",
+      who: ['🦊 Hana, opening', '🌿 Yuto, teaching', '🦉 Me3temed, co-teaching']
+    },
+    {
+      from: 8, to: 10, open: false, status: 'Not open yet',
+      line: "Two hours to go. The croissants are in.",
+      detail: "Hana is here now, unstacking chairs and talking to nobody in particular. Yuki is on her second tray. The whole room already smells like the reason people come. Doors at ten.",
+      who: ['🦊 Hana', '🐇 Yuki', '🥐 In the oven']
+    },
+    {
+      from: 10, to: 12, open: true, status: 'Open', day: 2,
+      line: "Doors are open, but Yuto is still at the university.",
+      detail: "The session runs till eleven. He'll come back after — he always stops at the café on the way, even when there's no reason to. Hana has the room. Somewhere across Cairo there is a small owl in tiny glasses being taken far more seriously than anyone expected.",
+      who: ['🦊 Hana', '🌿 Yuto, teaching', '🦉 Me3temed, in the glasses']
+    },
+    {
+      from: 10, to: 12, open: true, status: 'Open',
+      line: 'The doors just opened. The first kettle is on.',
+      detail: "The croissants are still warm enough to fog the plate. The first few people are settling in, choosing seats slowly the way you can when the room is empty. This is the best hour and almost nobody knows it.",
+      who: ['🦊 Hana', '🐇 Yuki', '🥐 Still warm']
+    },
+    {
+      from: 12, to: 14, open: true, status: 'Open',
+      line: "Midday. It's properly busy now.",
+      detail: "Every table has something on it. Yuki is down to the last few mochi waffles and has begun rationing them with her eyes alone. The machine hasn't stopped in forty minutes.",
+      who: ['🦊 Hana', '🐇 Yuki', '🌿 Yuto']
+    },
+    {
+      from: 14, to: 16, open: true, status: 'Open',
+      line: 'Early afternoon. The room has that full, warm sound.',
+      detail: "Conversations overlapping, a spoon against a cup, the door going every few minutes. If you wanted a seat right now you would have to want it quite badly.",
+      who: ['🦊 Hana', '🐇 Yuki', '🪑 No free tables']
+    },
+    {
+      from: 16, to: 18, open: true, status: 'Open · quiet',
+      line: 'The afternoon lull. Table four is free.',
+      detail: "This is the quietest the café gets while still being open. Hana is wiping down things that are already clean. The light has gone gold and moved across to the far wall. Come now if you want the place mostly to yourself.",
+      who: ['🦊 Hana', '🪑 Table four, empty', '🌇 Gold on the far wall']
+    },
+    {
+      from: 18, to: 20, open: true, status: 'Open',
+      line: 'Evening. The window seat is the best seat in Cairo.',
+      detail: "Everything in here is the colour of weak tea. People stay longer than they meant to and then stay a little longer than that. Nobody mentions it.",
+      who: ['🦊 Hana', '🌿 Yuto', '🌸 The good light']
+    },
+    {
+      from: 20, to: 21, open: true, status: 'Open',
+      line: 'The lamps are on and the room has gone small.',
+      detail: "Somebody is studying. Somebody is on their third free refill of genmaicha. The playlist drifted into its slow half without anyone deciding to let it.",
+      who: ['🦊 Hana', '🕯️ Lamps', '🎵 The slow half']
+    },
+    {
+      from: 21, to: 22, open: true, status: 'Closing soon',
+      line: "Last hour. Hana has started the closing playlist.",
+      detail: "She won't rush you — she never does. But the chairs at the back have begun going up, and there is a particular way she wipes the counter that means: soon.",
+      who: ['🦊 Hana', '🪑 Chairs going up']
+    },
+    {
+      from: 22, to: 23, open: false, status: 'Just closed',
+      line: "Just closed. Yuki is still at table four.",
+      detail: "She stays after — ten minutes, sometimes an hour — sitting in the dark with whatever she's reading. She says the room needs a moment to remember what it is. We stopped questioning it a long time ago.",
+      who: ['🐇 Yuki, staying', '🦉 Me3temed, watching']
+    },
+    {
+      from: 23, to: 24, open: false, status: 'Closed',
+      line: "Closed. The chairs are up and the last light is going off.",
+      detail: "Yuki went home twenty minutes ago. Hana counted the till, said goodnight to the room out of habit, and locked the door behind her. Ten hours until the dough comes out again.",
+      who: ['🦉 Me3temed, settling in']
+    }
+  ];
+
+  function renderNow(t) {
+    const card = document.getElementById('cardNow');
+    if (!card) return;
+
+    const h = t.hour;
+    const day = t.day;
+
+    const scene =
+      CAFE_SCENES.find(s => h >= s.from && h < s.to && s.day === day) ||
+      CAFE_SCENES.find(s => h >= s.from && h < s.to && s.day === undefined) ||
+      CAFE_SCENES[0];
+
+    card.classList.toggle('is-closed', !scene.open);
+    document.getElementById('nowStatus').textContent = scene.status;
+    document.getElementById('nowLine').textContent = scene.line;
+    document.getElementById('nowDetail').textContent = scene.detail;
+
+    const whoBox = document.getElementById('nowWho');
+    whoBox.replaceChildren();
+    scene.who.forEach(w => {
+      const chip = document.createElement('span');
+      chip.className = 'now-chip';
+      chip.textContent = w;
+      whoBox.appendChild(chip);
+    });
+  }
+
+  // ── The window seat: sky shifts with the hour
+  const SKIES = [
+    { to: 5,  sky: 'linear-gradient(to bottom, #131a30 0%, #26243f 55%, #3b3050 100%)', orb: '#dfe6f5', glow: 'rgba(223,230,245,0.35)', top: '16%', note: 'Right now: the long dark, and one lamp.' },
+    { to: 7,  sky: 'linear-gradient(to bottom, #4a3a5c 0%, #b0708a 45%, #f0b48a 100%)', orb: '#ffd9a8', glow: 'rgba(255,217,168,0.5)',  top: '66%', note: 'Right now: the sky going pink over the rooftops.' },
+    { to: 11, sky: 'linear-gradient(to bottom, #9fc6e8 0%, #cfe2f2 60%, #fbeadf 100%)', orb: '#fff6dc', glow: 'rgba(255,246,220,0.65)', top: '40%', note: 'Right now: the good morning light, all the way across the floor.' },
+    { to: 15, sky: 'linear-gradient(to bottom, #7fb6e3 0%, #b8d8ef 55%, #eef3f7 100%)', orb: '#fffdf2', glow: 'rgba(255,253,242,0.7)',  top: '14%', note: 'Right now: high, bright, and a little too warm by the glass.' },
+    { to: 18, sky: 'linear-gradient(to bottom, #8fb9db 0%, #dcc9ba 60%, #f6d9b8 100%)', orb: '#ffe6b0', glow: 'rgba(255,230,176,0.6)',  top: '52%', note: 'Right now: the four o’clock gold, moving up the far wall.' },
+    { to: 20, sky: 'linear-gradient(to bottom, #5b4a72 0%, #c47a7a 40%, #f2a86a 100%)', orb: '#ffc98a', glow: 'rgba(255,201,138,0.55)', top: '70%', note: 'Right now: the whole room the colour of weak tea.' },
+    { to: 24, sky: 'linear-gradient(to bottom, #141b31 0%, #2a2742 55%, #45304a 100%)', orb: '#e8ecf8', glow: 'rgba(232,236,248,0.32)', top: '22%', note: 'Right now: dark outside, warm in here.' }
+  ];
+
+  function renderWindow(t) {
+    const pane = document.getElementById('windowPane');
+    if (!pane) return;
+    const h = t.hour;
+    const s = SKIES.find(x => h < x.to) || SKIES[SKIES.length - 1];
+    pane.style.setProperty('--sky', s.sky);
+    pane.style.setProperty('--orb', s.orb);
+    pane.style.setProperty('--orb-glow', s.glow);
+    pane.style.setProperty('--orb-top', s.top);
+    document.getElementById('windowHour').textContent = s.note;
+  }
+
+  // The clock ticks every second; everything else only redraws when
+  // Cairo's hour actually changes, so a page left open stays honest.
+  let lastCairoHour = null;
+  function tick() {
+    const t = cairoNow();
+    renderClock(t);
+    if (t.hour !== lastCairoHour) {
+      lastCairoHour = t.hour;
+      renderNow(t);
+      renderWindow(t);
+      renderWeather(t);
+    }
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // ══════════════════════════════════════════════════════════
+  //  THE LETTERS — a readable archive
+  // ══════════════════════════════════════════════════════════
+  const LETTERS = {
+    morning: [
+      {
+        meta: '☀️ Morning Letter',
+        subject: '"Good morning. You don\'t have to be ready yet."',
+        body: "The day hasn't asked you for anything so far. That's worth noticing before it starts. Whatever you didn't finish yesterday is still going to be there in an hour, and it will survive you having a slow breakfast first. Yuki is here already. She's been here since five. Nobody asked her to be — she just likes the part of the morning nobody's using yet.",
+        sign: '— from our table to yours 🌸'
+      },
+      {
+        meta: '☀️ Morning Letter',
+        subject: '"On being the first one awake."',
+        body: "There's a specific quiet that only exists before other people are up, and it belongs entirely to whoever's in it. If that's you this morning: it's yours. Don't spend it catching up on things. Spend it on something small and useless and good. Hana makes her own coffee before she makes anyone else's. She says it's the only cup she actually tastes.",
+        sign: '— from our table to yours 🌸'
+      },
+      {
+        meta: '☀️ Morning Letter',
+        subject: '"You are allowed a boring day."',
+        body: "Not every morning has to begin something. Some mornings are just maintenance — you eat, you go, you come back, you sleep. That's not a wasted day, that's most of a life, and the people who are happy are mostly the ones who made peace with that. Come sit somewhere warm today, even for ten minutes. That counts.",
+        sign: '— from our table to yours 🌸'
+      }
+    ],
+    evening: [
+      {
+        meta: '🌙 Evening Letter',
+        subject: '"Whatever happened today, it\'s over now."',
+        body: "You can put it down. Not resolve it, not understand it — just put it down, the way you'd set a bag by the door instead of carrying it up the stairs. It'll still be there tomorrow if it needs to be. Most of it won't. Hana's started the closing playlist. The chairs at the back are going up. Nobody's rushing you.",
+        sign: '— goodnight from all of us 🌙'
+      },
+      {
+        meta: '🌙 Evening Letter',
+        subject: '"The ten minutes after closing."',
+        body: "Yuki stays after we lock up. Sits at table four in the dark, doesn't turn a light on, sometimes doesn't even read. She says the room needs a minute to remember what it is. We think she means she does. Either way, we've stopped questioning it — everyone should have ten minutes at the end of a day that belong to nothing.",
+        sign: '— goodnight from all of us 🌙'
+      },
+      {
+        meta: '🌙 Evening Letter',
+        subject: '"A short list of things that went fine today."',
+        body: "You got up. You handled something you didn't want to handle. You were probably kind to somebody without noticing you were doing it. That's a day. It doesn't have to have been a good one to have been enough of one. Sleep well. The window seat will still be the best seat in Cairo tomorrow.",
+        sign: '— goodnight from all of us 🌙'
+      }
+    ]
+  };
+
+  function showLetters(mode, btn) {
+    const stack = document.getElementById('letterStack');
+    if (!stack) return;
+    if (btn) {
+      btn.parentElement.querySelectorAll('button')
+        .forEach(b => b.classList.toggle('active', b === btn));
+    }
+    stack.replaceChildren();
+    LETTERS[mode].forEach(l => {
+      const el = document.createElement('div');
+      el.className = 'letter';
+      const meta = document.createElement('div');
+      meta.className = 'letter-meta';
+      meta.textContent = l.meta;
+      const subj = document.createElement('div');
+      subj.className = 'letter-subject';
+      subj.textContent = l.subject;
+      const body = document.createElement('div');
+      body.className = 'letter-body';
+      body.textContent = l.body;
+      const sign = document.createElement('span');
+      sign.className = 'letter-sign';
+      sign.textContent = l.sign;
+      el.append(meta, subj, body, sign);
+      stack.appendChild(el);
+    });
+  }
+  showLetters('morning', null);
+
+  // ══════════════════════════════════════════════════════════
+  //  TABLE FOUR — the guestbook
+  //
+  //  Notes are stored in this visitor's browser by default, so the
+  //  card works with no backend at all. To make the table SHARED
+  //  across everyone, deploy sakura-guestbook.gs (see README) and
+  //  paste its web-app URL here:
+  // ══════════════════════════════════════════════════════════
+  const GUESTBOOK_URL = ''; // '' = this browser only
+
+  const SEED_NOTES = [
+    { text: "Came here to work. Did none of it. Best day I've had in months.", who: 'R.' },
+    { text: "Told Hana it was my birthday. She didn't charge me for the cake. Still thinking about it.", who: 'anonymous' },
+    { text: "Been on the same page for twenty minutes and I don't mind at all.", who: 'Nour' },
+    { text: "If you're reading this and you needed a sign — this is it.", who: 'someone who was here Tuesday' },
+    { text: "Left my heart and a scarf. Keeping the scarf where it is.", who: 'M.' }
+  ];
+
+  const NOTES_KEY = 'sakuraTableFour';
+
+  // Source of truth for this visit. Seeded from localStorage where it's
+  // available, but kept in memory too — private windows and some embedded
+  // contexts throw on storage, and a note that vanishes after you write it
+  // is worse than one that simply doesn't outlive the tab.
+  let myNotes = (function () {
+    try { return JSON.parse(localStorage.getItem(NOTES_KEY)) || []; }
+    catch (e) { return []; }
+  })();
+
+  let sharedNotes = [];
+
+  function persistNotes() {
+    try { localStorage.setItem(NOTES_KEY, JSON.stringify(myNotes.slice(-40))); }
+    catch (e) { /* storage unavailable — the note lives for this session */ }
+  }
+
+  function renderNotes() {
+    const strip = document.getElementById('notesStrip');
+    if (!strip) return;
+    const all = SEED_NOTES
+      .map(n => ({ ...n, mine: false }))
+      .concat(sharedNotes.map(n => ({ ...n, mine: false })))
+      .concat(myNotes.map(n => ({ ...n, mine: true })));
+
+    strip.replaceChildren();
+    all.forEach((n, i) => {
+      const el = document.createElement('div');
+      el.className = 'note' + (n.mine ? ' mine' : '');
+      el.style.setProperty('--tilt', (((i * 37) % 5) - 2) * 0.6 + 'deg');
+      const t = document.createElement('div');
+      t.className = 'note-text';
+      t.textContent = '“' + n.text + '”';
+      const w = document.createElement('div');
+      w.className = 'note-who';
+      w.textContent = '— ' + (n.who || 'anonymous');
+      el.append(t, w);
+      strip.appendChild(el);
+    });
+  }
+
+  async function leaveNote() {
+    const textEl = document.getElementById('noteText');
+    const nameEl = document.getElementById('noteName');
+    const btn = document.getElementById('noteBtn');
+    const msg = document.getElementById('noteMsg');
+
+    const text = textEl.value.trim();
+    const who = nameEl.value.trim() || 'anonymous';
+
+    msg.style.display = 'none';
+    msg.classList.remove('err');
+
+    if (text.length < 2) {
+      msg.textContent = 'Write something first — anything at all.';
+      msg.classList.add('err');
+      msg.style.display = 'block';
+      textEl.focus();
+      return;
+    }
+
+    const note = { text, who };
+    btn.disabled = true;
+
+    if (GUESTBOOK_URL) {
+      try {
+        await fetch(GUESTBOOK_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(note)
+        });
+      } catch (e) { /* fall through — it's still kept locally */ }
+    }
+
+    myNotes.push(note);
+    persistNotes();
+    renderNotes();
+    textEl.value = '';
+    btn.disabled = false;
+    msg.textContent = "🌸 It's on the table.";
+    msg.style.display = 'block';
+
+    const strip = document.getElementById('notesStrip');
+    strip.scrollTo({ left: strip.scrollWidth, behavior: 'smooth' });
+  }
+
+  async function loadSharedNotes() {
+    renderNotes(); // paint seeds + this visitor's notes immediately
+    if (!GUESTBOOK_URL) return;
+    try {
+      const res = await fetch(GUESTBOOK_URL);
+      const data = await res.json();
+      if (Array.isArray(data)) { sharedNotes = data; renderNotes(); }
+    } catch (e) { /* keep seeds + local */ }
+  }
+  loadSharedNotes();
+
+  document.getElementById('noteText').addEventListener('keydown', e => {
+    if (e.key === 'Enter') leaveNote();
+  });
+
+  // ══════════════════════════════════════════════════════════
+  //  "WHAT DO YOU NEED TODAY?" — Hana's answer
+  // ══════════════════════════════════════════════════════════
+  const MOODS = {
+    tired: {
+      drink: 'The Long Morning',
+      note: "Sit by the window, I'll bring it over — you don't have to come back up to the counter. And I'm not going to ask how you're doing until you've had at least half of it."
+    },
+    heartbroken: {
+      drink: 'Sakura Blossom Tea',
+      note: "It takes four minutes, because the blossoms have to open again in the water. I know. Everyone says that's a lot to ask of a flower. Sit down. Four minutes is nothing."
+    },
+    sleepless: {
+      drink: 'Hojicha Latte',
+      note: "Almost no caffeine, and it tastes like something ending gently. Take the corner seat — the lamps are lower over there and nobody will talk to you. I'll make sure of it."
+    },
+    celebrating: {
+      drink: 'The Sakura Slice',
+      note: "On the good plate, with the blossom on top, and I'm bringing two forks whether or not there's somebody with you. That's not a comment. That's just how it's served."
+    },
+    overwhelmed: {
+      drink: 'Genmaicha, and table four',
+      note: "It refills for free, which means you don't have to decide anything for a while. Table four is open. Put your phone face down. That's the entire prescription."
+    },
+    new: {
+      drink: 'Matcha Latte',
+      note: "First time. Start here — it's the one we'd want you to remember us by. Sit anywhere. If you sit at table four you'll get the window, and then you'll come back, and then we'll have you."
+    }
+  };
+
+  function pickMood(key, btn) {
+    const m = MOODS[key];
+    if (!m) return;
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('moodDrink').textContent = m.drink;
+    document.getElementById('moodNote').textContent = '“' + m.note + '”';
+    document.getElementById('moodAnswer').classList.add('show');
+  }
+
   // ── Email submission → Google Sheets via Apps Script
   // 🔧 REPLACE THIS URL after you deploy the Apps Script web app:
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyPx6TziWg6PjpNiW15YAa8aE5jJuElxhL6hOYpnDxKGxtQ8xF9nLZYt3Q_u0vvxbn3/exec';
@@ -1646,39 +2788,15 @@
     if (e.key === 'Enter') submitEmail();
   });
 
-  // ── This Month's Read countdown
-  (function() {
-    const now = new Date();
-
-    // Target: end of April 2026 (month 3 = April, day 0 of May = last day of April)
-    const readEnd = new Date(2026, 4, 0, 23, 59, 59); // April 30 23:59:59
-    const daysLeft = Math.ceil((readEnd - now) / (1000 * 60 * 60 * 24));
-
-    document.getElementById('countdownNumber').textContent = daysLeft;
-    document.getElementById('monthLabel').textContent = 'April 2026';
-    document.getElementById('monthBadge').textContent = "April's Read";
-  })();
-
   // ── Bookshelf filter
-  function filterShelf(person) {
+  function filterShelf(person, btn) {
     // Update active tab
-    document.querySelectorAll('.shelf-tab').forEach(t => t.classList.remove('active'));
-    event.target.classList.add('active');
+    document.querySelectorAll('.shelf-tab').forEach(t => t.classList.toggle('active', t === btn));
 
-    // Show/hide books
+    // Show/hide books — only the ones this person specifically recommended
     document.querySelectorAll('.book-item').forEach(item => {
-      if (person === 'all') {
-        item.classList.remove('hidden');
-      } else {
-        const recommender = item.dataset.recommender;
-        const loved = item.dataset.loved.split(',');
-        // Only show books this person specifically recommended (first pick / chain rec)
-        if (recommender === person) {
-          item.classList.remove('hidden');
-        } else {
-          item.classList.add('hidden');
-        }
-      }
+      const show = person === 'all' || item.dataset.recommender === person;
+      item.classList.toggle('hidden', !show);
     });
   }
   function openStory() {
