@@ -123,6 +123,15 @@
     opacity: 0;
     animation: fadeUp 0.9s ease 0.7s forwards;
   }
+  .hero-cta {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 26px;
+    padding: 13px 24px; border-radius: 50px; text-decoration: none;
+    background: rgba(255,250,247,0.92); color: var(--sakura-dark);
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.3px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18); opacity: 0;
+    animation: fadeUp 0.9s ease 0.95s forwards; transition: transform 0.2s, background 0.2s;
+  }
+  .hero-cta:hover { transform: translateY(-2px); background: #fff; }
   .hero-logo {
     position: absolute;
     top: 36px;
@@ -1490,9 +1499,10 @@
   </div>
 
   <div class="hero-content">
-    <p class="hero-label">A dream café &nbsp;·&nbsp; Est. in imagination, 2024</p>
-    <h1 class="hero-title">Where every cup<br>holds a <em>little story.</em></h1>
-    <p class="hero-sub">A Japanese-inspired cozy café — imagined with love 🌸</p>
+    <p class="hero-label" id="heroLabel">A dream café &nbsp;·&nbsp; Est. in imagination, 2024</p>
+    <h1 class="hero-title" id="heroTitle">Where every cup<br>holds a <em>little story.</em></h1>
+    <p class="hero-sub" id="heroSub">A Japanese-inspired cozy café — imagined with love 🌸</p>
+    <a class="hero-cta" href="/cafe">Step inside the café →</a>
   </div>
 
   <div class="scroll-hint">
@@ -2096,6 +2106,7 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
       @sakuraslicecafe
     </a><br>
+    <a href="/cafe" style="color:var(--sakura-dark);font-weight:600;text-decoration:none;font-size:13px;">🪑 Step inside the 3D café</a><br>
     © 2026 Ahmed El-Bourgy &nbsp;·&nbsp; Made with 🌸 & matcha
   </div>
 </footer>
@@ -2110,15 +2121,15 @@
 <div class="story-overlay" id="storyOverlay" onclick="closeOnOverlay(event)">
   <div class="story-modal" id="storyModal">
     <button class="story-close" onclick="closeStory()">✕</button>
-    <img class="story-cover"
+    <img class="story-cover" id="storyCover"
       src="https://drive.google.com/thumbnail?id=1qcnY-7Q5ZHpSjhT_vnHKLrsM6TB4bTHy&sz=w1200"
       onerror="this.src='https://drive.google.com/uc?export=view&id=1qcnY-7Q5ZHpSjhT_vnHKLrsM6TB4bTHy'"
       alt="The Tuesday Morning Lecture">
     <div class="story-body">
       <div class="story-date" id="storyDate"></div>
-      <h2 class="story-title">The Tuesday Morning Lecture.</h2>
+      <h2 class="story-title" id="storyTitle">The Tuesday Morning Lecture.</h2>
       <div class="story-divider"></div>
-      <div class="story-text">
+      <div class="story-text" id="storyText">
         <p>Yuto's alarm goes off at 6:45 on Tuesday mornings.</p>
         <p>Me3temed is always already awake.</p>
         <p>He doesn't explain how. He is simply there — perched on the edge of the desk, watching the room with his soft half-open eyes, waiting for the morning to be officially acknowledged. When the alarm goes off and Yuto reaches to turn it off, Me3temed makes a small sound that means: <em>finally.</em></p>
@@ -2511,7 +2522,7 @@
   // ══════════════════════════════════════════════════════════
   //  THE LETTERS — a readable archive
   // ══════════════════════════════════════════════════════════
-  const LETTERS = {
+  let LETTERS = {
     morning: [
       {
         meta: '☀️ Morning Letter',
@@ -2586,14 +2597,14 @@
   // ══════════════════════════════════════════════════════════
   //  TABLE FOUR — the guestbook
   //
-  //  Notes are stored in this visitor's browser by default, so the
-  //  card works with no backend at all. To make the table SHARED
-  //  across everyone, deploy sakura-guestbook.gs (see README) and
-  //  paste its web-app URL here:
+  //  Notes are saved to the café's Postgres database through /api,
+  //  so everyone sees the same table. If the API can't be reached
+  //  (e.g. the page is opened as a plain file), notes are kept in
+  //  this visitor's browser instead.
   // ══════════════════════════════════════════════════════════
-  const GUESTBOOK_URL = ''; // '' = this browser only
+  const GUESTBOOK_URL = '/api/guestbook';
 
-  const SEED_NOTES = [
+  let SEED_NOTES = [
     { text: "Came here to work. Did none of it. Best day I've had in months.", who: 'R.' },
     { text: "Told Hana it was my birthday. She didn't charge me for the cake. Still thinking about it.", who: 'anonymous' },
     { text: "Been on the same page for twenty minutes and I don't mind at all.", who: 'Nour' },
@@ -2666,19 +2677,18 @@
     const note = { text, who };
     btn.disabled = true;
 
-    if (GUESTBOOK_URL) {
-      try {
-        await fetch(GUESTBOOK_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(note)
-        });
-      } catch (e) { /* fall through — it's still kept locally */ }
-    }
+    let shared = false;
+    try {
+      const res = await fetch(GUESTBOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(note)
+      });
+      shared = res.ok;
+    } catch (e) { /* fall through — it's still kept locally */ }
 
-    myNotes.push(note);
-    persistNotes();
+    if (shared) sharedNotes.push(note);
+    else { myNotes.push(note); persistNotes(); }
     renderNotes();
     textEl.value = '';
     btn.disabled = false;
@@ -2691,7 +2701,6 @@
 
   async function loadSharedNotes() {
     renderNotes(); // paint seeds + this visitor's notes immediately
-    if (!GUESTBOOK_URL) return;
     try {
       const res = await fetch(GUESTBOOK_URL);
       const data = await res.json();
@@ -2707,7 +2716,7 @@
   // ══════════════════════════════════════════════════════════
   //  "WHAT DO YOU NEED TODAY?" — Hana's answer
   // ══════════════════════════════════════════════════════════
-  const MOODS = {
+  let MOODS = {
     tired: {
       drink: 'The Long Morning',
       note: "Sit by the window, I'll bring it over — you don't have to come back up to the counter. And I'm not going to ask how you're doing until you've had at least half of it."
@@ -2766,19 +2775,37 @@
     errorEl.style.display = 'none';
 
     try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ email })
-      });
-      // no-cors means we can't read the response, so we optimistically show success
+      // Saved in Postgres; the server also keeps the Google Sheet in step.
+      let saved = false;
+      try {
+        const res = await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        saved = res.ok;
+        if (res.status === 400) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Please enter a valid email address.');
+        }
+      } catch (e) {
+        if (e.message && !/fetch|network/i.test(e.message)) throw e;
+      }
+      if (!saved) {
+        // No API here (static hosting): go straight to the Apps Script.
+        await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ email })
+        });
+      }
       document.getElementById('emailInputRow').style.display = 'none';
       successEl.style.display = 'flex';
     } catch (err) {
       btn.textContent = 'Join ✨';
       btn.disabled = false;
-      errorEl.textContent = 'Something went wrong. Please try again.';
+      errorEl.textContent = err.message && !/fetch|network/i.test(err.message) ? err.message : 'Something went wrong. Please try again.';
       errorEl.style.display = 'block';
     }
   }
@@ -2815,6 +2842,71 @@
     if (e.target === document.getElementById('storyOverlay')) closeStory();
   }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeStory(); });
+
+  // ══════════════════════════════════════════════════════════
+  //  CONTENT FROM THE DATABASE
+  //  Everything below can be changed from /admin (or straight in
+  //  Postgres, table site_content) without touching this file.
+  //  The text already in the page is the fallback.
+  // ══════════════════════════════════════════════════════════
+
+  // *italic* and {{spoken dialogue}} → safe DOM, never innerHTML.
+  function richText(el, text) {
+    el.replaceChildren();
+    String(text).split(/(\*[^*]+\*|\{\{[\s\S]+?\}\}|\n)/).forEach(part => {
+      if (!part) return;
+      if (part === '\n') { el.appendChild(document.createElement('br')); return; }
+      if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+        const em = document.createElement('em'); em.textContent = part.slice(1, -1); el.appendChild(em);
+      } else if (part.startsWith('{{')) {
+        const sp = document.createElement('span'); sp.className = 'dialogue'; sp.textContent = part.slice(2, -2); el.appendChild(sp);
+      } else el.appendChild(document.createTextNode(part));
+    });
+  }
+
+  function driveImage(idOrUrl, size) {
+    return /^https?:\/\//.test(idOrUrl) ? idOrUrl : `https://drive.google.com/thumbnail?id=${idOrUrl}&sz=${size}`;
+  }
+
+  async function loadContent() {
+    let c;
+    try {
+      const res = await fetch('/api/content');
+      if (!res.ok) return;
+      c = await res.json();
+    } catch (e) { return; } // static hosting: keep what's in the page
+
+    const hero = c['site.hero'];
+    if (hero) {
+      if (hero.label) document.getElementById('heroLabel').textContent = hero.label;
+      if (hero.title) richText(document.getElementById('heroTitle'), hero.title);
+      if (hero.subtitle) document.getElementById('heroSub').textContent = hero.subtitle;
+    }
+
+    const story = c['story.today'];
+    if (story && story.title && Array.isArray(story.paragraphs)) {
+      document.getElementById('storyTitle').textContent = story.title;
+      const text = document.getElementById('storyText');
+      text.replaceChildren(...story.paragraphs.map(p => { const el = document.createElement('p'); richText(el, p); return el; }));
+      if (story.image) {
+        const img = document.getElementById('storyCover');
+        img.src = driveImage(story.image, 'w1200');
+        img.alt = story.title;
+        img.onerror = /^https?:/.test(story.image) ? null
+          : function () { this.onerror = null; this.src = 'https://drive.google.com/uc?export=view&id=' + story.image; };
+      }
+    }
+
+    if (c.letters && Array.isArray(c.letters.morning) && Array.isArray(c.letters.evening)) {
+      LETTERS = c.letters;
+      const active = document.querySelector('.letter-toggle button.active, [onclick^="showLetters"].active');
+      const mode = active && /evening/.test(active.getAttribute('onclick') || '') ? 'evening' : 'morning';
+      showLetters(mode, null);
+    }
+    if (c.moods && typeof c.moods === 'object') MOODS = c.moods;
+    if (Array.isArray(c['guestbook.seed'])) { SEED_NOTES = c['guestbook.seed']; renderNotes(); }
+  }
+  loadContent();
 </script>
 </body>
 </html>

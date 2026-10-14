@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex">
+<title>Café Back Office</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗝️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Nunito:wght@400;600;700&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fef9f5; --card: #fffaf7; --text: #2d1f1f; --mid: #6b4c4c; --soft: #a07070;
+    --sakura: #f2a7bb; --sakura-light: #fde8ef; --sakura-dark: #d4678a; --matcha-dark: #4d7a4d;
+    --line: rgba(212,103,138,0.2); --field: #fff; --code: #fbf3ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1f1719; --card: #2a2022; --text: #fbeff0; --mid: #e6cfd2; --soft: #c7a5aa;
+      --sakura-light: #4a2f37; --line: rgba(242,167,187,0.22); --field: #2d2224; --code: #241b1d;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Nunito', sans-serif; min-height: 100vh; }
+  header { padding: 28px 16px 8px; max-width: 1100px; margin: 0 auto; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 2.4px; text-transform: uppercase; color: var(--sakura-dark); }
+  h1 { font-family: 'Playfair Display', serif; font-size: clamp(28px, 4vw, 40px); }
+  h1 em { color: var(--sakura-dark); }
+  h2 { font-family: 'Playfair Display', serif; font-size: 21px; margin-bottom: 4px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 22px; box-shadow: 0 8px 30px rgba(180,100,120,0.08); min-width: 0; }
+  .span12 { grid-column: span 12; } .span8 { grid-column: span 8; } .span4 { grid-column: span 4; } .span6 { grid-column: span 6; }
+  @media (max-width: 860px) { .span8, .span4, .span6 { grid-column: span 12; } }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+  .stat { background: var(--sakura-light); border-radius: 16px; padding: 14px 16px; }
+  .stat b { display: block; font-family: 'Playfair Display', serif; font-size: 28px; }
+  .stat span { font-size: 12px; color: var(--mid); font-weight: 600; }
+  .muted { color: var(--soft); font-size: 13px; line-height: 1.6; }
+  .keys { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+  .keys button { text-align: left; border: 1.5px solid var(--line); background: var(--field); color: var(--text); border-radius: 14px; padding: 10px 12px; font: inherit; cursor: pointer; }
+  .keys button.on { border-color: var(--sakura-dark); background: var(--sakura-light); }
+  .keys button b { display: block; font-size: 13.5px; }
+  .keys button small { color: var(--soft); font-size: 11.5px; }
+  textarea, input[type=text], input[type=email], input[type=password] {
+    width: 100%; border: 1.5px solid var(--line); background: var(--field); color: var(--text); border-radius: 14px; padding: 11px 13px; font: inherit; outline: none;
+  }
+  textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.55; min-height: 380px; background: var(--code); resize: vertical; tab-size: 2; }
+  textarea:focus, input:focus { border-color: var(--sakura); }
+  .btn { border: 0; border-radius: 999px; padding: 10px 18px; font: inherit; font-weight: 700; font-size: 13.5px; background: var(--sakura-dark); color: #fff; cursor: pointer; }
+  .btn.ghost { background: transparent; color: var(--sakura-dark); border: 1.5px solid var(--line); }
+  .btn.small { padding: 6px 12px; font-size: 12.5px; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .between { justify-content: space-between; }
+  .msg { font-size: 13px; min-height: 1.2em; margin-top: 8px; }
+  .msg.ok { color: var(--matcha-dark); } .msg.err { color: #b8405e; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--soft); }
+  td.text { overflow-wrap: anywhere; }
+  .scroll { max-height: 420px; overflow: auto; }
+  .hidden { display: none !important; }
+  #gate { max-width: 420px; margin: 60px auto; }
+  label span { display: block; font-size: 12px; font-weight: 700; color: var(--mid); margin: 10px 0 5px; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--sakura-light); color: var(--sakura-dark); }
+  a { color: var(--sakura-dark); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <p class="eyebrow">Sakura Slice Café</p>
+    <h1>The back <em>office.</em></h1>
+  </div>
+  <div class="row"><a href="/">Website</a> · <a href="/cafe">3D café</a> · <span id="who" class="muted"></span></div>
+</header>
+
+<div id="gate" class="card hidden">
+  <h2>Owners only</h2>
+  <p class="muted" id="gateMsg">Sign in with the account whose email is set as ADMIN_EMAIL on Railway.</p>
+  <form id="loginForm">
+    <label><span>Email or username</span><input type="text" name="login" required autocomplete="username"></label>
+    <label><span>Password</span><input type="password" name="password" required autocomplete="current-password"></label>
+    <div class="msg err" id="loginErr"></div>
+    <button class="btn" type="submit" style="margin-top:8px">Sign in</button>
+  </form>
+</div>
+
+<main id="app" class="hidden">
+  <section class="card span12">
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section class="card span4">
+    <h2>Site content</h2>
+    <p class="muted">Each piece lives in Postgres. Save, and the website and the café change straight away — no redeploy.</p>
+    <div class="keys" id="keys"></div>
+    <div class="row" style="margin-top:12px">
+      <input type="text" id="newKey" placeholder="new.key">
+      <button class="btn small ghost" id="addKey" type="button">Add</button>
+    </div>
+  </section>
+
+  <section class="card span8">
+    <div class="row between">
+      <div><h2 id="edKey">Pick something to edit</h2><p class="muted" id="edDesc"></p></div>
+      <span class="muted" id="edMeta"></span>
+    </div>
+    <textarea id="editor" spellcheck="false" disabled></textarea>
+    <div class="row between" style="margin-top:10px">
+      <div class="row">
+        <button class="btn" id="save" type="button" disabled>Save to database</button>
+        <button class="btn ghost" id="format" type="button" disabled>Tidy JSON</button>
+      </div>
+      <button class="btn ghost small" id="historyBtn" type="button" disabled>History</button>
+    </div>
+    <div class="msg" id="edMsg"></div>
+    <div id="history" class="hidden scroll"></div>
+  </section>
+
+  <section class="card span6">
+    <div class="row between"><h2>Notes in the café</h2><span class="muted" id="notesCount"></span></div>
+    <div class="scroll"><table><thead><tr><th>Note</th><th>By</th><th></th></tr></thead><tbody id="notes"></tbody></table></div>
+  </section>
+
+  <section class="card span6">
+    <div class="row between"><h2>Table Four guestbook</h2></div>
+    <div class="scroll"><table><thead><tr><th>Note</th><th>By</th><th></th></tr></thead><tbody id="guestbook"></tbody></table></div>
+  </section>
+
+  <section class="card span6">
+    <div class="row between"><h2>Letter subscribers</h2><a class="btn small" href="/api/admin/subscribers?format=csv">Download CSV</a></div>
+    <div class="scroll"><table><thead><tr><th>Email</th><th>Since</th></tr></thead><tbody id="subs"></tbody></table></div>
+  </section>
+
+  <section class="card span6">
+    <h2>Guests</h2>
+    <div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Admin</th></tr></thead><tbody id="users"></tbody></table></div>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let me = null, content = [], current = null;
+
+  async function api(path, opts = {}) {
+    const res = await fetch('/api' + path, {
+      method: opts.method || 'GET',
+      headers: opts.body !== undefined ? { 'Content-Type': 'application/json' } : {},
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) throw new Error((data && data.error) || res.statusText);
+    return data;
+  }
+  const el = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
+  const date = d => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  async function boot() {
+    try { me = (await api('/auth/me')).user; } catch (e) {}
+    if (!me || !me.isAdmin) {
+      $('gate').classList.remove('hidden');
+      if (me) $('gateMsg').textContent = `You're signed in as ${me.displayName}, but this account isn't an owner. Set ADMIN_EMAIL on Railway to its email and redeploy.`;
+      return;
+    }
+    $('gate').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    $('who').textContent = 'signed in as ' + me.displayName;
+    await Promise.all([loadStats(), loadContent(), loadNotes(), loadGuestbook(), loadSubs(), loadUsers()]);
+  }
+
+  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    try {
+      await api('/auth/login', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) });
+      boot();
+    } catch (err) { $('loginErr').textContent = err.message; }
+  });
+
+  async function loadStats() {
+    const s = await api('/admin/overview');
+    const items = [['online', 'in the café now'], ['users', 'accounts'], ['notes', 'notes & pins'], ['chat', 'chat messages'], ['guestbook', 'Table Four notes'], ['subscribers', 'letter subscribers']];
+    $('stats').replaceChildren(...items.map(([k, label]) => { const d = el('div', null, 'stat'); d.append(el('b', s[k]), el('span', label)); return d; }));
+  }
+
+  async function loadContent(select) {
+    content = (await api('/admin/content')).content;
+    $('keys').replaceChildren(...content.map(c => {
+      const b = el('button');
+      b.type = 'button';
+      b.append(el('b', c.key), el('small', c.description || ''));
+      b.onclick = () => edit(c.key);
+      b.dataset.key = c.key;
+      return b;
+    }));
+    if (select || current) edit(select || current);
+  }
+
+  function edit(key) {
+    const c = content.find(x => x.key === key) || { key, value: {}, description: '' };
+    current = key;
+    document.querySelectorAll('#keys button').forEach(b => b.classList.toggle('on', b.dataset.key === key));
+    $('edKey').textContent = key;
+    $('edDesc').textContent = c.description || '';
+    $('edMeta').textContent = c.updatedAt ? `saved ${date(c.updatedAt)}${c.updatedBy ? ' by ' + c.updatedBy : ''}` : 'not saved yet';
+    $('editor').value = JSON.stringify(c.value, null, 2);
+    ['editor', 'save', 'format', 'historyBtn'].forEach(id => { $(id).disabled = false; });
+    $('edMsg').textContent = '';
+    $('history').classList.add('hidden');
+  }
+
+  function parse() {
+    try { return { ok: true, value: JSON.parse($('editor').value) }; }
+    catch (e) { $('edMsg').className = 'msg err'; $('edMsg').textContent = 'That isn\'t valid JSON yet: ' + e.message; return { ok: false }; }
+  }
+
+  $('format').onclick = () => { const p = parse(); if (p.ok) $('editor').value = JSON.stringify(p.value, null, 2); };
+  $('save').onclick = async () => {
+    const p = parse();
+    if (!p.ok) return;
+    $('save').disabled = true;
+    try {
+      await api('/admin/content/' + encodeURIComponent(current), { method: 'PUT', body: { value: p.value } });
+      $('edMsg').className = 'msg ok';
+      $('edMsg').textContent = '🌸 Saved. It\'s live on the site now.';
+      await loadContent(current);
+      $('edMsg').className = 'msg ok';
+      $('edMsg').textContent = '🌸 Saved. It\'s live on the site now.';
+    } catch (e) { $('edMsg').className = 'msg err'; $('edMsg').textContent = e.message; }
+    $('save').disabled = false;
+  };
+  $('addKey').onclick = () => {
+    const k = $('newKey').value.trim();
+    if (!/^[a-z0-9_.-]{1,64}$/i.test(k)) { alert('Keys are letters, numbers, dots and dashes.'); return; }
+    content.push({ key: k, value: {}, description: '' });
+    $('newKey').value = '';
+    edit(k);
+  };
+  $('historyBtn').onclick = async () => {
+    const box = $('history');
+    if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+    const { history } = await api('/admin/content/' + encodeURIComponent(current) + '/history');
+    box.replaceChildren();
+    if (!history.length) box.append(el('p', 'No earlier versions yet.', 'muted'));
+    const t = el('table');
+    for (const h of history) {
+      const tr = el('tr');
+      tr.append(el('td', date(h.changedAt) + (h.changedBy ? ' · ' + h.changedBy : '')));
+      const td = el('td');
+      const b = el('button', 'Load this version', 'btn ghost small');
+      b.onclick = () => { $('editor').value = JSON.stringify(h.value, null, 2); $('edMsg').className = 'msg'; $('edMsg').textContent = 'Older version loaded — press Save to bring it back.'; };
+      td.append(b);
+      tr.append(td);
+      t.append(tr);
+    }
+    box.append(t);
+    box.classList.remove('hidden');
+  };
+
+  async function loadNotes() {
+    const { notes } = await api('/notes');
+    $('notesCount').textContent = notes.length + ' on the walls';
+    $('notes').replaceChildren(...notes.slice().reverse().map(n => {
+      const tr = el('tr');
+      const t = el('td', n.text, 'text');
+      t.append(el('div', `${n.surface} · ♥ ${n.hearts} · ${date(n.createdAt)}`, 'muted'));
+      const del = el('button', 'Take down', 'btn ghost small');
+      del.onclick = async () => { if (!confirm('Take this note down for everyone?')) return; await api('/notes/' + n.id, { method: 'DELETE' }); loadNotes(); loadStats(); };
+      const td = el('td'); td.append(del);
+      tr.append(t, el('td', n.author), td);
+      return tr;
+    }));
+  }
+
+  async function loadGuestbook() {
+    const { notes } = await api('/admin/guestbook');
+    $('guestbook').replaceChildren(...notes.map(n => {
+      const tr = el('tr');
+      const t = el('td', n.text, 'text');
+      t.append(el('div', date(n.createdAt), 'muted'));
+      if (n.hidden) t.append(el('span', 'hidden', 'pill'));
+      const b = el('button', n.hidden ? 'Show' : 'Hide', 'btn ghost small');
+      b.onclick = async () => { await api('/admin/guestbook/' + n.id, { method: 'PATCH', body: { hidden: !n.hidden } }); loadGuestbook(); };
+      const td = el('td'); td.append(b);
+      tr.append(t, el('td', n.who), td);
+      return tr;
+    }));
+  }
+
+  async function loadSubs() {
+    const { subscribers } = await api('/admin/subscribers');
+    $('subs').replaceChildren(...subscribers.slice().reverse().map(s => {
+      const tr = el('tr');
+      tr.append(el('td', s.email, 'text'), el('td', date(s.createdAt)));
+      return tr;
+    }));
+  }
+
+  async function loadUsers() {
+    const { users } = await api('/admin/users');
+    $('users').replaceChildren(...users.map(u => {
+      const tr = el('tr');
+      const name = el('td', u.displayName);
+      name.append(el('div', '@' + u.username, 'muted'));
+      const td = el('td');
+      if (u.id === me.id) td.append(el('span', 'you', 'pill'));
+      else {
+        const b = el('button', u.isAdmin ? 'Remove' : 'Make admin', 'btn ghost small');
+        b.onclick = async () => { await api('/admin/users/' + u.id, { method: 'PATCH', body: { isAdmin: !u.isAdmin } }); loadUsers(); };
+        td.append(b);
+      }
+      tr.append(name, el('td', u.email, 'text'), td);
+      return tr;
+    }));
+  }
+
+  boot();
+</script>
+</body>
+</html>

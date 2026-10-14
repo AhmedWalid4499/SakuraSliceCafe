@@ -1,0 +1,235 @@
+{
+  "story.today": {
+    "value": {
+      "title": "The Tuesday Morning Lecture.",
+      "image": "1qcnY-7Q5ZHpSjhT_vnHKLrsM6TB4bTHy",
+      "paragraphs": [
+        "Yuto's alarm goes off at 6:45 on Tuesday mornings.",
+        "Me3temed is always already awake.",
+        "He doesn't explain how. He is simply there — perched on the edge of the desk, watching the room with his soft half-open eyes, waiting for the morning to be officially acknowledged. When the alarm goes off and Yuto reaches to turn it off, Me3temed makes a small sound that means: *finally.*",
+        "By 7:15 they are both ready. Yuto in jeans and a clean shirt — the specific clothes of someone who is not quite a student and not quite a professor but something warmer than either. Me3temed in his café apron, which he refuses to remove even on university days, plus — for occasions of academic seriousness — a tiny pair of glasses that Yuto found for him in a curiosity shop in Khan el Khalili and which fit, against all reasonable expectation, perfectly.",
+        "They match. They have been told this. They do not disagree.",
+        "The drive to the university takes twenty minutes on a good Cairo morning, thirty-five on a Tuesday. They take it without complaint. Me3temed watches Cairo through the window the way he watches everything — quietly, completely, missing nothing. 🌿",
+        "The classroom smells like old books and whiteboard marker and the specific dusty warmth of a room that has held a lot of thinking.",
+        "Yuto loves it immediately, every time.",
+        "He sets his bag down. Opens his laptop. Writes one thing on the board before anyone arrives — not a topic, not an agenda. Just a question. The kind that doesn't have a clean answer and knows it.",
+        "The students come in slowly, the way students do at 9am — some still carrying coffee, some clearly having decided that presence counts as participation, a few already looking at him with the expression of people who came ready and are glad to be here.",
+        "Me3temed settles on Yuto's left shoulder. Adjusts his glasses. Surveys the room.",
+        "He has decided he is co-teaching. Yuto has not corrected this. 🦉",
+        "What Yuto loves about teaching — the thing he couldn't have explained before he started but now couldn't unknow — is the moment a room changes.",
+        "It doesn't always happen. Some sessions are good and practical and useful and that is enough. But sometimes — maybe once in a few weeks, maybe more — something shifts. A student says something that reframes the whole discussion. A question opens a door everyone was standing in front of without noticing. The room stops being a room full of people who showed up and becomes something else: a room full of people who are thinking together, following something, pulled forward by the same thread.",
+        "Those moments, Yuto has learned, cannot be manufactured. They can only be created conditions for.",
+        "So he creates conditions. He asks the strange questions. He leaves space after them. He doesn't fill the silence too quickly because he has learned that silence, attended to carefully, is often just a thought finishing its sentence.",
+        "Me3temed, on his shoulder, watches all of it with his steady eyes. Occasionally a student notices the small owl in the tiny glasses and loses their train of thought entirely. Yuto has factored this into the pacing. 🌸",
+        "By eleven the session is done. The students gather their things slowly — the ones who are in no rush to leave are, in Yuto's experience, always the ones who got something from it, even if they couldn't say what yet.",
+        "One student stops at the door.",
+        "{{I've been thinking about that question you asked last week,}} she says. {{I think I finally have something like an answer.}}",
+        "{{Tell me next time,}} Yuto says. {{I want to hear it.}}",
+        "She nods and goes. Me3temed watches her leave.",
+        "*Good one,* Me3temed says, in the way he says things — which is not in words, but in the specific stillness that means: yes. that was the right thing.",
+        "They stop at the café on the way back.",
+        "Not because they have to. Because it is where the day makes sense when they get back to it. Yuto unlocks the door. Puts the kettle on. Sits at table four for ten minutes before anyone arrives — the way Yuki does on Fridays, giving the space its five minutes to remember what it is.",
+        "Me3temed removes his academic glasses. Returns to his corner stool. Looks out the window at the Cairo afternoon with the expression of someone who has had a full morning and is exactly where he is supposed to be.",
+        "Yuto writes one thing in his notebook — not notes from the session, not a task, just a sentence. Something one of the students said that he wants to keep.",
+        "The café begins to fill.",
+        "The Tuesday continues.",
+        "Some days, Yuto thinks, are the kind that remind you why you chose everything you chose. The university in the morning, the café in the afternoon, the questions in between. The students who stop at the door. The small owl in the tiny glasses who watches it all and says nothing and means everything.",
+        "Those days, he has learned, are not rare.",
+        "They are Tuesdays.",
+        "*They are always Tuesdays.* 🌿🌸"
+      ]
+    },
+    "description": "Today's Café Story modal. image = Google Drive file id (or a full https URL). In paragraphs, *text* is italic and {{text}} is spoken dialogue."
+  },
+  "letters": {
+    "value": {
+      "morning": [
+        {
+          "meta": "☀️ Morning Letter",
+          "subject": "\"Good morning. You don't have to be ready yet.\"",
+          "body": "The day hasn't asked you for anything so far. That's worth noticing before it starts. Whatever you didn't finish yesterday is still going to be there in an hour, and it will survive you having a slow breakfast first. Yuki is here already. She's been here since five. Nobody asked her to be — she just likes the part of the morning nobody's using yet.",
+          "sign": "— from our table to yours 🌸"
+        },
+        {
+          "meta": "☀️ Morning Letter",
+          "subject": "\"On being the first one awake.\"",
+          "body": "There's a specific quiet that only exists before other people are up, and it belongs entirely to whoever's in it. If that's you this morning: it's yours. Don't spend it catching up on things. Spend it on something small and useless and good. Hana makes her own coffee before she makes anyone else's. She says it's the only cup she actually tastes.",
+          "sign": "— from our table to yours 🌸"
+        },
+        {
+          "meta": "☀️ Morning Letter",
+          "subject": "\"You are allowed a boring day.\"",
+          "body": "Not every morning has to begin something. Some mornings are just maintenance — you eat, you go, you come back, you sleep. That's not a wasted day, that's most of a life, and the people who are happy are mostly the ones who made peace with that. Come sit somewhere warm today, even for ten minutes. That counts.",
+          "sign": "— from our table to yours 🌸"
+        }
+      ],
+      "evening": [
+        {
+          "meta": "🌙 Evening Letter",
+          "subject": "\"Whatever happened today, it's over now.\"",
+          "body": "You can put it down. Not resolve it, not understand it — just put it down, the way you'd set a bag by the door instead of carrying it up the stairs. It'll still be there tomorrow if it needs to be. Most of it won't. Hana's started the closing playlist. The chairs at the back are going up. Nobody's rushing you.",
+          "sign": "— goodnight from all of us 🌙"
+        },
+        {
+          "meta": "🌙 Evening Letter",
+          "subject": "\"The ten minutes after closing.\"",
+          "body": "Yuki stays after we lock up. Sits at table four in the dark, doesn't turn a light on, sometimes doesn't even read. She says the room needs a minute to remember what it is. We think she means she does. Either way, we've stopped questioning it — everyone should have ten minutes at the end of a day that belong to nothing.",
+          "sign": "— goodnight from all of us 🌙"
+        },
+        {
+          "meta": "🌙 Evening Letter",
+          "subject": "\"A short list of things that went fine today.\"",
+          "body": "You got up. You handled something you didn't want to handle. You were probably kind to somebody without noticing you were doing it. That's a day. It doesn't have to have been a good one to have been enough of one. Sleep well. The window seat will still be the best seat in Cairo tomorrow.",
+          "sign": "— goodnight from all of us 🌙"
+        }
+      ]
+    },
+    "description": "Morning and evening letters shown in the Letters card."
+  },
+  "moods": {
+    "value": {
+      "tired": {
+        "drink": "The Long Morning",
+        "note": "Sit by the window, I'll bring it over — you don't have to come back up to the counter. And I'm not going to ask how you're doing until you've had at least half of it."
+      },
+      "heartbroken": {
+        "drink": "Sakura Blossom Tea",
+        "note": "It takes four minutes, because the blossoms have to open again in the water. I know. Everyone says that's a lot to ask of a flower. Sit down. Four minutes is nothing."
+      },
+      "sleepless": {
+        "drink": "Hojicha Latte",
+        "note": "Almost no caffeine, and it tastes like something ending gently. Take the corner seat — the lamps are lower over there and nobody will talk to you. I'll make sure of it."
+      },
+      "celebrating": {
+        "drink": "The Sakura Slice",
+        "note": "On the good plate, with the blossom on top, and I'm bringing two forks whether or not there's somebody with you. That's not a comment. That's just how it's served."
+      },
+      "overwhelmed": {
+        "drink": "Genmaicha, and table four",
+        "note": "It refills for free, which means you don't have to decide anything for a while. Table four is open. Put your phone face down. That's the entire prescription."
+      },
+      "new": {
+        "drink": "Matcha Latte",
+        "note": "First time. Start here — it's the one we'd want you to remember us by. Sit anywhere. If you sit at table four you'll get the window, and then you'll come back, and then we'll have you."
+      }
+    },
+    "description": "\"What do you need today?\" — Hana's answer for each mood."
+  },
+  "guestbook.seed": {
+    "value": [
+      {
+        "text": "Came here to work. Did none of it. Best day I've had in months.",
+        "who": "R."
+      },
+      {
+        "text": "Told Hana it was my birthday. She didn't charge me for the cake. Still thinking about it.",
+        "who": "anonymous"
+      },
+      {
+        "text": "Been on the same page for twenty minutes and I don't mind at all.",
+        "who": "Nour"
+      },
+      {
+        "text": "If you're reading this and you needed a sign — this is it.",
+        "who": "someone who was here Tuesday"
+      },
+      {
+        "text": "Left my heart and a scarf. Keeping the scarf where it is.",
+        "who": "M."
+      }
+    ],
+    "description": "Notes that are always on Table Four, before any visitor writes."
+  },
+  "site.hero": {
+    "value": {
+      "label": "A dream café  ·  Est. in imagination, 2024",
+      "title": "Where every cup\nholds a *little story.*",
+      "subtitle": "A Japanese-inspired cozy café — imagined with love 🌸"
+    },
+    "description": "Hero headline on the main website. *text* is italic; a new line (\\n) breaks the line."
+  },
+  "cafe.welcome": {
+    "value": {
+      "title": "Welcome in.",
+      "lines": [
+        "Take any seat you like. Nobody is going to rush you.",
+        "Leave a note on the board, or on a table, for whoever sits there next.",
+        "The music is soft on purpose. Turn it up, or turn it off — the café will not mind."
+      ],
+      "sign": "— Yuto 🌸"
+    },
+    "description": "Welcome card shown when someone steps into the 3D café."
+  },
+  "cafe.sound": {
+    "value": {
+      "master": 0.7,
+      "music": 0.55,
+      "rain": 0.35,
+      "murmur": 0.25,
+      "fire": 0.3,
+      "birds": 0.15,
+      "chimes": 0.4
+    },
+    "description": "Default sound mix in the 3D café (0 to 1). Each visitor can change their own mix; this is where new visitors start."
+  },
+  "cafe.menu": {
+    "value": [
+      {
+        "id": "matcha",
+        "name": "Warm Oat Milk Matcha",
+        "by": "Hana",
+        "color": "#8fbf6a"
+      },
+      {
+        "id": "hojicha",
+        "name": "Hojicha with Oat Milk",
+        "by": "Hana",
+        "color": "#a0714f"
+      },
+      {
+        "id": "cardamom",
+        "name": "Honey Cardamom Milk",
+        "by": "Yuto",
+        "color": "#efe0c4"
+      },
+      {
+        "id": "ginger",
+        "name": "Lemon Ginger Honey Tea",
+        "by": "Hana",
+        "color": "#e8b44a"
+      },
+      {
+        "id": "vanilla",
+        "name": "Iced Honey Vanilla Latte",
+        "by": "Yuki",
+        "color": "#d9b48f"
+      },
+      {
+        "id": "sakura",
+        "name": "Sakura Blossom Tea",
+        "by": "Hana",
+        "color": "#f2a7bb"
+      },
+      {
+        "id": "blueberry",
+        "name": "Blueberry Oat Smoothie",
+        "by": "Yuki",
+        "color": "#7b6fb0"
+      },
+      {
+        "id": "strawberry",
+        "name": "Strawberry Banana Smoothie",
+        "by": "Yuki",
+        "color": "#ee8a99"
+      }
+    ],
+    "description": "Drinks you can order at the counter in the 3D café. color = the colour of the drink in the cup."
+  },
+  "cafe.board": {
+    "value": {
+      "title": "The Community Board",
+      "subtitle": "pin something kind for a stranger"
+    },
+    "description": "Sign above the cork board in the 3D café."
+  }
+}

@@ -33,11 +33,75 @@ This is the **introduction landing page** for the concept — a single HTML file
 ```
 SakuraSliceCafe/
 │
-├── index.html              ← The entire website (single file)
-└── sakura-guestbook.gs     ← OPTIONAL Apps Script — makes Table Four shared
+├── public/
+│   ├── index.html          ← The website (single file, now reads content from the database)
+│   ├── cafe.html           ← The 3D virtual café — /cafe
+│   ├── cafe/               ← The café's modules
+│   │   ├── app.js          ←   accounts, walking, sitting, notes, ordering, chat, live presence
+│   │   ├── world.js        ←   the room, furniture, the team, Cairo outside, time-of-day light
+│   │   ├── avatar.js       ←   smooth rounded characters (people, fox, rabbit, cat, owl)
+│   │   ├── notes.js        ←   notes & pins drawn on high-res paper
+│   │   └── audio.js        ←   the generated soundscape (music, rain, fire, café hum…)
+│   └── admin.html          ← The back office — /admin
+├── server/
+│   ├── index.js            ← Express server + WebSocket
+│   ├── api.js              ← All /api routes
+│   ├── realtime.js         ← Live café: who's here, where they stand, broadcasts
+│   ├── auth.js             ← Accounts + sessions
+│   ├── db.js               ← Postgres connection + migrations
+│   ├── schema.sql          ← Every table
+│   └── seed-content.json   ← The site's starting content (written once, then lives in Postgres)
+├── railway.json            ← Railway deploy settings (start command + health check)
+└── sakura-guestbook.gs     ← Legacy Apps Script guestbook (no longer needed)
 ```
 
-The whole site lives in **one self-contained HTML file** — no frameworks, no build tools, no dependencies beyond Google Fonts. Just vanilla HTML, CSS, and JavaScript.
+---
+
+## 🚂 Deploying on Railway (with Postgres)
+
+1. In the Railway project, add a **Postgres** service (if it isn't there yet).
+2. On the website service → **Variables**, add:
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`
+   - `ADMIN_EMAIL` = the email you'll register with (this account becomes the owner)
+   - `NODE_ENV` = `production`
+   - `APPS_SCRIPT_URL` *(optional)* = your old email-collector web-app URL, so new signups also land in the Google Sheet the SendGrid sender reads
+3. Deploy. On start the server creates every table and seeds the content — safe to run on every deploy, it never overwrites what you've edited.
+4. Visit `/cafe`, register with your `ADMIN_EMAIL`, and `/admin` opens up for you.
+
+Local: `cp .env.example .env`, point `DATABASE_URL` at any Postgres, then `npm install && npm start` → http://localhost:3000.
+
+### What's in the database
+
+| Table | What it holds |
+|-------|---------------|
+| `users` | Accounts, avatar, personal sound mix & preferences |
+| `sessions` | Sign-in sessions (only a hash of each token is stored) |
+| `cafe_notes` | Every note & pin left in the 3D café — position, colour, text, author |
+| `note_hearts` | Who ♥'d which note |
+| `chat_messages` | The café's quiet chat |
+| `guestbook_notes` | Table Four notes from the website (can be hidden from /admin) |
+| `subscribers` | Morning & evening letter signups (CSV export in /admin) |
+| `site_content` | **Everything editable**: today's story, letters, moods, hero text, café menu, welcome card, default sound mix, board sign |
+| `site_content_history` | Every earlier version of each content row — nothing is ever lost |
+
+Change a `site_content` row (in `/admin`, or directly in Postgres) and the website and café pick it up immediately — no redeploy. People already inside the café see changes live.
+
+---
+
+## 🪑 The 3D Café — `/cafe`
+
+- **Accounts** — join with a name, username, email and password; sign back in any time.
+- **Avatar creator** — a person, fox, rabbit, cat or owl; skin/fur, hair style & colour, outfit, accent, and a little extra (glasses, headphones, scarf, beanie, a sakura flower). Saved to your account.
+- **Smooth, not pixelated** — real 3D with antialiasing, soft shadows, filmic tone mapping, high-resolution generated textures and rounded geometry. A *Picture* setting (Sharpest / Balanced / Gentle on battery) lives in the sound panel.
+- **Relaxing sound, generated live** — a slow electric-piano progression with a wandering melody that never loops the same way, soft rain on the glass, a far-off café hum with the odd cup clink, a fireplace that gets louder as you walk closer (3D audio), sparrows by day and crickets by night, and the door's wind chime. Every channel has its own slider; your mix is saved to your account.
+- **Notes & pins everyone sees** — 📌 *Leave a note* on the Community Board, any table (including Mariam's corner), or a wall. Sticky notes or pinned cards, six paper colours. They appear for everyone instantly, can be ♥'d, and only their author (or the owner) can take them down.
+- **People, live** — see who else is in, walking and sitting; wave, send a little emoji, or chat. Chat shows as soft bubbles over heads.
+- **Sit anywhere** — click a chair or an armchair by the fire.
+- **Order a drink** — click Hana or the counter; the drink appears in your hand (and others see it). The menu is the `cafe.menu` content row.
+- **The team** — Yuto (tortoiseshell glasses, cream apron), Hana the fox, Yuki the rabbit, and Me3temed on his top shelf with his forest-green bowtie. Click them.
+- **Cairo, right now** — the light, the sky through the back door and windows, the stars, and whether the lamps carry the room all follow Cairo's real clock.
+
+Controls: **WASD / arrows** or click the floor to walk · **drag** to look · **scroll** to zoom · **Enter** to chat · **Esc** to close.
 
 ---
 
@@ -103,12 +167,12 @@ A CSS window — no image needed — whose sky gradient, sun/moon position and g
 Six letters (three morning, three evening) live in the `LETTERS` object. The toggle swaps sets; the signup form sits underneath. Add a letter by pushing an object with `meta`, `subject`, `body`, `sign`.
 
 ### 🪑 Table Four
-A guestbook, seeded with five notes already "on the table."
+A guestbook, seeded with five notes already "on the table" (the `guestbook.seed` content row).
 
-- **Works with no backend** — notes are kept in the visitor's browser
+- **Shared through Postgres** — notes are saved via `/api/guestbook`, so every visitor sees the same table
+- If the API can't be reached (e.g. the file opened locally), notes fall back to the visitor's browser
 - Held in memory as well as `localStorage`, so notes still appear in private windows and other storage-blocked contexts
 - All note text is rendered with `textContent`, so pasted markup can never execute
-- Optional: deploy `sakura-guestbook.gs` and set `GUESTBOOK_URL` to make the table **shared across all visitors**
 
 ### 🍵 The Menu
 Its own full section, not a card. **No prices** — the café doesn't exist, so nothing costs anything.
@@ -175,82 +239,28 @@ Four equal square cards for the café's imagined characters:
 
 ---
 
-## ⚙️ Google Apps Script Setup
+## 💌 Letter signups
 
-The email signup requires a small backend to write to Google Sheets.
-
-### Step 1 — Deploy the script
-
-1. Go to [script.google.com](https://script.google.com)
-2. Create a new project and paste your email-collector script
-3. Click **Deploy → New deployment**
-4. Set type to **Web app**, execute as **Me**, access **Anyone**
-5. Copy the generated Web App URL
-
-### Step 2 — Connect to the HTML
-
-In `index.html`, find this line and replace the URL:
-
-```js
-const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
-```
-
-### How it works
-
-```
-User enters email → clicks Join
-        ↓
-fetch() POST → Apps Script Web App
-        ↓
-Script checks for duplicates in Column A
-        ↓
-Writes email to next empty row (starting A2)
-        ↓
-Returns success → page shows "🌸 You're in!"
-```
-
-> **Note:** The request uses `mode: 'no-cors'` so the browser can't read the response. The page optimistically shows success after the request fires.
-
----
-
-## 🪑 Table Four Setup (optional)
-
-Table Four works out of the box — notes are stored in each visitor's own browser. Deploy this only when you want **everyone to see the same notes**.
-
-1. Make a Google Sheet, name the first tab **`TableFour`**, headers in row 1: `Timestamp | Name | Note`
-2. Paste `sakura-guestbook.gs` into a new [script.google.com](https://script.google.com) project
-3. Set `SHEET_ID` at the top of the script to your sheet's ID
-4. **Deploy → New deployment → Web app**, execute as **Me**, access **Anyone**
-5. Paste the URL into `index.html`:
-
-```js
-const GUESTBOOK_URL = 'https://script.google.com/macros/s/..../exec';
-```
-
-`doPost` appends a note; `doGet` returns the latest 60 as JSON. If the fetch fails for any reason, the card quietly falls back to the seed notes plus whatever this visitor wrote.
+Signups go to `/api/subscribe` and are stored in the `subscribers` table (export from `/admin` as CSV). If `APPS_SCRIPT_URL` is set on Railway, the server also forwards each new address to that Apps Script, so the Google Sheet the SendGrid sender reads stays in step. If the page is ever served without the API (static hosting), it falls back to posting straight to the Apps Script.
 
 ---
 
 ## 🔄 Updating the Daily Story
 
-The story modal is designed to be updated every day. Here's what to change:
+Open `/admin` → `story.today` and edit:
 
-```html
-<!-- 1. Swap the cover image src -->
-<img class="story-cover"
-  src="https://drive.google.com/thumbnail?id=YOUR_NEW_IMAGE_ID&sz=w1200"
-  ...>
-
-<!-- 2. Update the story title -->
-<h2 class="story-title">Your New Story Title</h2>
-
-<!-- 3. Replace the story paragraphs -->
-<div class="story-text">
-  <p>Your new story goes here...</p>
-</div>
+```json
+{
+  "title": "Your New Story Title",
+  "image": "GOOGLE_DRIVE_FILE_ID (or a full https:// URL)",
+  "paragraphs": [
+    "First paragraph. *Italic words* like this.",
+    "{{Spoken dialogue,}} she says. {{Like this.}}"
+  ]
+}
 ```
 
-The date auto-generates from the user's system clock — no changes needed there.
+Save, and the modal changes for everyone straight away. The date still comes from the visitor's clock. Older versions are kept under **History**.
 
 ---
 
@@ -286,16 +296,16 @@ https://drive.google.com/thumbnail?id=FILE_ID&sz=w600
 ## 🧠 Tech Stack
 
 ```
-HTML5          → Structure
-CSS3           → Layout (bento grid, flexbox), animations, custom properties
-Vanilla JS     → Petals, email submission, modal, date generation
-Google Fonts   → Playfair Display, Nunito, Dancing Script
-Google Drive   → Image hosting
-Google Sheets  → Email collection backend
-Apps Script    → Serverless POST endpoint
+HTML / CSS / vanilla JS  → The website and the café UI
+Three.js (r169, via npm) → The 3D café
+Web Audio API            → The generated soundscape — no audio files
+Node.js + Express        → Server and /api
+ws                       → Live presence, chat and note broadcasts
+PostgreSQL (Railway)     → Accounts, notes, chat, guestbook, subscribers, all site content
+bcryptjs                 → Password hashing
+Google Drive             → Image hosting
+Apps Script + SendGrid   → The morning & night emails (Sheet kept in sync)
 ```
-
-No frameworks. No build step. No node_modules. Just one file. 🌸
 
 ---
 
