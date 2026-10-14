@@ -348,7 +348,7 @@ let lastSentState = '';
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen = () => { wsRetry = 0; sendMove(true); };
+  ws.onopen = () => { wsRetry = 0; sendMove(true); loadNotes(); };
   ws.onmessage = ev => {
     let m;
     try { m = JSON.parse(ev.data); } catch (e) { return; }
@@ -468,11 +468,24 @@ function removeNote(id) {
   if (state.reading === id) closePanels();
 }
 
+// Brings the walls in line with the database: adds notes we haven't seen,
+// removes ones that were taken down, and refreshes hearts. Runs on entry
+// and every half minute, so nobody misses a note even if a live message
+// was dropped on the way.
 async function loadNotes() {
   try {
     const { notes } = await api('/notes');
-    for (const id of [...state.notes.keys()]) removeNote(id);
-    notes.forEach(addNote);
+    const ids = new Set(notes.map(n => n.id));
+    for (const id of [...state.notes.keys()]) if (!ids.has(id)) removeNote(id);
+    for (const n of notes) {
+      const have = state.notes.get(n.id);
+      if (!have) addNote(n);
+      else if (have.note.hearts !== n.hearts) {
+        have.note.hearts = n.hearts;
+        have.note.hearted = n.hearted;
+        have.group.userData.setHearts(n.hearts);
+      }
+    }
   } catch (e) { /* the café still works without them */ }
 }
 
@@ -1194,6 +1207,7 @@ $('enterBtn').onclick = async () => {
   canvas.focus();
 
   connect();
+  loadNotes();
   try {
     const { messages } = await api('/chat');
     messages.forEach(addChat);
@@ -1251,5 +1265,5 @@ if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player,
     $('door').classList.remove('hidden');
   }
   // notes refresh quietly now and then, in case a message was missed
-  setInterval(() => { if (state.started && (!ws || ws.readyState !== 1)) loadNotes(); }, 60000);
+  setInterval(() => { if (!document.hidden) loadNotes(); }, 30000);
 })();

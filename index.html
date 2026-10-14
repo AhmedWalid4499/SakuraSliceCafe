@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sakura Slice Café</title>
+<!--
+  Only GitHub Pages ever serves this file. The real site (with the 3D café,
+  accounts and shared notes) runs on Railway from public/, so this sends
+  visitors there, keeping the page they asked for (e.g. /cafe).
+  Once sakuraslicecafe.com points at Railway, nobody will see this page.
+-->
+<meta http-equiv="refresh" content="0; url=https://sakura-slice-cafe-production.up.railway.app/">
+<script>
+  location.replace('https://sakura-slice-cafe-production.up.railway.app'
+    + location.pathname + location.search + location.hash);
+</script>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fef9f5; color: #6b4c4c; font-family: Georgia, serif; text-align: center; }
+  a { color: #d4678a; }
+</style>
+</head>
+<body>
+  <p>🌸 The café has moved — <a href="https://sakura-slice-cafe-production.up.railway.app/">step inside here</a>.</p>
+</body>
+</html>
