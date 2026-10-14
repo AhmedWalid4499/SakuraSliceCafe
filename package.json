@@ -1,0 +1,23 @@
+{
+  "name": "sakura-slice-cafe",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sakura Slice Café — website, 3D virtual café and Postgres backend",
+  "main": "server/index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "migrate": "node server/migrate.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "three": "^0.169.0",
+    "ws": "^8.18.0"
+  }
+}

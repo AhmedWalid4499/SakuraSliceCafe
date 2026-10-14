@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Sakura Slice Café — Step Inside</title>
+<meta name="description" content="A cozy virtual café in Cairo. Make an avatar, find a seat, leave a note for a stranger.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Nunito:wght@300;400;600;700&family=Dancing+Script:wght@500;700&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "/vendor/three/build/three.module.js",
+  "three/addons/": "/vendor/three/addons/"
+} }
+</script>
+<style>
+  :root {
+    --sakura: #f2a7bb; --sakura-light: #fde8ef; --sakura-dark: #d4678a;
+    --matcha: #7aab7a; --matcha-light: #e8f5e8; --matcha-dark: #4d7a4d;
+    --cream: #fef9f5; --text-dark: #2d1f1f; --text-mid: #6b4c4c; --text-soft: #a07070;
+    --glass: rgba(255, 250, 247, 0.86);
+    --glass-strong: rgba(255, 250, 247, 0.96);
+    --line: rgba(212, 103, 138, 0.18);
+    --shadow: 0 18px 50px rgba(80, 40, 50, 0.18);
+    --field: #fffdfb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --glass: rgba(38, 28, 30, 0.84);
+      --glass-strong: rgba(38, 28, 30, 0.96);
+      --text-dark: #fbeff0; --text-mid: #e6cfd2; --text-soft: #c7a5aa;
+      --line: rgba(242, 167, 187, 0.22);
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+      --field: #2d2224;
+      --sakura-light: #4a2f37; --matcha-light: #2c3a2c;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: #f6ece2; }
+  body { font-family: 'Nunito', sans-serif; color: var(--text-dark); -webkit-font-smoothing: antialiased; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+  button { font-family: inherit; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* ── veil while loading */
+  #veil {
+    position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: radial-gradient(ellipse at center, #fff6f0 0%, #f6e3d6 100%); transition: opacity 0.9s ease;
+  }
+  #veil.gone { opacity: 0; pointer-events: none; }
+  #veil h1 { font-family: 'Playfair Display', serif; font-size: clamp(28px, 5vw, 44px); color: #2d1f1f; }
+  #veil p { font-family: 'Dancing Script', cursive; font-size: 22px; color: #d4678a; }
+  .kettle { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #f2a7bb; border-top-color: transparent; animation: spin 1.4s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── cards */
+  .card {
+    background: var(--glass); backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow);
+  }
+  .overlay { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(60, 30, 40, 0.18); }
+  .overlay > .card { width: min(460px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 30px 28px; animation: rise 0.5s cubic-bezier(.2,.8,.2,1); }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px) scale(0.98); } }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 2.4px; text-transform: uppercase; color: var(--sakura-dark); }
+  h2 { font-family: 'Playfair Display', serif; font-size: 30px; line-height: 1.15; margin: 6px 0 10px; }
+  h2 em { color: var(--sakura-dark); }
+  h3 { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 6px; }
+  .lede { color: var(--text-mid); font-size: 14.5px; line-height: 1.65; }
+  .sign { font-family: 'Dancing Script', cursive; font-size: 21px; color: var(--sakura-dark); margin-top: 10px; }
+
+  .tabs { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: var(--sakura-light); margin: 18px 0 16px; }
+  .tabs button { flex: 1; border: 0; background: transparent; padding: 9px 12px; border-radius: 999px; font-weight: 700; font-size: 13px; color: var(--text-mid); }
+  .tabs button.on { background: var(--glass-strong); color: var(--sakura-dark); box-shadow: 0 2px 10px rgba(212,103,138,0.15); }
+
+  label.field { display: block; margin-bottom: 12px; }
+  label.field span { display: block; font-size: 12px; font-weight: 700; color: var(--text-mid); margin-bottom: 5px; }
+  input[type=text], input[type=email], input[type=password], textarea {
+    width: 100%; border: 1.5px solid var(--line); background: var(--field); color: var(--text-dark);
+    border-radius: 14px; padding: 11px 14px; font: inherit; font-size: 14.5px; outline: none; transition: border-color .2s, box-shadow .2s;
+  }
+  input:focus, textarea:focus { border-color: var(--sakura); box-shadow: 0 0 0 4px rgba(242,167,187,0.25); }
+  textarea { resize: none; font-family: 'Dancing Script', cursive; font-size: 22px; line-height: 1.35; }
+
+  .btn {
+    border: 0; border-radius: 999px; padding: 12px 22px; font-weight: 700; font-size: 14px;
+    background: var(--sakura-dark); color: #fff; box-shadow: 0 8px 24px rgba(212,103,138,0.35); transition: transform .2s, box-shadow .2s, background .2s;
+  }
+  .btn:hover { transform: translateY(-2px); background: #c25579; }
+  .btn:disabled { opacity: 0.6; transform: none; cursor: default; }
+  .btn.ghost { background: transparent; color: var(--sakura-dark); box-shadow: none; border: 1.5px solid var(--line); }
+  .btn.matcha { background: var(--matcha-dark); box-shadow: 0 8px 24px rgba(77,122,77,0.3); }
+  .btn.wide { width: 100%; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row.end { justify-content: flex-end; }
+  .error { color: #b8405e; font-size: 13px; margin: 6px 0 10px; min-height: 1em; }
+  .fine { font-size: 12px; color: var(--text-soft); margin-top: 12px; line-height: 1.6; }
+  .fine a, .lede a { color: var(--sakura-dark); }
+
+  /* ── avatar creator */
+  #creator > .card { width: min(820px, 100%); display: grid; grid-template-columns: 300px 1fr; gap: 22px; padding: 22px; }
+  #previewWrap { border-radius: 18px; overflow: hidden; background: radial-gradient(circle at 50% 35%, #fff 0%, #fde8ef 70%); aspect-ratio: 3/4; position: relative; }
+  #previewWrap canvas { width: 100%; height: 100%; display: block; }
+  .opt-group { margin-bottom: 14px; }
+  .opt-group > span { display: block; font-size: 12px; font-weight: 700; color: var(--text-mid); margin-bottom: 7px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { border: 1.5px solid var(--line); background: var(--field); color: var(--text-mid); border-radius: 999px; padding: 7px 13px; font-size: 13px; font-weight: 600; }
+  .chip.on { border-color: var(--sakura-dark); color: var(--sakura-dark); background: var(--sakura-light); }
+  .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.06); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.6); }
+  .swatch.on { outline: 3px solid var(--sakura-dark); outline-offset: 2px; }
+  @media (max-width: 720px) {
+    #creator > .card { grid-template-columns: 1fr; }
+    #previewWrap { aspect-ratio: 4/3; max-height: 34vh; }
+  }
+
+  /* ── HUD */
+  .hud { position: fixed; z-index: 10; }
+  #hudTop { top: 14px; left: 14px; right: 14px; display: flex; justify-content: space-between; gap: 10px; pointer-events: none; }
+  #hudTop > * { pointer-events: auto; }
+  .brand { padding: 10px 16px; border-radius: 18px; display: flex; flex-direction: column; gap: 2px; }
+  .brand b { font-family: 'Playfair Display', serif; font-size: 16px; }
+  .brand small { font-size: 12px; color: var(--text-mid); }
+  .brand .live { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--matcha); margin-right: 5px; box-shadow: 0 0 0 3px rgba(122,171,122,0.25); }
+  .iconbar { display: flex; gap: 8px; align-items: flex-start; }
+  .icon {
+    width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--glass);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); font-size: 18px; display: grid; place-items: center; box-shadow: var(--shadow);
+    color: var(--text-dark); text-decoration: none;
+  }
+  .icon:hover { background: var(--glass-strong); }
+
+  #actions { left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; padding: 8px; border-radius: 999px; }
+  #actions button { border: 0; background: transparent; border-radius: 999px; padding: 10px 15px; font-weight: 700; font-size: 13.5px; color: var(--text-dark); white-space: nowrap; }
+  #actions button:hover, #actions button.on { background: var(--sakura-light); color: var(--sakura-dark); }
+  @media (max-width: 640px) { #actions button .t { display: none; } #actions button { font-size: 18px; padding: 10px 12px; } }
+
+  #placing { left: 50%; top: 80px; transform: translateX(-50%); padding: 10px 18px; border-radius: 999px; font-size: 13.5px; font-weight: 600; color: var(--text-mid); }
+
+  /* chat */
+  #chat { left: 14px; bottom: 86px; width: min(340px, calc(100vw - 28px)); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; }
+  #chatLog { max-height: 30vh; overflow-y: auto; padding: 12px 14px 4px; display: flex; flex-direction: column; gap: 7px; font-size: 13.5px; }
+  #chatLog .m b { color: var(--sakura-dark); font-weight: 700; margin-right: 4px; }
+  #chatLog .m { line-height: 1.45; color: var(--text-mid); overflow-wrap: anywhere; }
+  #chatLog .m.sys { font-style: italic; color: var(--text-soft); font-size: 12.5px; }
+  #chatForm { display: flex; gap: 6px; padding: 10px; border-top: 1px solid var(--line); }
+  #chatForm input { border-radius: 999px; padding: 9px 14px; font-size: 13.5px; }
+  #chatForm button { flex-shrink: 0; padding: 9px 14px; }
+
+  /* side panel (notes, menu, sound…) */
+  .panel { position: fixed; z-index: 20; right: 14px; top: 72px; width: min(380px, calc(100vw - 28px)); max-height: calc(100vh - 170px); overflow: auto; padding: 22px; }
+  .panel .x { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--sakura-light); color: var(--sakura-dark); font-size: 15px; font-weight: 700; }
+  @media (max-width: 640px) { .panel { top: auto; bottom: 84px; right: 14px; max-height: 58vh; } }
+
+  .note-paper { border-radius: 6px; padding: 26px 22px 18px; margin: 12px 0; box-shadow: 0 10px 24px rgba(80,40,50,0.12); color: #3a2a2a; transform: rotate(-0.8deg); }
+  .note-paper .words { font-family: 'Dancing Script', cursive; font-size: 25px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .note-paper .who { font-size: 13px; margin-top: 12px; color: #6b4c4c; font-weight: 600; }
+  .heart { border: 1.5px solid var(--line); background: var(--field); color: var(--sakura-dark); border-radius: 999px; padding: 8px 16px; font-weight: 700; }
+  .heart.on { background: var(--sakura-dark); color: #fff; border-color: var(--sakura-dark); }
+
+  .menu-list { display: grid; gap: 8px; margin-top: 12px; }
+  .menu-list button { display: flex; align-items: center; gap: 12px; text-align: left; border: 1.5px solid var(--line); background: var(--field); border-radius: 16px; padding: 11px 14px; color: var(--text-dark); }
+  .menu-list button:hover { border-color: var(--sakura); }
+  .menu-list .dot { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 -4px 0 rgba(0,0,0,0.08); }
+  .menu-list b { display: block; font-size: 14px; }
+  .menu-list small { color: var(--text-soft); font-size: 12px; }
+
+  .mix { display: grid; gap: 12px; margin-top: 12px; }
+  .mix label { display: grid; grid-template-columns: 92px 1fr 34px; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; color: var(--text-mid); }
+  .mix output { font-size: 12px; color: var(--text-soft); text-align: right; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; background: var(--sakura-light); outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--sakura-dark); border: 3px solid #fff; box-shadow: 0 2px 8px rgba(212,103,138,0.4); }
+  input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--sakura-dark); border: 3px solid #fff; }
+
+  /* floating things in the world */
+  #tip { position: fixed; z-index: 15; pointer-events: none; padding: 7px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; transform: translate(14px, 14px); white-space: nowrap; }
+  .bubble {
+    position: fixed; z-index: 9; pointer-events: none; transform: translate(-50%, -100%); max-width: 220px;
+    background: var(--glass-strong); color: var(--text-dark); border: 1px solid var(--line); border-radius: 16px; padding: 8px 12px;
+    font-size: 13px; line-height: 1.4; box-shadow: var(--shadow); text-align: center; overflow-wrap: anywhere; transition: opacity .4s;
+  }
+  .bubble.emote { font-size: 26px; padding: 4px 10px; background: transparent; border: 0; box-shadow: none; }
+  .bubble.npc { font-family: 'Playfair Display', serif; font-style: italic; }
+
+  #toasts { position: fixed; z-index: 40; top: 76px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+  .toast { padding: 10px 18px; border-radius: 999px; font-size: 13.5px; font-weight: 600; transition: opacity .5s; }
+
+  .color-row { display: flex; gap: 8px; margin: 6px 0 12px; }
+  .kind-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .help-list { list-style: none; display: grid; gap: 8px; margin-top: 10px; font-size: 14px; color: var(--text-mid); }
+  .help-list kbd { font-family: inherit; font-weight: 700; background: var(--sakura-light); color: var(--sakura-dark); border-radius: 6px; padding: 1px 7px; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<canvas id="scene" tabindex="0" aria-label="The Sakura Slice Café, in 3D"></canvas>
+
+<div id="veil">
+  <div class="kettle"></div>
+  <h1>Sakura Slice Café</h1>
+  <p>warming the kettle…</p>
+</div>
+
+<!-- ── the door: sign in / join -->
+<div id="door" class="overlay hidden">
+  <div class="card">
+    <p class="eyebrow">Sakura Slice Café · Cairo</p>
+    <h2>Come in, <em>stay a while.</em></h2>
+    <p class="lede">A quiet café you can sit in from anywhere. Make yourself an avatar, find a seat, and leave a note for whoever needs it next.</p>
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="join" class="on">I'm new here</button>
+      <button type="button" data-tab="login">I've been before</button>
+    </div>
+    <form id="joinForm" autocomplete="on">
+      <label class="field"><span>What should we call you?</span><input type="text" name="displayName" maxlength="24" required placeholder="Mariam"></label>
+      <label class="field"><span>Username</span><input type="text" name="username" maxlength="24" required placeholder="mariam" pattern="[A-Za-z0-9_.]{3,24}" autocomplete="username"></label>
+      <label class="field"><span>Email</span><input type="email" name="email" required placeholder="you@email.com" autocomplete="email"></label>
+      <label class="field"><span>Password (8+ characters)</span><input type="password" name="password" minlength="8" required autocomplete="new-password"></label>
+      <div class="error" id="joinErr"></div>
+      <button class="btn wide" type="submit">Make my avatar 🌸</button>
+    </form>
+    <form id="loginForm" class="hidden" autocomplete="on">
+      <label class="field"><span>Email or username</span><input type="text" name="login" required autocomplete="username"></label>
+      <label class="field"><span>Password</span><input type="password" name="password" required autocomplete="current-password"></label>
+      <div class="error" id="loginErr"></div>
+      <button class="btn wide" type="submit">Open the door</button>
+    </form>
+    <p class="fine">Your notes are seen by everyone in the café. Be gentle. <a href="/">← back to the website</a></p>
+  </div>
+</div>
+
+<!-- ── avatar creator -->
+<div id="creator" class="overlay hidden">
+  <div class="card">
+    <div id="previewWrap"><canvas id="preview"></canvas></div>
+    <div>
+      <p class="eyebrow">Your avatar</p>
+      <h2>Who's <em>coming in?</em></h2>
+      <label class="field"><span>Name above your head</span><input type="text" id="cName" maxlength="24"></label>
+      <div class="opt-group"><span>You are…</span><div class="chips" id="optBody"></div></div>
+      <div class="opt-group"><span id="skinLabel">Skin</span><div class="chips" id="optSkin"></div></div>
+      <div class="opt-group" id="hairGroup"><span>Hair</span><div class="chips" id="optHairStyle"></div><div class="chips" id="optHair" style="margin-top:8px"></div></div>
+      <div class="opt-group"><span>Outfit</span><div class="chips" id="optOutfit"></div></div>
+      <div class="opt-group"><span>Accent</span><div class="chips" id="optAccent"></div></div>
+      <div class="opt-group"><span>Something extra</span><div class="chips" id="optAccessory"></div></div>
+      <div class="error" id="creatorErr"></div>
+      <div class="row end"><button class="btn ghost hidden" id="creatorCancel" type="button">Cancel</button><button class="btn" id="creatorSave" type="button">Step inside</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── welcome (the click that also wakes the audio) -->
+<div id="welcome" class="overlay hidden">
+  <div class="card">
+    <p class="eyebrow" id="welcomeEyebrow">Welcome back</p>
+    <h2 id="welcomeTitle">Welcome in.</h2>
+    <div id="welcomeLines" class="lede"></div>
+    <p class="sign" id="welcomeSign">— Yuto 🌸</p>
+    <div style="height:16px"></div>
+    <button class="btn wide" id="enterBtn" type="button">Step inside 🌸</button>
+    <p class="fine">🎧 The café has soft music, rain and a fireplace. Headphones are nice.</p>
+  </div>
+</div>
+
+<!-- ── HUD -->
+<div id="hudTop" class="hud hidden">
+  <div class="brand card">
+    <b>Sakura Slice Café</b>
+    <small><span class="live"></span><span id="online">just you</span> · <span id="cairoTime">Cairo</span></small>
+  </div>
+  <div class="iconbar">
+    <button class="icon" id="soundBtn" title="Sound" aria-label="Sound">🔊</button>
+    <button class="icon" id="avatarBtn" title="Change your avatar" aria-label="Change your avatar">🪞</button>
+    <button class="icon" id="helpBtn" title="How to move" aria-label="Help">?</button>
+    <a class="icon hidden" id="adminLink" href="/admin" title="Café admin" aria-label="Admin">🗝️</a>
+    <button class="icon" id="outBtn" title="Leave the café" aria-label="Sign out">🚪</button>
+  </div>
+</div>
+
+<div id="actions" class="hud card hidden">
+  <button id="noteAct" title="Leave a note"><span>📌</span> <span class="t">Leave a note</span></button>
+  <button id="orderAct" title="Order a drink"><span>☕</span> <span class="t">Order</span></button>
+  <button id="waveAct" title="Wave"><span>👋</span> <span class="t">Wave</span></button>
+  <button id="emoteAct" title="Send a little something"><span>🌸</span></button>
+  <button id="chatAct" title="Chat" class="on"><span>💬</span></button>
+</div>
+
+<div id="placing" class="hud card hidden">Click the board, a table, or a wall to leave your note · <b>Esc</b> to cancel</div>
+
+<div id="chat" class="hud card hidden">
+  <div id="chatLog" aria-live="polite"></div>
+  <form id="chatForm"><input type="text" id="chatInput" maxlength="240" placeholder="Say something softly…" autocomplete="off"><button class="btn" type="submit">Send</button></form>
+</div>
+
+<div id="tip" class="card hidden"></div>
+<div id="toasts"></div>
+<div id="bubbles"></div>
+
+<!-- ── panels -->
+<div id="composePanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">A note for whoever comes next</p>
+  <h3 id="composeWhere">On the board</h3>
+  <div class="kind-row chips" id="composeKind">
+    <button type="button" class="chip on" data-kind="note">Sticky note</button>
+    <button type="button" class="chip" data-kind="pin">Pinned card</button>
+  </div>
+  <div class="color-row" id="composeColors"></div>
+  <textarea id="composeText" rows="4" maxlength="220" placeholder="You're doing better than you think."></textarea>
+  <div class="row" style="justify-content:space-between;margin-top:6px"><small class="fine" id="composeCount" style="margin:0">0 / 220</small></div>
+  <div class="error" id="composeErr"></div>
+  <div class="row end"><button class="btn ghost" data-close type="button">Not now</button><button class="btn" id="composeSave" type="button">Leave it here 📌</button></div>
+</div>
+
+<div id="readPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow" id="readWhere">On the board</p>
+  <div class="note-paper" id="readPaper"><div class="words" id="readWords"></div><div class="who" id="readWho"></div></div>
+  <div class="row" style="justify-content:space-between">
+    <button class="heart" id="readHeart" type="button">♡ <span id="readHearts">0</span></button>
+    <button class="btn ghost hidden" id="readDelete" type="button">Take it down</button>
+  </div>
+</div>
+
+<div id="menuPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">At the counter</p>
+  <h3>What can we make you?</h3>
+  <p class="lede" id="menuNote" style="font-size:13.5px">Hana will bring it over. Nothing costs anything here.</p>
+  <div class="menu-list" id="menuList"></div>
+</div>
+
+<div id="soundPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The café's sound</p>
+  <h3>Make it yours</h3>
+  <p class="lede" style="font-size:13.5px">Everything here is played live — the music never repeats exactly. Your mix is saved to your account.</p>
+  <div class="mix" id="mix"></div>
+  <div class="row" style="margin-top:16px;justify-content:space-between">
+    <button class="btn ghost" id="muteBtn" type="button">Mute everything</button>
+  </div>
+  <div class="opt-group" style="margin-top:18px"><span>Picture</span><div class="chips" id="optQuality"></div></div>
+</div>
+
+<div id="infoPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow" id="infoEyebrow">In the café</p>
+  <h3 id="infoTitle"></h3>
+  <p class="lede" id="infoText"></p>
+</div>
+
+<div id="helpPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Finding your way</p>
+  <h3>How the café works</h3>
+  <ul class="help-list">
+    <li><kbd>W A S D</kbd> or <kbd>arrows</kbd> to walk — or just click the floor</li>
+    <li><b>Drag</b> to look around · <b>scroll</b> to come closer</li>
+    <li>Click a <b>chair</b> to sit. Walk to stand back up.</li>
+    <li>Click <b>Hana or the counter</b> to order a drink</li>
+    <li>📌 <b>Leave a note</b> on the board, a table, or a wall — everyone will see it</li>
+    <li>Click any note to read it and leave a ♥</li>
+    <li><kbd>Enter</kbd> to chat · <kbd>Esc</kbd> to close things</li>
+  </ul>
+</div>
+
+<script type="module" src="/cafe/app.js"></script>
+</body>
+</html>
