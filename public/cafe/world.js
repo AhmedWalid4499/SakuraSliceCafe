@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { buildAvatar, makeLabel } from './avatar.js';
+import { makeDessert } from './pastries.js';
 import { mapX, mapZ, deltaAt, OLD } from './layout.mjs';
 
 export const ROOM = { minX: -15, maxX: 15, minZ: -11, maxZ: 11, h: 4.2 };
@@ -374,53 +375,8 @@ export function buildWorld(renderer) {
     root.add(f);
   }
 
-  // back door (open a little, glass upper half) — Cairo is through here
+  // the front door itself is built after the remap (to fit its opening exactly)
   {
-    const frame = windowFrame(2, 2.7, 0);
-    frame.position.set(-8, 1.35, -8.1);
-    frame.children.forEach(ch => { if (ch.geometry?.parameters?.depth === 0.35) ch.visible = false; });
-    root.add(frame);
-    const door = new THREE.Group();
-    const panel = rbox(0.95, 2.6, 0.06, 0.02, M.wood);
-    panel.position.set(0.475, 1.3, 0);
-    const pane = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.2), M.glass);
-    pane.position.set(0.475, 1.75, 0.04);
-    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 24, 24), M.brass);
-    knob.position.set(0.85, 1.1, 0.06);
-    door.add(panel, pane, knob);
-    door.position.set(-9, 0, -8.05);
-    door.rotation.y = -0.9; // ajar, letting the morning in
-    root.add(door);
-    // cutting out the panel's glass area: simple trick — a second frame half
-    const half = new THREE.Group();
-    const p2 = rbox(0.95, 2.6, 0.06, 0.02, M.wood);
-    p2.position.set(-0.475, 1.3, 0);
-    half.add(p2);
-    half.position.set(-7, 0, -8.05);
-    half.rotation.y = 0.9;
-    root.add(half);
-    const hover = new THREE.Mesh(new THREE.BoxGeometry(2, 2.7, 0.4), new THREE.MeshBasicMaterial({ visible: false }));
-    hover.position.set(-8, 1.35, -8.2);
-    hover.userData = { kind: 'info', label: 'The back door — Cairo, just outside', text: 'Through the back door: a Cairo street, the minarets, the palms, and whatever the sky is doing right now in Cairo.' };
-    interactables.push(hover);
-    root.add(hover);
-  }
-
-  // front door (closed, glass top, OPEN sign)
-  {
-    const door = rbox(2.1, 2.75, 0.08, 0.03, M.wood);
-    door.position.set(0, 1.375, 8.08);
-    root.add(door);
-    const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.0), M.glass);
-    pane.position.set(0, 2.0, 8.03);
-    pane.rotation.y = Math.PI;
-    root.add(pane);
-    const sign = makeSign([
-      { text: 'open', font: 'Dancing Script, cursive', size: 210, color: COLORS.sakuraDark, weight: '700' },
-    ], 0.7, 0.32, { bg: COLORS.cream });
-    sign.position.set(0, 1.3, 8.02);
-    sign.rotation.y = Math.PI;
-    root.add(sign);
     // wind chime above the door
     const chime = new THREE.Group();
     for (let i = 0; i < 5; i++) {
@@ -501,9 +457,36 @@ export function buildWorld(renderer) {
     root.add(g);
   }
 
-  function addTable(id, label, x, z, chairAngles, { reserved = false, sign = null } = {}) {
+  // A little standing card with the table's number, readable from both sides.
+  function numberCard(n, x, y, z, ry) {
+    const g = new THREE.Group();
+    for (const side of [0, Math.PI]) {
+      const s = makeSign([
+        { text: String(n), size: 330, weight: '700', color: COLORS.sakuraDark },
+        { text: 'table', font: 'Dancing Script, cursive', size: 120, color: COLORS.woodDark },
+      ], 0.13, 0.17, { radius: 60 });
+      s.rotation.y = side;
+      s.position.z = side ? -0.004 : 0.004;
+      g.add(s);
+    }
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.012, 0.05), M.woodDark);
+    foot.position.y = -0.085;
+    g.add(foot);
+    g.position.set(x, y + 0.09, z);
+    g.rotation.y = ry;
+    root.add(g);
+    return g;
+  }
+
+  function addTable(id, label, x, z, chairAngles, { reserved = false, sign = null, number = null } = {}) {
     const t = roundTable(x, z);
     vase(x, t.top.userData.top - FY, z);
+    if (number != null) {
+      label = `Table ${number}`;
+      t.top.userData.tableName = label;
+      // the card stands off to one side of the vase, turned to face most of the room
+      numberCard(number, x + 0.26, t.top.userData.top - FY, z + 0.16, 0.4);
+    }
     chairAngles.forEach((ang, i) => {
       const cx = x + Math.sin(ang) * 0.85;
       const cz = z + Math.cos(ang) * 0.85;
@@ -511,7 +494,7 @@ export function buildWorld(renderer) {
       const c = chair(cx, cz, ry);
       colliders.push({ type: 'circle', x: cx, z: cz, r: 0.28 });
       if (!reserved) {
-        const seat = { id: `${id}-${i}`, label, x: cx, z: cz, y: FY, ry, chair: c };
+        const seat = { id: `${id}-${i}`, label, x: cx, z: cz, y: FY, h: 0.54, ry, chair: c, table: id };
         seats.push(seat);
         c.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat, label: `Sit at ${label}` }; interactables.push(o); } });
       } else {
@@ -522,15 +505,16 @@ export function buildWorld(renderer) {
   }
 
   // ── tables
-  addTable('t1', 'the middle table', -5.5, 1.2, [0, Math.PI]);
-  addTable('t2', 'the table by the rug', -2.2, 4.4, [Math.PI / 2, -Math.PI / 2]);
-  addTable('t3', 'the sunny table', 1.6, 1.0, [0, Math.PI, Math.PI / 2]);
-  addTable('t5', 'the table by the tree', 4.6, 4.8, [Math.PI / 2, -Math.PI / 2]);
-  addTable('t6', 'the quiet table', -5.6, -3.6, [Math.PI / 2, -Math.PI / 2]);
-  addTable('t7', 'the table in the middle of everything', -1.8, -1.2, [0, Math.PI * 2 / 3, -Math.PI * 2 / 3]);
+  // numbered, so you can find Table 4 (the one by the window)
+  addTable('t1', 'the middle table', -5.5, 1.2, [0, Math.PI], { number: 1 });
+  addTable('t2', 'the table by the rug', -2.2, 4.4, [Math.PI / 2, -Math.PI / 2], { number: 2 });
+  addTable('t3', 'the sunny table', 1.6, 1.0, [0, Math.PI, Math.PI / 2], { number: 3 });
+  addTable('t5', 'the table by the tree', 4.6, 4.8, [Math.PI / 2, -Math.PI / 2], { number: 5 });
+  addTable('t6', 'the quiet table', -5.6, -3.6, [Math.PI / 2, -Math.PI / 2], { number: 6 });
+  addTable('t7', 'the table in the middle of everything', -1.8, -1.2, [0, Math.PI * 2 / 3, -Math.PI * 2 / 3], { number: 7 });
 
   // Table Four, at the window
-  addTable('four', 'Table Four', -9.6, -3.5, [Math.PI / 2 + 0.5, Math.PI / 2 - 0.5 + Math.PI]);
+  addTable('four', 'Table Four', -9.6, -3.5, [Math.PI / 2 + 0.5, Math.PI / 2 - 0.5 + Math.PI], { number: 4 });
   {
     const s = makeSign([
       { text: 'Table Four', size: 120, weight: '700' },
@@ -660,7 +644,7 @@ export function buildWorld(renderer) {
     g.rotation.y = ry;
     root.add(g);
     colliders.push({ type: 'circle', x, z, r: 0.5 });
-    const seat = { id, label, x, z, y: 0.02 + FY, ry, chair: g };
+    const seat = { id, label, x, z, y: 0.02 + FY, h: 0.59, ry, chair: g };
     seats.push(seat);
     g.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat, label: `Sit in ${label}` }; interactables.push(o); } });
   }
@@ -691,7 +675,8 @@ export function buildWorld(renderer) {
     }
     counter.add(body, top, kick);
     root.add(counter);
-    colliders.push({ type: 'box', minX: 2.75, maxX: 10.3, minZ: -8, maxZ: -4.05 });
+    // players can't walk behind the counter; the team can (see the nav grid)
+    colliders.push({ type: 'box', minX: 2.75, maxX: 10.3, minZ: -8, maxZ: -4.05, staffOnly: true });
 
     // forest green coffee machine
     const machine = new THREE.Group();
@@ -1046,22 +1031,22 @@ export function buildWorld(renderer) {
   const team = [
     {
       id: 'hana', name: 'Hana', role: 'Head Barista', x: 7.3, z: -5.9, ry: 0.15,
-      avatar: { body: 'fox', skin: '#b5562b', accent: '#fdf3e6', outfit: '#fef9f5' }, extra: { apron: '#efe0c4', neckerchief: '#7aab7a' },
+      avatar: { body: 'fox', skin: '#b5562b', accent: '#fdf3e6', outfit: '#fef9f5', gender: 'she' }, extra: { apron: '#efe0c4', neckerchief: '#7aab7a' },
       lines: ["What can I make you?", "Sit anywhere — I'll bring it over.", "The hojicha is very good today. I'm not biased. I'm a little biased."],
     },
     {
       id: 'yuki', name: 'Yuki', role: 'Pastry Chef', x: 4.6, z: -5.9, ry: 0.1,
-      avatar: { body: 'rabbit', skin: '#f6f2ee', accent: '#fde8ef', outfit: '#f2a7bb' }, extra: { apron: '#fffaf4', bow: '#d4678a' },
+      avatar: { body: 'rabbit', skin: '#f6f2ee', accent: '#fde8ef', outfit: '#f2a7bb', gender: 'she', bottom: 'skirt' }, extra: { apron: '#fffaf4', bow: '#d4678a' },
       lines: ["The Sakura Slice? I won't say how. Sorry.", "I've been here since five. It's the best part of the day.", "If you sit at table four, you'll come back. Everyone does."],
     },
     {
       id: 'yuto', name: 'Yuto', role: 'Owner · Co-founder', x: 2.2, z: -3.4, ry: 0.5,
-      avatar: { body: 'person', skin: '#c99a74', hair: '#2a1d1a', hairStyle: 'short', outfit: '#6f9a6c' }, extra: { apron: '#efe0c4', glasses: 'tortoise', pocket: 'pencil' },
+      avatar: { body: 'person', skin: '#c99a74', hair: '#2a1d1a', hairStyle: 'short', outfit: '#6f9a6c', gender: 'he' }, extra: { apron: '#efe0c4', glasses: 'tortoise', pocket: 'pencil' },
       lines: ["Welcome in. Take your time.", "You don't have to be ready yet.", "Leave a note on the board if you like — someone will need it."],
     },
     {
       id: 'me3temed', name: 'Me3temed', role: 'Co-founder · Mascot', x: 6.5, z: -7.6, y: 2.625, ry: 0, scale: 0.42,
-      avatar: { body: 'owl', skin: '#9c8a6a', accent: '#f4ead8' }, extra: { bowtie: '#2f5d3a' },
+      avatar: { body: 'owl', skin: '#9c8a6a', accent: '#f4ead8', gender: 'he' }, extra: { bowtie: '#2f5d3a' },
       lines: ['…', '(a soft, approving stillness)', '(he blinks, slowly. it means: yes.)'],
     },
   ];
@@ -1079,7 +1064,6 @@ export function buildWorld(renderer) {
     });
     npcs.push({ ...p, av, label });
   }
-  colliders.push({ type: 'circle', x: 2.2, z: -3.4, r: 0.4 });
 
   // ── the spiral staircase up to the second floor
   {
@@ -1270,14 +1254,14 @@ export function buildWorld(renderer) {
           const cz = z + side * (d / 2 + 0.38);
           const ry = side < 0 ? 0 : Math.PI;
           const c = chair(cx, cz, ry, side < 0 ? M.cushion : M.cushionSage);
-          const seat = { id: `long-${n++}`, label: 'the big table', x: cx, z: cz, y: FY, ry, chair: c };
+          const seat = { id: `long-${n++}`, label: 'the big table', x: cx, z: cz, y: FY, h: 0.54, ry, chair: c };
           seats.push(seat);
           c.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat, label: 'Sit at the big table' }; interactables.push(o); } });
         }
       }
       for (const [cx, ry] of [[x - w / 2 - 0.45, Math.PI / 2], [x + w / 2 + 0.45, -Math.PI / 2]]) {
         const c = chair(cx, z, ry);
-        const seat = { id: `long-${n++}`, label: 'the head of the table', x: cx, z, y: FY, ry, chair: c };
+        const seat = { id: `long-${n++}`, label: 'the head of the table', x: cx, z, y: FY, h: 0.54, ry, chair: c };
         seats.push(seat);
         c.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat, label: 'Sit at the head of the table' }; interactables.push(o); } });
       }
@@ -1306,7 +1290,7 @@ export function buildWorld(renderer) {
       colliders.push({ type: 'circle', x, z, r: Math.min(1.1, w / 2) });
       for (let i = 0; i < n; i++) {
         const off = -((n - 1) * 0.75) / 2 + i * 0.75;
-        const seat = { id: `${id}-${i}`, label, x: x + along.x * off, z: z + along.z * off, y: 0.02 + FY, ry, chair: g };
+        const seat = { id: `${id}-${i}`, label, x: x + along.x * off, z: z + along.z * off, y: 0.02 + FY, h: 0.595, ry, chair: g };
         seats.push(seat);
       }
       g.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat: seats[seats.length - n], label: `Sit on ${label}` }; interactables.push(o); } });
@@ -1335,7 +1319,7 @@ export function buildWorld(renderer) {
       bag.scale.set(1, 0.55, 1);
       bag.position.set(x, 0.23, z);
       root.add(bag);
-      const seat = { id: `cushion-${i}`, label: 'a floor cushion by the window', x, z, y: FY - 0.25, ry: Math.PI, chair: bag };
+      const seat = { id: `cushion-${i}`, label: 'a floor cushion by the window', x, z, y: FY, h: 0.42, ry: Math.PI, chair: bag };
       seats.push(seat);
       bag.userData = { kind: 'seat', seat, label: 'Sit on the floor cushion' };
       interactables.push(bag);
@@ -1469,6 +1453,376 @@ export function buildWorld(renderer) {
   // ── outside: Cairo
   const outside = buildCairo(scene);
 
+  // ════════════════════════════════════════════════════════════════
+  //  Built after the spread-out, in the café's real coordinates:
+  //  the front door (fitted to its opening), the kitchen behind the
+  //  back door, and the clock over the entrance.
+  // ════════════════════════════════════════════════════════════════
+  root = floors.main.group;
+  const main = floors.main;
+  const late = new THREE.Group();
+  root.add(late);
+  const add = (...objs) => { for (const o of objs) { fixed(o); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); late.add(o); } };
+  const kbox = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+
+  // A door leaf with a window cut through it (rect: [x0, y0, x1, y1], or a round porthole).
+  function doorLeaf(w, h, win, material) {
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0); shape.lineTo(w, 0); shape.lineTo(w, h); shape.lineTo(0, h); shape.closePath();
+    const hole = new THREE.Path();
+    if (win.r) hole.absarc(win.x, win.y, win.r, 0, Math.PI * 2, true);
+    else { hole.moveTo(win[0], win[1]); hole.lineTo(win[0], win[3]); hole.lineTo(win[2], win[3]); hole.lineTo(win[2], win[1]); hole.closePath(); }
+    shape.holes.push(hole);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.055, bevelEnabled: true, bevelSize: 0.008, bevelThickness: 0.008, bevelSegments: 2 });
+    geo.translate(0, 0, -0.0275);
+    const leaf = new THREE.Group();
+    leaf.add(new THREE.Mesh(geo, material));
+    const glass = win.r ? new THREE.Mesh(new THREE.CircleGeometry(win.r, 40), M.glass)
+      : new THREE.Mesh(new THREE.PlaneGeometry(win[2] - win[0], win[3] - win[1]), M.glass);
+    glass.position.set(win.r ? win.x : (win[0] + win[2]) / 2, win.r ? win.y : (win[1] + win[3]) / 2, 0);
+    leaf.add(glass);
+    const ringGeo = win.r ? new THREE.TorusGeometry(win.r, 0.022, 10, 40) : null;
+    if (ringGeo) { for (const z of [-0.035, 0.035]) { const r = new THREE.Mesh(ringGeo, M.brass); r.position.set(win.x, win.y, z); leaf.add(r); } }
+    return leaf;
+  }
+
+  // A proper frame for an opening in a wall at z = wz (jambs, head, and trim on both faces).
+  function doorCasing(cx, wz, w, h) {
+    const g = new THREE.Group();
+    for (const s of [-1, 1]) {
+      const jamb = kbox(0.08, h, 0.26, M.woodDark); jamb.position.set(cx + s * (w / 2 - 0.04), h / 2, wz); g.add(jamb);
+      for (const f of [-1, 1]) {
+        const trim = kbox(0.13, h + 0.12, 0.035, M.woodDark); trim.position.set(cx + s * (w / 2 + 0.05), (h + 0.12) / 2, wz + f * 0.118); g.add(trim);
+      }
+    }
+    const head = kbox(w, 0.08, 0.26, M.woodDark); head.position.set(cx, h - 0.04, wz); g.add(head);
+    for (const f of [-1, 1]) {
+      const ht = kbox(w + 0.36, 0.14, 0.04, M.woodDark); ht.position.set(cx, h + 0.06, wz + f * 0.12); g.add(ht);
+    }
+    const sill = kbox(w, 0.025, 0.3, M.woodLight); sill.position.set(cx, 0.012, wz); g.add(sill);
+    return g;
+  }
+
+  // ── the front door: two glazed leaves that fill the opening exactly
+  {
+    const wz = ROOM.maxZ + 0.1, W2 = 2.2, H2 = 2.8;
+    add(doorCasing(0, wz, W2, H2));
+    const leafW = (W2 - 0.16) / 2 - 0.004, leafH = H2 - 0.08;
+    for (const s of [-1, 1]) {
+      const leaf = doorLeaf(leafW, leafH, [0.16, 1.25, leafW - 0.16, leafH - 0.2], M.wood);
+      leaf.position.set(s < 0 ? -W2 / 2 + 0.08 : W2 / 2 - 0.08 - leafW, 0, wz);
+      add(leaf);
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.55, 12), M.brass);
+      bar.position.set(s < 0 ? -0.14 : 0.14, 1.05, wz - 0.07);
+      add(bar);
+    }
+    const sign = makeSign([{ text: 'open', font: 'Dancing Script, cursive', size: 210, color: COLORS.sakuraDark, weight: '700' }], 0.5, 0.24, { bg: COLORS.cream });
+    sign.position.set(-0.5, 1.62, wz - 0.06);
+    sign.rotation.y = Math.PI;
+    add(sign);
+    const mat = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.8), std('#b98a62', { roughness: 1 }));
+    mat.rotation.x = -Math.PI / 2;
+    mat.position.set(0, 0.006, wz - 0.75);
+    add(mat);
+  }
+
+  // ── a clock over the entrance, on Cairo time (the same face as the street clock)
+  {
+    const g = new THREE.Group();
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.07, 48), M.woodDark);
+    rim.rotation.x = Math.PI / 2;
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.32, 48), new THREE.MeshStandardMaterial({ map: outside.faceTex, roughness: 0.5 }));
+    face.position.z = 0.037;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.018, 10, 48), M.brass);
+    ring.position.z = 0.04;
+    g.add(rim, face, ring);
+    g.position.set(0, 3.5, ROOM.maxZ - 0.04);
+    g.rotation.y = Math.PI;
+    add(g);
+    const hover = new THREE.Mesh(new THREE.CircleGeometry(0.36, 24), new THREE.MeshBasicMaterial({ visible: false }));
+    hover.position.copy(g.position).add(new THREE.Vector3(0, 0, -0.05));
+    hover.rotation.y = Math.PI;
+    hover.userData = { kind: 'info', label: 'The café clock — Cairo time', text: 'The same time as the street clock outside. The café opens at 10 and closes at 10.' };
+    main.interactables.push(hover);
+    late.add(hover);
+  }
+
+  // ── the kitchen, through the back door
+  const KX = mapX(-8);                                  // the door's centre on the back wall
+  const KIT = { minX: -14.8, maxX: -7.0, minZ: -14.4, maxZ: ROOM.minZ - 0.2 };
+  const KH = 3.2;
+  const kitchenDoor = { x: KX, z: ROOM.minZ - 0.1, open: 0, leaves: [] };
+  {
+    const wz = ROOM.minZ - 0.1;
+    add(doorCasing(KX, wz, 2, 2.7));
+    // two swinging leaves with round portholes, hinged at the sides, opening into the kitchen
+    for (const s of [-1, 1]) {
+      const hinge = new THREE.Group();
+      hinge.position.set(KX + s * 0.92, 0, wz);
+      const leaf = doorLeaf(0.91, 2.6, { x: 0.455, y: 1.62, r: 0.17 }, std(COLORS.sage, { roughness: 0.6 }));
+      if (s > 0) leaf.position.x = -0.91;
+      const plate = kbox(0.5, 0.18, 0.065, M.brass);
+      plate.position.set(s < 0 ? 0.6 : -0.6, 1.0, 0);
+      hinge.add(leaf, plate);
+      add(hinge);
+      kitchenDoor.leaves.push({ hinge, s });
+    }
+    const sign = makeSign([
+      { text: 'Kitchen', size: 150, weight: '700' },
+      { text: 'Hana & Yuki · knock gently', font: 'Dancing Script, cursive', size: 78, color: COLORS.sakuraDark },
+    ], 0.62, 0.24);
+    sign.position.set(KX, 2.98, ROOM.minZ + 0.02);
+    add(sign);
+  }
+  {
+    const tileTex = softTexture(512, (c, S) => {
+      const n = 8, t = S / n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        c.fillStyle = (i + j) % 2 ? '#f6efe2' : '#cfe0c7';
+        c.fillRect(i * t, j * t, t, t);
+      }
+      c.strokeStyle = 'rgba(120,100,80,0.25)'; c.lineWidth = 3;
+      for (let i = 0; i <= n; i++) { c.beginPath(); c.moveTo(i * t, 0); c.lineTo(i * t, S); c.stroke(); c.beginPath(); c.moveTo(0, i * t); c.lineTo(S, i * t); c.stroke(); }
+    });
+    tileTex.wrapS = tileTex.wrapT = THREE.RepeatWrapping;
+    tileTex.repeat.set((KIT.maxX - KIT.minX) / 2, (KIT.maxZ - KIT.minZ) / 2);
+    const floorK = new THREE.Mesh(new THREE.PlaneGeometry(KIT.maxX - KIT.minX + 0.2, KIT.maxZ - KIT.minZ + 0.2), std('#ffffff', { map: tileTex, roughness: 0.4 }));
+    floorK.rotation.x = -Math.PI / 2;
+    floorK.position.set((KIT.minX + KIT.maxX) / 2, 0.004, (KIT.minZ + KIT.maxZ) / 2);
+    floorK.userData = { floor: true };
+    add(floorK);
+    main.interactables.push(floorK);
+
+    // walls: plaster outside, subway tiles to shoulder height inside
+    const subway = softTexture(512, (c, S) => {
+      c.fillStyle = '#fbf7f0'; c.fillRect(0, 0, S, S);
+      c.strokeStyle = 'rgba(150,130,110,0.35)'; c.lineWidth = 3;
+      const rows = 8, h = S / rows;
+      for (let r = 0; r < rows; r++) {
+        c.beginPath(); c.moveTo(0, r * h); c.lineTo(S, r * h); c.stroke();
+        for (let k = 0; k < 4; k++) { const x = (k + (r % 2) * 0.5) * S / 4; c.beginPath(); c.moveTo(x, r * h); c.lineTo(x, (r + 1) * h); c.stroke(); }
+      }
+    });
+    subway.wrapS = subway.wrapT = THREE.RepeatWrapping;
+    const tileM = (len) => { const t = subway.clone(); t.needsUpdate = true; t.repeat.set(len / 1.2, 1.5 / 1.2); return std('#ffffff', { map: t, roughness: 0.35 }); };
+    const creamM = std('#f6ead6', { roughness: 0.9 });
+    const back = wallWithHoles(KIT.maxX - KIT.minX + 0.4, KH, [[-12.1 - (KIT.minX + KIT.maxX) / 2 - 0.7, 1.25, -12.1 - (KIT.minX + KIT.maxX) / 2 + 0.7, 2.25]], M.plaster);
+    back.position.set((KIT.minX + KIT.maxX) / 2, 0, KIT.minZ - 0.1);
+    const west = kbox(0.2, KH, KIT.maxZ - KIT.minZ + 0.4, M.plaster); west.position.set(KIT.minX - 0.1, KH / 2, (KIT.minZ + KIT.maxZ) / 2);
+    const east = west.clone(); east.position.x = KIT.maxX + 0.1;
+    const roof = kbox(KIT.maxX - KIT.minX + 0.6, 0.2, KIT.maxZ - KIT.minZ + 0.6, std('#c99a74', { roughness: 0.9 }));
+    roof.position.set((KIT.minX + KIT.maxX) / 2, KH + 0.1, (KIT.minZ + KIT.maxZ) / 2);
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(KIT.maxX - KIT.minX, KIT.maxZ - KIT.minZ), creamM);
+    ceil.rotation.x = Math.PI / 2;
+    ceil.position.set((KIT.minX + KIT.maxX) / 2, KH - 0.001, (KIT.minZ + KIT.maxZ) / 2);
+    add(back, west, east, roof, ceil);
+    // tiles inside: the back wall (left and right of the window) and the side walls
+    const tiles = [
+      [KIT.minX, -12.8, 0], [-11.4, KIT.maxX, 0],
+    ];
+    for (const [x0, x1] of tiles) {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, 1.5), tileM(x1 - x0));
+      p.position.set((x0 + x1) / 2, 0.75, KIT.minZ + 0.005);
+      add(p);
+    }
+    const under = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.25), tileM(1.4));
+    under.position.set(-12.1, 0.625, KIT.minZ + 0.005);
+    add(under);
+    for (const [x, ry] of [[KIT.minX + 0.005, Math.PI / 2], [KIT.maxX - 0.005, -Math.PI / 2]]) {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(KIT.maxZ - KIT.minZ, 1.5), tileM(KIT.maxZ - KIT.minZ));
+      p.position.set(x, 0.75, (KIT.minZ + KIT.maxZ) / 2);
+      p.rotation.y = ry;
+      add(p);
+    }
+    // the café's back wall, seen from the kitchen side: cream above the tiles
+    const winFrame = windowFrame(1.4, 1.0, 1);
+    winFrame.position.set(-12.1, 1.75, KIT.minZ - 0.1);
+    add(winFrame);
+    const glassK = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.0), M.glass);
+    glassK.position.set(-12.1, 1.75, KIT.minZ - 0.1);
+    add(glassK);
+
+    // the long counter along the back wall, with a sink under the window
+    const counterM = std('#9fbf98', { roughness: 0.8 });
+    const topM = std(COLORS.woodLight, { roughness: 0.5 });
+    const cBody = rbox(KIT.maxX - 1.9 - KIT.minX, 0.86, 0.62, 0.03, counterM);
+    cBody.position.set((KIT.minX + KIT.maxX - 1.9) / 2, 0.43, KIT.minZ + 0.31);
+    const cTop = rbox(KIT.maxX - 1.9 - KIT.minX + 0.04, 0.05, 0.66, 0.015, topM);
+    cTop.position.set(cBody.position.x, 0.885, KIT.minZ + 0.33);
+    const sink = kbox(0.62, 0.02, 0.42, std('#d8dde0', { roughness: 0.2, metalness: 0.6 }));
+    sink.position.set(-12.1, 0.912, KIT.minZ + 0.33);
+    const tap = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.015, 8, 20, Math.PI), M.brass);
+    tap.position.set(-12.1, 1.0, KIT.minZ + 0.1);
+    add(cBody, cTop, sink, tap);
+    for (let x = KIT.minX + 0.35; x < KIT.maxX - 2.0; x += 0.6) {
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 12), M.brass);
+      knob.position.set(x, 0.72, KIT.minZ + 0.625);
+      add(knob);
+    }
+    main.colliders.push({ type: 'box', minX: KIT.minX, maxX: KIT.maxX - 1.9, minZ: KIT.minZ, maxZ: KIT.minZ + 0.66, fixed: true });
+
+    // the oven and hob at the end, with a pink kettle and a copper hood
+    const oven = rbox(1.0, 0.9, 0.66, 0.04, std('#f6ead6', { roughness: 0.45 }));
+    oven.position.set(KIT.maxX - 1.35, 0.45, KIT.minZ + 0.33);
+    const ovenWin = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.32), new THREE.MeshStandardMaterial({ color: '#ffb36b', emissive: '#ff8a3c', emissiveIntensity: 0.9 }));
+    ovenWin.position.set(oven.position.x, 0.42, KIT.minZ + 0.665);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.7, 10), M.brass);
+    handle.rotation.z = Math.PI / 2;
+    handle.position.set(oven.position.x, 0.7, KIT.minZ + 0.69);
+    add(oven, ovenWin, handle);
+    for (const [dx, dz] of [[-0.22, 0.15], [0.22, 0.15], [-0.22, 0.45], [0.22, 0.45]]) {
+      const burner = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.014, 8, 24), std('#3a3332', { roughness: 0.6 }));
+      burner.rotation.x = Math.PI / 2;
+      burner.position.set(oven.position.x + dx, 0.905, KIT.minZ + dz);
+      add(burner);
+    }
+    const kettle = new THREE.Mesh(new THREE.SphereGeometry(0.12, 24, 16), std('#f2a7bb', { roughness: 0.35 }));
+    kettle.scale.y = 0.85;
+    kettle.position.set(oven.position.x - 0.22, 1.0, KIT.minZ + 0.45);
+    const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.03, 0.14, 10), kettle.material);
+    spout.position.set(oven.position.x - 0.1, 1.04, KIT.minZ + 0.45); spout.rotation.z = -0.9;
+    add(kettle, spout);
+    const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.6, 0.5, 4, 1), std('#c17f4a', { roughness: 0.35, metalness: 0.7 }));
+    hood.rotation.y = Math.PI / 4;
+    hood.scale.z = 0.6;
+    hood.position.set(oven.position.x, 2.2, KIT.minZ + 0.3);
+    add(hood);
+    main.colliders.push({ type: 'box', minX: KIT.maxX - 1.9, maxX: KIT.maxX, minZ: KIT.minZ, maxZ: KIT.minZ + 0.7, fixed: true });
+    // steam from the kettle
+    const steamM = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.3, depthWrite: false });
+    const puffs = [];
+    for (let i = 0; i < 5; i++) {
+      const p = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), steamM.clone());
+      late.add(fixed(p));
+      puffs.push(p);
+    }
+    animated.push((dt, t) => puffs.forEach((p, i) => {
+      const k = (t * 0.35 + i / puffs.length) % 1;
+      p.position.set(oven.position.x - 0.03 + Math.sin(t + i) * 0.03, 1.12 + k * 0.5, KIT.minZ + 0.45);
+      p.scale.setScalar(0.6 + k * 1.6);
+      p.material.opacity = 0.32 * (1 - k);
+    }));
+
+    // the mint fridge in the corner by the door
+    const fridge = rbox(0.78, 1.85, 0.7, 0.12, std('#bfe0d0', { roughness: 0.4 }));
+    fridge.position.set(KIT.minX + 0.42, 0.925, KIT.maxZ - 0.6);
+    const fHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.5, 10), M.brass);
+    fHandle.position.set(KIT.minX + 0.8, 1.15, KIT.maxZ - 0.35);
+    const note = makeSign([{ text: 'milk, oat milk,', size: 70 }, { text: 'more cardamom ♡', font: 'Dancing Script, cursive', size: 80, color: COLORS.sakuraDark }], 0.2, 0.16);
+    note.position.set(KIT.minX + 0.82, 1.45, KIT.maxZ - 0.65);
+    note.rotation.y = Math.PI / 2;
+    add(fridge, fHandle, note);
+    main.colliders.push({ type: 'box', minX: KIT.minX, maxX: KIT.minX + 0.85, minZ: KIT.maxZ - 0.98, maxZ: KIT.maxZ, fixed: true });
+
+    // open shelves with jars, either side of the window
+    const jarColors = ['#8fbf6a', '#a0714f', '#f2a7bb', '#e8b44a', '#efe0c4', '#c2405a'];
+    let jn = 0;
+    for (const [x0, x1] of [[KIT.minX + 0.1, -13.0], [-11.2, KIT.maxX - 2.1]]) {
+      for (const y of [1.6, 2.15]) {
+        const shelf = kbox(x1 - x0, 0.04, 0.26, M.woodLight);
+        shelf.position.set((x0 + x1) / 2, y, KIT.minZ + 0.14);
+        add(shelf);
+        for (let x = x0 + 0.15; x < x1 - 0.1; x += 0.22) {
+          const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.17, 16), new THREE.MeshStandardMaterial({ color: jarColors[jn++ % jarColors.length], roughness: 0.3, transparent: true, opacity: 0.85 }));
+          jar.position.set(x, y + 0.105, KIT.minZ + 0.14);
+          const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.03, 16), M.woodDark);
+          lid.position.set(x, y + 0.205, KIT.minZ + 0.14);
+          add(jar, lid);
+        }
+      }
+    }
+    // hanging copper pans on a rail by the hob
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.4, 10), M.brass);
+    rail.rotation.z = Math.PI / 2;
+    rail.position.set(KIT.maxX - 0.9, 2.55, KIT.maxZ - 1.2);
+    rail.rotation.y = Math.PI / 2;
+    add(rail);
+    for (let i = 0; i < 3; i++) {
+      const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.13 - i * 0.02, 0.11 - i * 0.02, 0.06, 24), std('#c17f4a', { roughness: 0.3, metalness: 0.8 }));
+      pan.rotation.z = Math.PI / 2;
+      pan.position.set(KIT.maxX - 0.15, 2.3, KIT.maxZ - 0.75 - i * 0.4);
+      add(pan);
+    }
+
+    // a wooden prep table: dough, a rolling pin, flour, the recipe book, and pastries cooling
+    const prep = rbox(1.5, 0.06, 0.75, 0.02, M.woodLight);
+    prep.position.set(-13.2, 0.88, -12.75);
+    add(prep);
+    for (const [dx, dz] of [[-0.65, -0.3], [0.65, -0.3], [-0.65, 0.3], [0.65, 0.3]]) {
+      const leg = kbox(0.06, 0.86, 0.06, M.woodDark);
+      leg.position.set(-13.2 + dx, 0.43, -12.75 + dz);
+      add(leg);
+    }
+    const dough = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 14), std('#f3e2c4', { roughness: 0.95 }));
+    dough.scale.y = 0.55; dough.position.set(-13.65, 0.94, -12.75);
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 14), M.woodLight);
+    pin.rotation.z = Math.PI / 2; pin.position.set(-13.55, 0.94, -12.5);
+    const flour = new THREE.Mesh(new THREE.CircleGeometry(0.22, 24), std('#ffffff', { roughness: 1 }));
+    flour.rotation.x = -Math.PI / 2; flour.position.set(-13.6, 0.912, -12.72);
+    const book = kbox(0.32, 0.04, 0.24, std('#d4678a', { roughness: 0.8 }));
+    book.position.set(-12.65, 0.93, -12.95); book.rotation.y = 0.3;
+    const pages = kbox(0.3, 0.02, 0.22, std('#fffaf2'));
+    pages.position.set(-12.65, 0.955, -12.95); pages.rotation.y = 0.3;
+    add(dough, pin, flour, book, pages);
+    const rack = kbox(0.6, 0.015, 0.4, M.brass);
+    rack.position.set(-13.05, 0.95, -12.75);
+    add(rack);
+    [['slice', -13.22, -12.85], ['daifuku', -12.95, -12.62], ['shells', -12.95, -12.88], ['melonpan', -13.25, -12.6]].forEach(([shape, x, z]) => {
+      const d = makeDessert(shape);
+      d.scale.setScalar(0.9);
+      d.position.set(x, 0.958, z);
+      add(d);
+    });
+    main.colliders.push({ type: 'box', minX: -14.0, maxX: -12.4, minZ: -13.15, maxZ: -12.35, fixed: true });
+
+    // today's bakes, chalked on the side wall
+    const board = makeSign([
+      { text: "Today's bakes", font: 'Dancing Script, cursive', size: 120, color: '#fdf6ee' },
+      { text: 'sakura slice · maamoul mochi', size: 64, color: '#f6c6d2' },
+      { text: 'melon pan · madeleines', size: 64, color: '#f6c6d2' },
+      { text: '— Hana & Yuki', font: 'Dancing Script, cursive', size: 70, color: '#b9d7b9' },
+    ], 0.9, 0.62, { bg: '#2f3a33', border: '#8a5a3a' });
+    board.position.set(KIT.maxX - 0.03, 1.7, KIT.maxZ - 0.9);
+    board.rotation.y = -Math.PI / 2;
+    add(board);
+    // a jar of sakura on the counter, and a little lamp light
+    const jarS = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.2, 16), M.glass);
+    jarS.position.set(-10.6, 1.01, KIT.minZ + 0.3);
+    add(jarS);
+    for (let i = 0; i < 6; i++) {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 10), std(COLORS.sakura, { roughness: 0.9 }));
+      b.position.set(-10.6 + Math.sin(i * 2) * 0.07, 1.2 + (i % 3) * 0.06, KIT.minZ + 0.3 + Math.cos(i * 3) * 0.05);
+      add(b);
+    }
+    for (const x of [-12.9, -9.6]) {
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.6, 6), M.woodDark);
+      cord.position.set(x, KH - 0.3, -12.7);
+      const shade = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.18, 24, 1, true), std('#fffaf2', { emissive: '#ffd9a0', emissiveIntensity: 0.6, side: THREE.DoubleSide }));
+      shade.position.set(x, KH - 0.66, -12.7);
+      add(cord, shade);
+    }
+    const kLight = new THREE.PointLight('#ffd9a8', 7, 9, 1.6);
+    kLight.position.set(-11, KH - 0.8, -12.7);
+    late.add(fixed(kLight));
+  }
+  noFog(late);
+
+  // ── where people can walk: the room, the doorway, and the kitchen
+  const walk = [
+    { minX: ROOM.minX + 0.35, maxX: ROOM.maxX - 0.35, minZ: ROOM.minZ + 0.35, maxZ: ROOM.maxZ - 0.35 },
+    { minX: KX - 0.62, maxX: KX + 0.62, minZ: KIT.maxZ - 0.35, maxZ: ROOM.minZ + 0.4 },
+    { minX: KIT.minX + 0.3, maxX: KIT.maxX - 0.3, minZ: KIT.minZ + 0.3, maxZ: KIT.maxZ - 0.3 },
+  ];
+  for (const c of main.colliders) if (c.type === 'room') c.walk = walk;
+
+  // The kitchen doors swing open when anyone walks up to them, and close behind.
+  function updateDoors(dt, points) {
+    let near = false;
+    for (const p of points) if (Math.hypot(p.x - kitchenDoor.x, p.z - kitchenDoor.z) < 1.9) { near = true; break; }
+    kitchenDoor.open += ((near ? 1 : 0) - kitchenDoor.open) * Math.min(1, dt * (near ? 5 : 2.5));
+    for (const { hinge, s } of kitchenDoor.leaves) hinge.rotation.y = -s * kitchenDoor.open * 1.35;
+  }
+
   // ── light
   const hemi = new THREE.HemisphereLight('#fff3e0', '#c9a27c', 0.9);
   scene.add(hemi);
@@ -1534,7 +1888,7 @@ export function buildWorld(renderer) {
 
   function update(dt, t) {
     animated.forEach(f => f(dt, t));
-    npcs.forEach(n => n.av.update(dt, {}));
+    npcs.forEach(n => { if (!n.controlled) n.av.update(dt, {}); });
     outside.update(dt, t);
     // lightning: a sudden white flash, then thunder a moment later
     if (wx.flashes) {
@@ -1558,6 +1912,7 @@ export function buildWorld(renderer) {
   const api = Object.assign(api_, {
     scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
+    walk, kitchen: { ...KIT, door: { x: KX, z: ROOM.minZ - 0.1 } }, updateDoors, counter,
     fire: { x: fire.x - 0.4, y: 0.5, z: fire.z }, board, tree,
   });
   // Show one floor and point colliders/seats/surfaces/interactables at it.
@@ -1818,9 +2173,11 @@ function buildCairo(scene) {
 
   // lamps and palms alternate along each side of the café
   const lx = STREET.pave.x - 0.8, lz = STREET.pave.z - 0.8;
-  for (let x = -16; x <= 16; x += 8) { streetLamp(x, lz, 0, 1); streetLamp(x + 0.01, -lz, 0, -1); }
+  // (nothing grows or stands where the kitchen juts out behind the back door)
+  const inKitchen = (x, z) => x > -15.6 && x < -6.2 && z > -15 && z < -10.5;
+  for (let x = -16; x <= 16; x += 8) { streetLamp(x, lz, 0, 1); if (!inKitchen(x, -lz)) streetLamp(x + 0.01, -lz, 0, -1); }
   for (const z of [-8, 0, 8]) { streetLamp(lx, z, 1, 0); streetLamp(-lx, z, -1, 0); }
-  for (let x = -12; x <= 12; x += 8) { palm(x, lz - 0.2, 7 + r() * 2); palm(x, -lz + 0.2, 7 + r() * 2); }
+  for (let x = -12; x <= 12; x += 8) { palm(x, lz - 0.2, 7 + r() * 2); if (!inKitchen(x, -lz + 0.2)) palm(x, -lz + 0.2, 7 + r() * 2); }
   for (const z of [-12, -4, 4, 12]) { palm(lx - 0.2, z, 7 + r() * 2); palm(-lx + 0.2, z, 7 + r() * 2); }
 
 
@@ -1947,7 +2304,6 @@ function buildCairo(scene) {
   }
   streetClock(mapX(-6), 12.4);                      // framed by the left front window
   chalkBoard(1.9, 11.75, 0);                         // by the front door
-  chalkBoard(mapX(-8) + 0.5, -12.7, Math.PI + 0.35); // seen through the open back door
   let clockShown = '';
   function setClock(hour, label, w) {
     const key = `${label}|${w ? w.icon + w.temp + w.label : ''}`;
@@ -2217,15 +2573,23 @@ function buildCairo(scene) {
     { body: 'person', skin: '#7d5236', hair: '#2a1d1a', hairStyle: 'curly', outfit: '#e8b44a', accent: '#fef9f5', accessory: 'headphones' },
     { body: 'cat', skin: '#c9b8a8', accent: '#fef9f5', outfit: '#9fbf98' },
   ];
+  // Round the block: along the café's pavement at the front and sides, and
+  // along the far pavement at the back (the kitchen takes up the near one).
   const walkX = STREET.pave.x - 1.6, walkZ = STREET.pave.z - 1.6;
-  const walkLen = 4 * walkX + 4 * walkZ;
+  const backZ = -(STREET.road.z + (STREET.far.z - STREET.road.z) / 2);
+  const route = [[-walkX, walkZ], [walkX, walkZ], [walkX, backZ], [-walkX, backZ]];
+  const legs = route.map((p, i) => { const q = route[(i + 1) % route.length]; return { p, q, len: Math.hypot(q[0] - p[0], q[1] - p[1]) }; });
+  const walkLen = legs.reduce((a, l) => a + l.len, 0);
   function onWalk(s) {
     s = ((s % walkLen) + walkLen) % walkLen;
-    const a = 2 * walkX, b = 2 * walkZ;
-    if (s < a) return { x: -walkX + s, z: walkZ, ry: Math.PI / 2 };
-    s -= a; if (s < b) return { x: walkX, z: walkZ - s, ry: Math.PI };
-    s -= b; if (s < a) return { x: walkX - s, z: -walkZ, ry: -Math.PI / 2 };
-    s -= a; return { x: -walkX, z: -walkZ + s, ry: 0 };
+    for (const l of legs) {
+      if (s <= l.len) {
+        const k = s / l.len, dx = l.q[0] - l.p[0], dz = l.q[1] - l.p[1];
+        return { x: l.p[0] + dx * k, z: l.p[1] + dz * k, ry: Math.atan2(dx, dz) };
+      }
+      s -= l.len;
+    }
+    return { x: route[0][0], z: route[0][1], ry: 0 };
   }
   looks.forEach((look, i) => {
     const av = buildAvatar(look);
@@ -2379,7 +2743,7 @@ function buildCairo(scene) {
     });
   }
 
-  return { setSky, setWeather, setFlash, update, setClock };
+  return { setSky, setWeather, setFlash, update, setClock, faceTex };
 }
 
 function lerpAngleW(a, b, t) {

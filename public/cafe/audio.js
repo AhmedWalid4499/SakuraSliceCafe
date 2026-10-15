@@ -418,8 +418,122 @@ export class Soundscape {
     else if (kind === 'heart') { this.bell(1568, now, 0.05, 2); this.bell(2093, now + 0.09, 0.04, 2.5); }
     else if (kind === 'drink') { this.cupClink(); this.bell(1046.5, now + 0.1, 0.04, 2.5); }
     else if (kind === 'chat') { this.bell(1760, now, 0.025, 1.5); }
-    else if (kind === 'join') { this.windChime(); }
+    else if (kind === 'join') { this.doorBell(0.7); }
     else if (kind === 'sit') { this.bell(880, now, 0.03, 1.5); }
+  }
+
+  // The little brass bell over the front door, when someone comes in:
+  // a few quick strikes that ring out, and the wind chime answering.
+  doorBell(gain = 1) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const strikes = [0, 0.11, 0.2, 0.34, 0.5];
+    strikes.forEach((t, i) => {
+      const k = gain * (1 - i * 0.16);
+      this.bell(2093 * (1 + (i % 2) * 0.006), now + t, 0.085 * k, 2.4);
+      this.bell(2637, now + t + 0.012, 0.04 * k, 1.8);
+    });
+    setTimeout(() => this.windChime(), 450);
+  }
+
+  // A soft, wordless voice for the team when they talk — a few little
+  // syllables, each with its own pitch (Me3temed hoots instead).
+  voice(who, text = '') {
+    const ctx = this.ctx;
+    if (!ctx || this.muted) return;
+    const base = { hana: 520, yuki: 760, yuto: 360, me3temed: 300 }[who] || 600;
+    const now = ctx.currentTime;
+    if (who === 'me3temed') {
+      // hoo… hoo
+      [0, 0.42].forEach((t, i) => {
+        const o = ctx.createOscillator(); o.type = 'sine';
+        o.frequency.setValueAtTime(base * (i ? 0.92 : 1), now + t);
+        o.frequency.linearRampToValueAtTime(base * (i ? 0.84 : 0.95), now + t + 0.3);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, now + t);
+        g.gain.linearRampToValueAtTime(0.09, now + t + 0.06);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.34);
+        o.connect(g); g.connect(this.bus.chimes); g.connect(this.reverb);
+        o.start(now + t); o.stop(now + t + 0.4);
+      });
+      return;
+    }
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const n = Math.max(3, Math.min(9, Math.round(words.length * 0.8)));
+    let seed = [...String(text)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+    for (let i = 0; i < n; i++) {
+      const t = now + i * 0.085 + rnd() * 0.02;
+      const f = base * Math.pow(2, (Math.floor(rnd() * 5) - 2) / 12) * (i === n - 1 ? 1.12 : 1);
+      const o = ctx.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(f * 0.9, t);
+      o.frequency.exponentialRampToValueAtTime(f * 1.08, t + 0.05);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.075);
+      o.connect(g); g.connect(this.bus.chimes);
+      o.start(t); o.stop(t + 0.09);
+    }
+  }
+
+  // A soft sip, and a little crunch for a bite.
+  sip() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    const len = Math.floor(ctx.sampleRate * 0.35);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / len);
+    src.buffer = buf;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(1600, t + 0.3);
+    const g = ctx.createGain(); g.gain.value = 0.05;
+    src.connect(bp).connect(g).connect(this.bus.chimes);
+    src.start(t);
+    this.bell(1046.5, t + 0.32, 0.018, 0.8);
+  }
+  bite() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [0, 0.07, 0.13].forEach((dt, i) => {
+      const src = ctx.createBufferSource();
+      const len = Math.floor(ctx.sampleRate * 0.05);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let k = 0; k < len; k++) d[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / len, 2);
+      src.buffer = buf;
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800 + i * 400;
+      const g = ctx.createGain(); g.gain.value = 0.07 - i * 0.015;
+      src.connect(hp).connect(g).connect(this.bus.chimes);
+      src.start(t + dt);
+    });
+  }
+
+  // A message you send: a little rising pop. One you receive: a soft two-note ding.
+  chatSend() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(620, t);
+    o.frequency.exponentialRampToValueAtTime(1240, t + 0.09);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.08, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    o.connect(g); g.connect(this.bus.chimes);
+    o.start(t); o.stop(t + 0.2);
+    this.bell(1568, t + 0.07, 0.025, 0.9);
+  }
+  chatGet() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.bell(1318.5, t, 0.05, 1.4);
+    this.bell(1760, t + 0.13, 0.045, 1.8);
   }
 
   // ───────────────────────────────────────── music

@@ -40,24 +40,31 @@ function stillIn(userId, room, exceptWs) {
   return false;
 }
 
+// What's on someone's table, as a short key (to spot when it changes).
+function placedKey(p) {
+  return p && typeof p === 'object' ? `${p.drink || ''}:${p.sips || 0}+${p.dessert || ''}:${p.bites || 0}@${p.x},${p.z}` : '';
+}
+
 function cleanState(m) {
   return {
     x: clamp(m.x, -15, 15) || 0,
-    z: clamp(m.z, -11, 11) || 0,
+    z: clamp(m.z, -14.5, 11) || 0, // −11 → −14.5: the kitchen behind the back door
     ry: clamp(m.ry, -10, 10) || 0,
     seat: typeof m.seat === 'string' ? m.seat.slice(0, 24) : null,
-    drink: typeof m.drink === 'string' ? m.drink.slice(0, 24) : null,
+    drink: typeof m.drink === 'string' ? m.drink.slice(0, 60) : null,
+    sips: Math.round(clamp(m.sips, 0, 4)) || 0, // how much of the drink is gone (0–4)
     // a pastry on a plate in the other hand, and how many bites are gone (0–3)
     dessert: typeof m.dessert === 'string' ? m.dessert.slice(0, 40) : null,
     bites: Math.round(clamp(m.bites, 0, 3)) || 0,
     // what this person has set down on a table (one spot at a time): a cup, a plate, or both
     placed: m.placed && (typeof m.placed.drink === 'string' || typeof m.placed.dessert === 'string') ? {
-      drink: typeof m.placed.drink === 'string' ? m.placed.drink.slice(0, 24) : null,
+      drink: typeof m.placed.drink === 'string' ? m.placed.drink.slice(0, 60) : null,
+      sips: Math.round(clamp(m.placed.sips, 0, 4)) || 0,
       dessert: typeof m.placed.dessert === 'string' ? m.placed.dessert.slice(0, 40) : null,
       bites: Math.round(clamp(m.placed.bites, 0, 3)) || 0,
       x: clamp(m.placed.x, -15, 15) || 0,
       y: clamp(m.placed.y, 0, 8.6) || 0,
-      z: clamp(m.placed.z, -11, 11) || 0,
+      z: clamp(m.placed.z, -14.5, 11) || 0,
     } : null,
     moving: !!m.moving,
   };
@@ -111,7 +118,8 @@ function attach(server, opts = {}) {
       // State changes (sitting, drinks) always go through; plain walking is
       // limited to ~15 updates a second.
       const important = m.t === 'move' && (m.seat !== entry.state.seat || m.drink !== entry.state.drink
-        || (m.dessert || null) !== entry.state.dessert || (m.bites || 0) !== entry.state.bites || !!m.placed !== !!entry.state.placed);
+        || (m.dessert || null) !== entry.state.dessert || (m.bites || 0) !== entry.state.bites || (m.sips || 0) !== entry.state.sips
+        || placedKey(m.placed) !== placedKey(entry.state.placed));
       if (!important && now - entry.lastMsg < 60) return;
       entry.lastMsg = now;
 
