@@ -22,7 +22,11 @@ async function api(path, { method = 'GET', body } = {}) {
   });
   let data = null;
   try { data = await res.json(); } catch (e) { /* empty */ }
-  if (!res.ok) throw new Error((data && data.error) || 'Something went wrong. Please try again.');
+  if (!res.ok) {
+    const err = new Error((data && data.error) || 'Something went wrong. Please try again.');
+    err.detail = data && data.detail; // only sent to the café owner
+    throw err;
+  }
   return data;
 }
 
@@ -1490,6 +1494,7 @@ $('talkForm').addEventListener('submit', async e => {
     const fresh = npc.lines.filter(l => !shown.includes(l));
     const line = (fresh.length ? fresh : npc.lines)[Math.floor(Math.random() * (fresh.length || npc.lines.length))];
     talkLine('them', /resting|smiles/.test(err.message) ? line : err.message);
+    if (err.detail) talkLine('them typing', '🗝️ (only you see this, as the owner) ' + err.detail);
   } finally {
     talkBusy = false;
     $('talkSend').disabled = false;
