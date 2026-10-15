@@ -2244,3 +2244,6 @@ if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player,
   // notes refresh quietly now and then, in case a message was missed
   setInterval(() => { if (!document.hidden) loadNotes(); }, 30000);
 })();
+
+// everything above ran: the café started (cafe.html shows a card if this never happens)
+window.__cafeReady = true;
