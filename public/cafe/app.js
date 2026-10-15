@@ -1495,11 +1495,60 @@ function buildMixer() {
     b.type = 'button';
     b.className = 'chip' + (state.quality === id ? ' on' : '');
     b.textContent = name;
-    b.onclick = () => { applyQuality(id); buildMixer(); savePrefs(); };
+    b.onclick = () => { state.qualityChosen = true; applyQuality(id); buildMixer(); savePrefs(); };
     q.appendChild(b);
   }
 }
-$('soundBtn').onclick = () => { buildMixer(); openPanel('soundPanel'); };
+$('soundBtn').onclick = () => { buildMixer(); openPanel('soundPanel'); openSpotify(); };
+
+// ── Lofi from Spotify: the café's playlist (site_content 'cafe.spotify'),
+// played in Spotify's own player. Everyone gets the same playlist; while it
+// plays, the café's generated piano fades out (rain, fire and the room stay).
+const DEFAULT_SPOTIFY = 'https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn';
+function spotifyUri(link) {
+  const m = String(link || '').match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(playlist|album|track|artist|show|episode)\/([A-Za-z0-9]+)/)
+    || String(link || '').match(/^spotify:(playlist|album|track|artist|show|episode):([A-Za-z0-9]+)$/);
+  return m ? `spotify:${m[1]}:${m[2]}` : null;
+}
+let spotify = { api: null, controller: null, uri: null, loading: false };
+function openSpotify() {
+  const admin = !!(state.me && state.me.isAdmin);
+  $('spotOwner').classList.toggle('hidden', !admin);
+  const conf = state.content['cafe.spotify'] || {};
+  const uri = spotifyUri(conf.link) || spotifyUri(DEFAULT_SPOTIFY);
+  if (admin && !$('spotLink').value) $('spotLink').value = conf.link || DEFAULT_SPOTIFY;
+  if (spotify.controller) { if (spotify.uri !== uri) { spotify.controller.loadUri(uri); spotify.uri = uri; } return; }
+  if (spotify.loading) return;
+  spotify.loading = true;
+  const make = api => {
+    spotify.api = api;
+    const holder = document.createElement('div');
+    $('spotEmbed').replaceChildren(holder);
+    api.createController(holder, { uri, width: '100%', height: 152 }, controller => {
+      spotify.controller = controller;
+      spotify.uri = uri;
+      controller.addListener('playback_update', e => sound.duckMusic(e.data && !e.data.isPaused));
+    });
+  };
+  if (window.SpotifyIframeApi) return make(window.SpotifyIframeApi);
+  window.onSpotifyIframeApiReady = api => { window.SpotifyIframeApi = api; make(api); };
+  const s = document.createElement('script');
+  s.src = 'https://open.spotify.com/embed/iframe-api/v1';
+  s.async = true;
+  s.onerror = () => { spotify.loading = false; $('spotEmbed').textContent = "Spotify didn't load — check your connection and open this panel again."; };
+  document.head.appendChild(s);
+}
+$('spotSave').onclick = async () => {
+  $('spotErr').textContent = '';
+  const link = $('spotLink').value.trim();
+  if (!spotifyUri(link)) { $('spotErr').textContent = 'That doesn\'t look like a Spotify link (open the playlist in Spotify → Share → Copy link).'; return; }
+  try {
+    await api('/admin/content/cafe.spotify', { method: 'PUT', body: { value: { link }, description: "The café's Spotify playlist (the sound panel's player, the same for everyone). Any Spotify playlist, album or track link." } });
+    state.content['cafe.spotify'] = { link };
+    openSpotify();
+    toast('🎧 The café\'s playlist is changed — for everyone.');
+  } catch (e) { $('spotErr').textContent = e.message; }
+};
 $('muteBtn').onclick = () => {
   sound.setMuted(!sound.muted);
   $('soundBtn').textContent = sound.muted ? '🔇' : '🔊';
@@ -1548,6 +1597,7 @@ $('outBtn').onclick = async () => {
 
 function applyContent(key) {
   const c = state.content;
+  if (key === 'cafe.spotify' && spotify.controller) openSpotify();
   if (!key || key === 'cafe.weather') refreshWeather();
   if (!key || key === 'cafe.board') {
     const b = c['cafe.board'];
@@ -1765,7 +1815,7 @@ $('enterBtn').onclick = async () => {
   if (weatherNow) sound.setWeather(weatherNow.look);
   sound.setNight(cairoHour() < 6 || cairoHour() >= 18.5);
   sound.setFirePosition(world.fire);
-  if (prefs.quality) applyQuality(prefs.quality);
+  if (prefs.quality) { applyQuality(prefs.quality); state.qualityChosen = true; }
 
   playerAvatar();
   // walk in through the front door
@@ -2199,8 +2249,26 @@ $('floorAct').onclick = () => (state.room === 'main' ? openUpstairs() : goToRoom
 
 const clock = new THREE.Clock();
 let introAngle = 0;
+// If the café is struggling (lots of people, a small laptop), make the picture
+// a little gentler by itself — once per step, and never after you chose one.
+const perf = { t: 0, frames: 0, slow: 0 };
+function watchSpeed(realDt) {
+  if (!state.started || state.qualityChosen || state.quality === 'gentle' || document.hidden) return;
+  perf.t += realDt; perf.frames++;
+  if (perf.t < 3) return;
+  const fps = perf.frames / perf.t;
+  perf.t = 0; perf.frames = 0;
+  perf.slow = fps < 30 ? perf.slow + 1 : 0;
+  if (perf.slow < 2) return;
+  perf.slow = 0;
+  applyQuality(state.quality === 'high' ? 'balanced' : 'gentle');
+  toast('🌸 The picture is a little gentler now, so the café stays smooth. (You can change it in 🔊.)');
+}
+
 function frame() {
-  const dt = Math.min(0.05, clock.getDelta());
+  const realDt = clock.getDelta();
+  watchSpeed(Math.min(realDt, 1));
+  const dt = Math.min(0.05, realDt);
   const t = clock.elapsedTime;
   world.update(dt, t);
   if (state.started) {

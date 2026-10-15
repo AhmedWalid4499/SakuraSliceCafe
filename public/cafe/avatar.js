@@ -3,24 +3,72 @@
 // preview in the avatar creator.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeDessert, setBites } from './pastries.js';
 
 const SEG = 32; // generous segment counts keep silhouettes round up close
 
-const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({
-  color, roughness: opts.roughness ?? 0.75, metalness: opts.metalness ?? 0, ...opts,
-});
+// While an avatar is being built, the same colour and finish gives the same
+// material, so its parts can be drawn together (see bundle() below).
+let matCache = null;
+const mat = (color, opts = {}) => {
+  const make = () => new THREE.MeshStandardMaterial({ color, roughness: opts.roughness ?? 0.75, metalness: opts.metalness ?? 0, ...opts });
+  if (!matCache) return make();
+  const key = new THREE.Color(color).getHexString() + JSON.stringify(opts, (k, v) => (v && v.isColor ? v.getHexString() : v));
+  if (!matCache.has(key)) matCache.set(key, make());
+  return matCache.get(key);
+};
+
+// Segments by size: a head stays round up close, an eye or a curl doesn't
+// need two thousand triangles.
+const segsFor = r => Math.max(10, Math.min(SEG, Math.round(r * 110)));
 
 function capsule(r, len, color, m) {
-  const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 12, SEG), m || mat(color));
+  const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 6, Math.max(12, segsFor(r))), m || mat(color));
   mesh.castShadow = true;
   return mesh;
 }
 
 function sphere(r, color, m) {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, SEG, SEG), m || mat(color));
+  const n = segsFor(r);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, n, Math.max(8, Math.round(n * 0.75))), m || mat(color));
   mesh.castShadow = true;
   return mesh;
+}
+
+// Draw an avatar in a handful of pieces, not seventy: inside each moving part
+// (the body, the head, an arm, an eye…), meshes that share a material become
+// one mesh. Only the bigger pieces cast shadows.
+function bundle(root, keep) {
+  const groups = [];
+  root.traverse(o => { if (!o.isMesh && o.children.length) groups.push(o); });
+  for (const g of groups) {
+    const byMat = new Map();
+    for (const c of g.children) {
+      if (!c.isMesh || c.children.length || keep.has(c) || !c.geometry.index) continue;
+      const k = c.material;
+      if (!byMat.has(k)) byMat.set(k, []);
+      byMat.get(k).push(c);
+    }
+    for (const [m, list] of byMat) {
+      if (list.length < 2) continue;
+      const geos = list.map(c => { c.updateMatrix(); const geo = c.geometry.clone().applyMatrix4(c.matrix); for (const name of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(name)) geo.deleteAttribute(name); return geo; });
+      const merged = mergeGeometries(geos, false);
+      geos.forEach(x => x.dispose());
+      if (!merged) continue;
+      const one = new THREE.Mesh(merged, m);
+      merged.computeBoundingSphere();
+      one.castShadow = merged.boundingSphere.radius > 0.07;
+      one.receiveShadow = false;
+      for (const c of list) { g.remove(c); c.geometry.dispose(); }
+      g.add(one);
+    }
+  }
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+    if (o.geometry.boundingSphere.radius < 0.07) o.castShadow = false;
+  });
 }
 
 function shade(hex, amt) {
@@ -95,6 +143,11 @@ export function makeLabel(text, opts = {}) {
  * paws, a rabbit's floppy ear, an owl's half-shut eyes and feathered chest.
  */
 export function buildAvatar(avatar = {}, extra = {}) {
+  matCache = new Map();
+  try { return buildAvatarParts(avatar, extra); } finally { matCache = null; }
+}
+
+function buildAvatarParts(avatar, extra) {
   const a = {
     body: 'person', skin: '#e0b48c', hair: '#3b2a22', hairStyle: 'short',
     outfit: '#7aab7a', accent: '#fef9f5', accessory: 'none', ...avatar,
@@ -673,6 +726,7 @@ export function buildAvatar(avatar = {}, extra = {}) {
   }
 
   root.scale.setScalar(extra.scale || 1);
+  bundle(root, new Set([torso]));
 
   // ── a drink in the right hand
   let cup = null, cupColor = null;
