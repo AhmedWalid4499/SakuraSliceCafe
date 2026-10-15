@@ -23,7 +23,12 @@ const BETAS = ['server-side-fallback-2026-07-01', 'thinking-binding-controls-202
 
 let client = null;
 function claude() {
-  if (!client) client = new Anthropic(); // reads ANTHROPIC_API_KEY
+  if (!client) {
+    // Keys made at the organisation level (not inside a workspace) must say
+    // which workspace to use. Set ANTHROPIC_WORKSPACE_ID (wrkspc_…) for those.
+    const ws = (process.env.ANTHROPIC_WORKSPACE_ID || '').trim();
+    client = new Anthropic(ws ? { defaultHeaders: { 'anthropic-workspace-id': ws } } : {}); // reads ANTHROPIC_API_KEY
+  }
   return client;
 }
 
