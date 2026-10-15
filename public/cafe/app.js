@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildWorld, ROOM } from './world.js';
+import { buildWorld, ROOM, STAIRS } from './world.js';
 import { buildAvatar, makeLabel, makeCup, disposeTree } from './avatar.js';
 import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
@@ -29,6 +29,8 @@ async function api(path, { method = 'GET', body } = {}) {
 // ───────────────────────────────────────── state
 
 const state = {
+  room: 'main',         // 'main' = the café; 'group:<id>' = that group's room upstairs
+  roomName: null,
   me: null,
   content: {},
   notes: new Map(),     // id -> { note, group }
@@ -217,7 +219,11 @@ function nearestFreeSeat(from, near = null, maxDist = Infinity) {
 
 function goSit(seat) {
   if (!seat) return toast('Every seat nearby is taken — try another table.');
-  if (seatTaken(seat)) return toast('Someone is already sitting there.');
+  if (seatTaken(seat)) {
+    const near = nearestFreeSeat(player.pos, { x: seat.x, z: seat.z, r: 1.6 });
+    if (!near) return toast('Someone is already sitting there.');
+    seat = near;
+  }
   if (player.seat) standUp();
   player.goingToSeat = seat;
   player.target = new THREE.Vector3(seat.x, 0, seat.z);
@@ -364,7 +370,7 @@ function updatePlayer(dt) {
       player.target = null;
     }
   }
-  if (!player.seat) { player.pos.y = 0; collide(player.pos); }
+  if (!player.seat) { player.pos.y = world.floorY; collide(player.pos); }
 
   player.moving = moving;
   if (player.waving > 0) player.waving -= dt;
@@ -383,7 +389,7 @@ function lerpAngle(a, b, t) {
 const camPos = new THREE.Vector3();
 function updateCamera(dt) {
   cam.dist += (cam.targetDist - cam.dist) * Math.min(1, dt * 6);
-  const focus = player.av ? player.pos.clone().add(new THREE.Vector3(0, player.seat ? 1.15 : 1.45, 0)) : new THREE.Vector3(0, 1.5, 0);
+  const focus = player.av ? player.pos.clone().add(new THREE.Vector3(0, player.seat ? 1.15 : 1.45, 0)) : new THREE.Vector3(0, 1.5 + world.floorY, 0);
   camTarget.lerp(focus, Math.min(1, dt * 8));
   const cp = Math.cos(cam.pitch);
   camPos.set(
@@ -394,7 +400,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   camPos.x = Math.min(ROOM.maxX - 0.25, Math.max(ROOM.minX + 0.25, camPos.x));
   camPos.z = Math.min(ROOM.maxZ - 0.25, Math.max(ROOM.minZ + 0.25, camPos.z));
-  camPos.y = Math.min(ROOM.h - 0.3, Math.max(0.4, camPos.y));
+  camPos.y = Math.min(world.floorY + world.floorH - 0.3, Math.max(world.floorY + 0.4, camPos.y));
   camera.position.copy(camPos);
   camera.lookAt(camTarget);
 
@@ -456,7 +462,7 @@ function updatePeople(dt) {
     const before = p.pos.clone();
     p.pos.x += (tx - p.pos.x) * k;
     p.pos.z += (tz - p.pos.z) * k;
-    p.pos.y = seat ? seat.y : 0;
+    p.pos.y = seat ? seat.y : world.floorY;
     p.ry = lerpAngle(p.ry, seat ? seat.ry : s.ry, k);
     const moving = before.distanceTo(p.pos) > dt * 0.4;
     p.av.group.position.copy(p.pos);
@@ -468,7 +474,8 @@ function updatePeople(dt) {
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  $('online').textContent = n <= 1 ? 'just you, for now' : `${n} people here`;
+  const where = state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
 // ───────────────────────────────────────── live connection
@@ -481,7 +488,13 @@ let lastSentState = '';
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen = () => { wsRetry = 0; sendMove(true); loadNotes(); };
+  ws.onopen = () => {
+    wsRetry = 0;
+    // after a reconnect, rejoin the room we were in
+    if (state.room !== 'main') send({ t: 'room', room: state.room, state: { x: player.pos.x, z: player.pos.z, ry: player.ry } });
+    sendMove(true);
+    loadNotes();
+  };
   ws.onmessage = ev => {
     let m;
     try { m = JSON.parse(ev.data); } catch (e) { return; }
@@ -497,9 +510,13 @@ function connect() {
 function handle(m) {
   switch (m.t) {
     case 'hello':
+      if (m.room && m.room !== state.room) break; // an answer for a room we've since left
       for (const id of [...state.people.keys()]) removePerson(id);
       m.people.forEach(addPerson);
       updateOnline();
+      break;
+    case 'room:denied':
+      toast('That room is only for its group.');
       break;
     case 'join':
       addPerson(m.person);
@@ -610,7 +627,7 @@ function removeNote(id) {
 // was dropped on the way.
 async function loadNotes() {
   try {
-    const { notes } = await api('/notes');
+    const { notes } = await api('/notes?room=' + encodeURIComponent(state.room));
     const ids = new Set(notes.map(n => n.id));
     for (const id of [...state.notes.keys()]) if (!ids.has(id)) removeNote(id);
     for (const n of notes) {
@@ -636,7 +653,7 @@ function placementFromHit(hit) {
     return { surface, x: hit.point.x, y: hit.object.userData.top ?? hit.point.y, z: hit.point.z, ry: Math.random() * 0.6 - 0.3 + cam.yaw, tilt: 0 };
   }
   if (Math.abs(n.y) > 0.3) return null;
-  if (hit.point.y < 0.35 || hit.point.y > ROOM.h - 0.3) return null;
+  if (hit.point.y < world.floorY + 0.35 || hit.point.y > world.floorY + world.floorH - 0.3) return null;
   const off = surface === 'board' ? 0.025 : 0.11;
   return {
     surface, x: hit.point.x + n.x * off, y: hit.point.y, z: hit.point.z + n.z * off,
@@ -695,7 +712,7 @@ $('composeSave').onclick = async () => {
   const btn = $('composeSave');
   btn.disabled = true;
   try {
-    const { note } = await api('/notes', { method: 'POST', body: { ...state.pending, text, color: composeColor, kind: composeKind } });
+    const { note } = await api('/notes', { method: 'POST', body: { ...state.pending, text, color: composeColor, kind: composeKind, room: state.room } });
     if (!state.notes.has(note.id)) addNote(note);
     $('composeText').value = '';
     $('composeCount').textContent = '0 / 220';
@@ -830,7 +847,7 @@ $('chatForm').addEventListener('submit', async e => {
   if (!text) return;
   input.value = '';
   try {
-    const { msg } = await api('/chat', { method: 'POST', body: { text } });
+    const { msg } = await api('/chat', { method: 'POST', body: { text, room: state.room } });
     addChat(msg);
     bubble(player.av.group, text);
   } catch (err) { toast(err.message); input.value = text; }
@@ -912,7 +929,7 @@ function personMeshes() {
 }
 
 function pickInteractive(x, y) {
-  const hits = castAt(x, y, [...noteMeshes(), ...world.interactables, ...personMeshes(), ...world.surfaces, world.scene.children.find(o => o.userData.floor)]);
+  const hits = castAt(x, y, [...noteMeshes(), ...world.interactables, ...personMeshes(), ...world.surfaces, world.floorMesh]);
   for (const h of hits) {
     if (h.object.isSprite && h.object.userData.kind !== 'note') continue;
     const k = h.object.userData.kind;
@@ -984,14 +1001,9 @@ function click(x, y) {
     return;
   }
   if (d.kind === 'order') return openMenu();
-  if (d.kind === 'npc') {
-    const n = d.npc;
-    if (n.id === 'hana') return openMenu();
-    const line = n.lines[Math.floor(Math.random() * n.lines.length)];
-    const npc = world.npcs.find(x => x.id === n.id);
-    bubble(npc.av.group, line, 'npc');
-    return;
-  }
+  if (d.kind === 'npc') return openTalk(d.npc.id);
+  if (d.kind === 'stairs-up') return openUpstairs();
+  if (d.kind === 'stairs-down') return goToRoom('main');
   if (d.kind === 'person') {
     bubble(player.av.group, '👋', 'emote');
     player.waving = 2;
@@ -1036,7 +1048,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -1362,7 +1374,7 @@ $('enterBtn').onclick = async () => {
   connect();
   loadNotes();
   try {
-    const { messages } = await api('/chat');
+    const { messages } = await api('/chat?room=main');
     messages.forEach(addChat);
   } catch (e) { /* fine */ }
   sysChat('You came in. The door chimes softly behind you.');
@@ -1372,6 +1384,295 @@ $('enterBtn').onclick = async () => {
   }, 1600);
   updateOnline();
 };
+
+// ───────────────────────────────────────── talking with the team (AI)
+// Yuto, Hana, Yuki and Me3temed answer for real (see server/npc.js). They
+// can recommend a drink — it shows as a card with an "order this" button —
+// and they remember what you like, across visits.
+
+const FACES = { yuto: '👓', hana: '🦊', yuki: '🐰', me3temed: '🦉' };
+const wait = ms => new Promise(r => setTimeout(r, ms));
+let talkTo = null;
+let talkBusy = false;
+
+function talkLine(cls, text) {
+  const el = document.createElement('div');
+  el.className = 'say ' + cls;
+  el.textContent = text;
+  $('talkLog').appendChild(el);
+  $('talkLog').scrollTop = $('talkLog').scrollHeight;
+  return el;
+}
+
+function recCard(rec) {
+  const d = menu().find(x => x.id === rec.id) || rec;
+  const card = document.createElement('div');
+  card.className = 'rec';
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  dot.style.background = d.color || '#d9b48f';
+  const txt = document.createElement('div');
+  const b = document.createElement('b');
+  b.textContent = d.name;
+  const why = document.createElement('small');
+  why.textContent = rec.why || `made by ${d.by}`;
+  txt.append(b, why);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn';
+  btn.textContent = 'Order this ☕';
+  btn.onclick = () => { order(d); btn.disabled = true; btn.textContent = 'Coming up…'; };
+  card.append(dot, txt, btn);
+  $('talkLog').appendChild(card);
+  $('talkLog').scrollTop = $('talkLog').scrollHeight;
+}
+
+async function openTalk(id) {
+  const npc = world.npcs.find(n => n.id === id);
+  if (!npc) return;
+  talkTo = id;
+  $('talkFace').textContent = FACES[id] || '🌸';
+  $('talkName').textContent = npc.name;
+  $('talkRole').textContent = npc.role;
+  $('talkInput').placeholder = id === 'hana' ? 'What should I drink today?' : id === 'me3temed' ? 'Say something to the owl…' : `Say something to ${npc.name}…`;
+  const who = $('talkWho');
+  who.replaceChildren(...world.npcs.map(n => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = `${FACES[n.id] || ''} ${n.name}`;
+    b.className = n.id === id ? 'on' : '';
+    b.onclick = () => openTalk(n.id);
+    return b;
+  }));
+  $('talkLog').replaceChildren();
+  openPanel('talkPanel');
+  setTimeout(() => $('talkInput').focus(), 50);
+  let had = false;
+  try {
+    const { messages } = await api('/npc/' + id);
+    if (talkTo !== id) return;
+    for (const m of messages) {
+      talkLine(m.role === 'user' ? 'me' : 'them', m.display);
+      if (m.meta && m.meta.recommendation) recCard(m.meta.recommendation);
+      had = true;
+    }
+  } catch (e) { /* fine — start fresh */ }
+  if (!had) talkLine('them', npc.lines[0]);
+  if (state.room === 'main') bubble(npc.av.group, npc.lines[0], 'npc');
+}
+
+$('talkForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const input = $('talkInput');
+  const text = input.value.trim();
+  if (!text || !talkTo || talkBusy) return;
+  const id = talkTo;
+  const npc = world.npcs.find(n => n.id === id);
+  input.value = '';
+  talkLine('me', text);
+  const typing = talkLine('them typing', id === 'me3temed' ? '(…)' : '…');
+  talkBusy = true;
+  $('talkSend').disabled = true;
+  try {
+    const holding = player.drink ? (menu().find(d => d.id === player.drink) || {}).name : '';
+    const where = state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
+    typing.remove();
+    if (talkTo !== id) return;
+    talkLine('them', r.reply);
+    if (r.recommendation) recCard(r.recommendation);
+    if (state.room === 'main') bubble(npc.av.group, r.reply.length > 120 ? r.reply.slice(0, 117) + '…' : r.reply, 'npc');
+    sound.cue('chat');
+  } catch (err) {
+    typing.remove();
+    // No voice yet (no API key), or a hiccup: answer in character anyway.
+    const shown = [...$('talkLog').querySelectorAll('.say.them')].map(x => x.textContent);
+    const fresh = npc.lines.filter(l => !shown.includes(l));
+    const line = (fresh.length ? fresh : npc.lines)[Math.floor(Math.random() * (fresh.length || npc.lines.length))];
+    talkLine('them', /resting|smiles/.test(err.message) ? line : err.message);
+  } finally {
+    talkBusy = false;
+    $('talkSend').disabled = false;
+    $('talkInput').focus();
+  }
+});
+
+$('talkAct').onclick = () => openTalk(talkTo || 'hana');
+
+// ───────────────────────────────────────── upstairs: rooms for groups
+
+const GROUP_COLORS = ['#d4678a', '#4d7a4d', '#e8a64a', '#6b8fb5', '#8a6bb0', '#a0714f'];
+let groupColor = GROUP_COLORS[0];
+$('upColors').append(...GROUP_COLORS.map((c, i) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'swatch' + (i === 0 ? ' on' : '');
+  b.style.background = c;
+  b.setAttribute('aria-label', 'Group colour');
+  b.onclick = () => { groupColor = c; [...$('upColors').children].forEach(x => x.classList.toggle('on', x === b)); };
+  return b;
+}));
+
+function groupCard(g, mine) {
+  const el = document.createElement('div');
+  el.className = 'group';
+  const name = document.createElement('div');
+  name.className = 'gname';
+  const dot = document.createElement('i');
+  dot.style.background = g.color;
+  name.append(dot, document.createTextNode(g.name));
+  const sub = document.createElement('small');
+  const bits = [`${g.members} member${g.members === 1 ? '' : 's'}`];
+  if (g.here) bits.push(`${g.here} upstairs now`);
+  if (!g.isPublic) bits.push('private');
+  sub.textContent = (g.description ? g.description + ' · ' : '') + bits.join(' · ');
+  const row = document.createElement('div');
+  row.className = 'row';
+  if (mine) {
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'btn';
+    go.textContent = state.room === 'group:' + g.id ? "You're here" : 'Go up 🪜';
+    go.disabled = state.room === 'group:' + g.id;
+    go.onclick = () => goToRoom('group:' + g.id, g);
+    const code = document.createElement('code');
+    code.textContent = g.inviteCode;
+    code.title = 'Invite code — share it with friends';
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'btn ghost';
+    copy.textContent = 'Copy invite';
+    copy.onclick = async () => {
+      const msg = `Come upstairs at Sakura Slice Café 🌸 Join "${g.name}" with the code ${g.inviteCode} — ${location.origin}/cafe`;
+      try { await navigator.clipboard.writeText(msg); toast('Invite copied — send it to a friend.'); }
+      catch (e) { prompt('Copy this invite:', msg); }
+    };
+    const leave = document.createElement('button');
+    leave.type = 'button';
+    leave.className = 'btn ghost';
+    leave.textContent = g.role === 'owner' ? 'Close room' : 'Leave';
+    leave.onclick = async () => {
+      const ask = g.role === 'owner'
+        ? `Close "${g.name}"? The room, its notes and its chat will be gone for everyone.`
+        : `Leave "${g.name}"?`;
+      if (!confirm(ask)) return;
+      try {
+        await api(`/groups/${g.id}/leave`, { method: 'POST', body: {} });
+        if (state.room === 'group:' + g.id) await goToRoom('main');
+        loadGroups();
+      } catch (e) { toast(e.message); }
+    };
+    row.append(go, code, copy, leave);
+  } else {
+    const join = document.createElement('button');
+    join.type = 'button';
+    join.className = 'btn';
+    join.textContent = 'Join';
+    join.onclick = async () => {
+      try { await api('/groups/join', { method: 'POST', body: { id: g.id } }); sound.cue('pin'); loadGroups(); }
+      catch (e) { toast(e.message); }
+    };
+    row.append(join);
+  }
+  el.append(name, sub, row);
+  return el;
+}
+
+async function loadGroups() {
+  try {
+    const { mine, open } = await api('/groups');
+    const m = $('upMine');
+    m.replaceChildren(...mine.map(g => groupCard(g, true)));
+    if (!mine.length) {
+      const p = document.createElement('p');
+      p.className = 'fine';
+      p.textContent = "You're not in a group yet. Start one for your friends, or join one below.";
+      m.appendChild(p);
+      $('upCreateBox').open = true;
+    }
+    $('upOpen').replaceChildren(...open.map(g => groupCard(g, false)));
+    $('upOpenWrap').classList.toggle('hidden', !open.length);
+  } catch (e) { toast(e.message); }
+}
+
+function openUpstairs() {
+  openPanel('upPanel');
+  loadGroups();
+}
+
+$('upCreate').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  $('upCreateErr').textContent = '';
+  try {
+    const { group } = await api('/groups', { method: 'POST', body: {
+      name: f.get('name'), description: f.get('description'), isPublic: f.get('isPublic') === 'on', color: groupColor,
+    } });
+    e.target.reset();
+    toast(`🌸 "${group.name}" has a room upstairs now. Invite code: ${group.inviteCode}`);
+    await goToRoom('group:' + group.id, group);
+  } catch (err) { $('upCreateErr').textContent = err.message; }
+});
+
+$('upJoin').addEventListener('submit', async e => {
+  e.preventDefault();
+  const code = new FormData(e.target).get('code');
+  $('upJoinErr').textContent = '';
+  try {
+    const { group } = await api('/groups/join', { method: 'POST', body: { code } });
+    e.target.reset();
+    sound.cue('pin');
+    await goToRoom('group:' + group.id, group);
+  } catch (err) { $('upJoinErr').textContent = err.message; }
+});
+
+// Climb the stairs (or come back down). Everything room-specific — who's
+// here, the notes on the walls, the chat — switches over.
+async function goToRoom(room, group = null) {
+  closePanels();
+  if (room === state.room) return;
+  stopPlacing();
+  $('fade').classList.add('on');
+  sound.cue('sit');
+  await wait(480);
+
+  player.seat = null;
+  player.target = null;
+  player.goingToSeat = null;
+  setPlaced(null);
+  const up = room !== 'main';
+  state.room = room;
+  state.roomName = up ? group.name : null;
+  world.setFloor(up ? 'up' : 'main');
+  if (up) world.setUpstairsSign(group.name, group.description || 'upstairs at Sakura Slice', group.color);
+
+  // arrive at the top (or the foot) of the stairs, facing into the room
+  player.pos.set(STAIRS.x - 0.3, world.floorY, STAIRS.z + 2.2);
+  player.ry = 0;
+  cam.yaw = Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.4;
+  camTarget.copy(player.pos).add(new THREE.Vector3(0, 1.45, 0));
+
+  for (const id of [...state.people.keys()]) removePerson(id);
+  for (const id of [...state.notes.keys()]) removeNote(id);
+  $('chatLog').replaceChildren();
+  send({ t: 'room', room, state: {
+    x: player.pos.x, z: player.pos.z, ry: player.ry, seat: null, drink: player.drink, placed: null, moving: false,
+  } });
+  $('floorAct').querySelector('.t').textContent = up ? 'Downstairs' : 'Upstairs';
+  $('floorAct').firstElementChild.textContent = up ? '⬇️' : '🪜';
+  refreshActions();
+  await loadNotes();
+  try {
+    const { messages } = await api('/chat?room=' + encodeURIComponent(room));
+    messages.forEach(addChat);
+  } catch (e) { /* fine */ }
+  sysChat(up ? `You climb the spiral stairs to ${group.name}'s room.` : 'You come back down into the café.');
+  updateOnline();
+  await wait(120);
+  $('fade').classList.remove('on');
+}
+
+$('floorAct').onclick = () => (state.room === 'main' ? openUpstairs() : goToRoom('main'));
 
 // ───────────────────────────────────────── the loop
 

@@ -5,6 +5,8 @@ const { query, pool } = require('./db');
 const auth = require('./auth');
 const realtime = require('./realtime');
 const { rateLimit, cleanText, isHexColor, clamp, wrap } = require('./util');
+const groups = require('./groups');
+const npc = require('./npc');
 
 const api = express.Router();
 api.use(express.json({ limit: '200kb' }));
@@ -141,7 +143,7 @@ const NOTE_COLORS = ['#fde8ef', '#fff4c7', '#e8f5e8', '#e6eefc', '#fbe3cf', '#ef
 
 const NOTE_SELECT = `
   SELECT n.id, n.kind, n.surface, n.text, n.color, n.pos_x AS x, n.pos_y AS y, n.pos_z AS z,
-         n.rot_y AS ry, n.tilt, n.created_at AS "createdAt",
+         n.rot_y AS ry, n.tilt, n.room, n.created_at AS "createdAt",
          u.id AS "userId", u.display_name AS "author",
          (SELECT count(*)::int FROM note_hearts h WHERE h.note_id = n.id) AS hearts
   FROM cafe_notes n JOIN users u ON u.id = n.user_id`;
@@ -159,7 +161,11 @@ async function noteWithMine(id, userId) {
 }
 
 api.get('/notes', wrap(async (req, res) => {
-  const { rows } = await query(NOTE_SELECT + ' ORDER BY n.created_at DESC LIMIT 400');
+  const room = groups.roomFromQuery(req);
+  if (room !== 'main' && !(req.user && await groups.canEnter(req.user.id, room))) {
+    return res.status(403).json({ error: 'That room is for its group only.' });
+  }
+  const { rows } = await query(NOTE_SELECT + ' WHERE n.room = $1 ORDER BY n.created_at DESC LIMIT 400', [room]);
   if (req.user && rows.length) {
     const mine = await query('SELECT note_id FROM note_hearts WHERE user_id = $1', [req.user.id]);
     const set = new Set(mine.rows.map(r => r.note_id));
@@ -177,7 +183,10 @@ api.post('/notes', auth.requireUser, writeLimit, wrap(async (req, res) => {
   const kind = b.kind === 'pin' ? 'pin' : 'note';
   const color = NOTE_COLORS.includes(b.color) ? b.color : NOTE_COLORS[0];
 
-  const pos = [clamp(b.x, -11, 11), clamp(b.y, 0, 4.2), clamp(b.z, -8, 8)];
+  const room = groups.roomFromQuery(req);
+  if (!(await groups.canEnter(req.user.id, room))) return res.status(403).json({ error: 'That room is for its group only.' });
+  // y covers both floors: the ground floor (0–4.2) and upstairs (4.4–8.6)
+  const pos = [clamp(b.x, -11, 11), clamp(b.y, 0, 8.6), clamp(b.z, -8, 8)];
   if (pos.some(Number.isNaN)) return res.status(400).json({ error: 'Where should it go?' });
 
   const daily = await query(
@@ -188,23 +197,23 @@ api.post('/notes', auth.requireUser, writeLimit, wrap(async (req, res) => {
   }
 
   const { rows } = await query(
-    `INSERT INTO cafe_notes (user_id, kind, surface, text, color, pos_x, pos_y, pos_z, rot_y, tilt)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-    [req.user.id, kind, surface, text, color, ...pos, clamp(b.ry || 0, -10, 10) || 0, clamp(b.tilt || 0, -0.4, 0.4) || 0]);
+    `INSERT INTO cafe_notes (user_id, kind, surface, text, color, pos_x, pos_y, pos_z, rot_y, tilt, room)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+    [req.user.id, kind, surface, text, color, ...pos, clamp(b.ry || 0, -10, 10) || 0, clamp(b.tilt || 0, -0.4, 0.4) || 0, room]);
   const note = await noteWithMine(rows[0].id, null);
-  realtime.broadcast({ t: 'note:new', note });
+  realtime.broadcast({ t: 'note:new', note }, null, room);
   res.status(201).json({ note: { ...note, hearted: false } });
 }));
 
 api.delete('/notes/:id', auth.requireUser, wrap(async (req, res) => {
   const id = Number(req.params.id);
-  const { rows } = await query('SELECT user_id FROM cafe_notes WHERE id = $1', [id]);
+  const { rows } = await query('SELECT user_id, room FROM cafe_notes WHERE id = $1', [id]);
   if (!rows[0]) return res.status(404).json({ error: 'That note is already gone.' });
   if (rows[0].user_id !== req.user.id && !req.user.is_admin) {
     return res.status(403).json({ error: 'Only the person who left it can take it down.' });
   }
   await query('DELETE FROM cafe_notes WHERE id = $1', [id]);
-  realtime.broadcast({ t: 'note:delete', id });
+  realtime.broadcast({ t: 'note:delete', id }, null, rows[0].room);
   res.json({ ok: true });
 }));
 
@@ -215,29 +224,34 @@ api.post('/notes/:id/heart', auth.requireUser, writeLimit, wrap(async (req, res)
     try { await query('INSERT INTO note_hearts (note_id, user_id) VALUES ($1, $2)', [id, req.user.id]); }
     catch (e) { return res.status(404).json({ error: 'That note is gone.' }); }
   }
-  const { rows } = await query('SELECT count(*)::int AS n FROM note_hearts WHERE note_id = $1', [id]);
-  realtime.broadcast({ t: 'note:hearts', id, hearts: rows[0].n });
+  const { rows } = await query(
+    'SELECT (SELECT count(*)::int FROM note_hearts WHERE note_id = $1) AS n, (SELECT room FROM cafe_notes WHERE id = $1) AS room', [id]);
+  realtime.broadcast({ t: 'note:hearts', id, hearts: rows[0].n }, null, rows[0].room || 'main');
   res.json({ hearted: !del.rowCount, hearts: rows[0].n });
 }));
 
 // ─────────────────────────────────────────── quiet chat
 
 api.get('/chat', auth.requireUser, wrap(async (req, res) => {
+  const room = groups.roomFromQuery(req);
+  if (!(await groups.canEnter(req.user.id, room))) return res.status(403).json({ error: 'That room is for its group only.' });
   const { rows } = await query(
     `SELECT c.id, c.text, c.created_at AS "createdAt", u.id AS "userId", u.display_name AS "author"
      FROM chat_messages c JOIN users u ON u.id = c.user_id
-     ORDER BY c.created_at DESC LIMIT 40`);
+     WHERE c.room = $1 ORDER BY c.created_at DESC LIMIT 40`, [room]);
   res.json({ messages: rows.reverse() });
 }));
 
 api.post('/chat', auth.requireUser, chatLimit, wrap(async (req, res) => {
   const text = cleanText(req.body.text, 240).replace(/\n/g, ' ');
   if (!text) return res.status(400).json({ error: 'Say something first.' });
+  const room = groups.roomFromQuery(req);
+  if (!(await groups.canEnter(req.user.id, room))) return res.status(403).json({ error: 'That room is for its group only.' });
   const { rows } = await query(
-    'INSERT INTO chat_messages (user_id, text) VALUES ($1, $2) RETURNING id, created_at AS "createdAt"',
-    [req.user.id, text]);
+    'INSERT INTO chat_messages (user_id, text, room) VALUES ($1, $2, $3) RETURNING id, created_at AS "createdAt"',
+    [req.user.id, text, room]);
   const msg = { ...rows[0], text, userId: req.user.id, author: req.user.display_name };
-  realtime.broadcast({ t: 'chat', msg });
+  realtime.broadcast({ t: 'chat', msg }, null, room);
   res.status(201).json({ msg });
 }));
 
@@ -407,11 +421,13 @@ admin.patch('/guestbook/:id', wrap(async (req, res) => {
 }));
 
 admin.delete('/chat/:id', wrap(async (req, res) => {
-  await query('DELETE FROM chat_messages WHERE id = $1', [Number(req.params.id)]);
-  realtime.broadcast({ t: 'chat:delete', id: Number(req.params.id) });
+  const { rows } = await query('DELETE FROM chat_messages WHERE id = $1 RETURNING room', [Number(req.params.id)]);
+  if (rows[0]) realtime.broadcast({ t: 'chat:delete', id: Number(req.params.id) }, null, rows[0].room);
   res.json({ ok: true });
 }));
 
+api.use(groups.router);
+api.use(npc);
 api.use('/admin', admin);
 
 api.use((_req, res) => res.status(404).json({ error: 'Not found.' }));

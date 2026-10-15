@@ -93,3 +93,72 @@ CREATE TABLE IF NOT EXISTS site_content_history (
   changed_by  INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS content_history_key_idx ON site_content_history(key, changed_at DESC);
+
+-- ─────────────────────────────────────────── talking with the team (AI)
+
+-- One conversation with one character. A new one starts after a quiet
+-- spell, so each conversation is short and only ever appended to.
+CREATE TABLE IF NOT EXISTS npc_sessions (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  npc         TEXT NOT NULL,                          -- 'yuto' | 'hana' | 'yuki' | 'me3temed'
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS npc_sessions_user_idx ON npc_sessions(user_id, npc, updated_at DESC);
+
+-- Every message exactly as sent to / received from the model (content is
+-- the raw message content, replayed verbatim). `display` is what the guest
+-- sees in the chat window; null for tool plumbing.
+CREATE TABLE IF NOT EXISTS npc_messages (
+  id          SERIAL PRIMARY KEY,
+  session_id  INTEGER NOT NULL REFERENCES npc_sessions(id) ON DELETE CASCADE,
+  role        TEXT NOT NULL,                          -- 'user' | 'assistant'
+  content     JSON NOT NULL,                          -- JSON, not JSONB: kept byte-for-byte
+  display     TEXT,
+  meta        JSONB,                                  -- e.g. a drink recommendation
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS npc_messages_session_idx ON npc_messages(session_id, id);
+-- (early databases had JSONB here, which re-sorts keys; the replayed history must match exactly)
+ALTER TABLE npc_messages ALTER COLUMN content TYPE JSON USING content::text::json;
+
+-- Small things the team remembers about a guest ("loves cardamom",
+-- "doesn't drink caffeine after 6"), shared by all four characters.
+CREATE TABLE IF NOT EXISTS guest_memories (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  note        TEXT NOT NULL,
+  learned_by  TEXT NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS guest_memories_user_idx ON guest_memories(user_id, created_at DESC);
+
+-- ─────────────────────────────────────────── groups & the second floor
+
+CREATE TABLE IF NOT EXISTS groups (
+  id          SERIAL PRIMARY KEY,
+  name        TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  color       TEXT NOT NULL DEFAULT '#d4678a',
+  is_public   BOOLEAN NOT NULL DEFAULT FALSE,
+  invite_code TEXT NOT NULL UNIQUE,
+  owner_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role        TEXT NOT NULL DEFAULT 'member',         -- 'owner' | 'member'
+  joined_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (group_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS group_members_user_idx ON group_members(user_id);
+
+-- Which room a note or chat message belongs to: 'main' is the ground
+-- floor; 'group:<id>' is that group's room upstairs.
+ALTER TABLE cafe_notes    ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT 'main';
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT 'main';
+CREATE INDEX IF NOT EXISTS cafe_notes_room_idx ON cafe_notes(room, created_at DESC);
+CREATE INDEX IF NOT EXISTS chat_room_idx ON chat_messages(room, created_at DESC);
