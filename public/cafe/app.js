@@ -4,7 +4,9 @@
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildWorld, ROOM, STAIRS } from './world.js';
+import { buildWorld, ROOM, STAIRS, noFog } from './world.js';
+import { mapZ } from './layout.mjs';
+import { currentWeather, WEATHER } from './weather.js';
 import { buildAvatar, makeLabel, makeCup, disposeTree } from './avatar.js';
 import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
@@ -78,6 +80,7 @@ await Promise.all([
 ]).catch(() => {});
 
 const world = buildWorld(renderer);
+world.onThunder = () => sound.thunder();
 const scene = world.scene;
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -110,8 +113,76 @@ function cairoClock() {
     return new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date());
   } catch (e) { return ''; }
 }
+// ── the weather: Cairo's own (seeded by the date), unless the owner set it
+let weatherNow = null;
+function refreshWeather() {
+  const w = currentWeather(state.content['cafe.weather']);
+  const changed = !weatherNow || weatherNow.key !== w.key;
+  weatherNow = w;
+  if (changed) {
+    world.setWeather(w.look);
+    sound.setWeather(w.look);
+  }
+  $('wxChipIcon').textContent = w.icon;
+  $('wxChipText').textContent = `${w.temp}° · ${w.label}`;
+  if (!$('wxPanel').classList.contains('hidden')) fillWeatherPanel();
+}
+
+function fillWeatherPanel() {
+  const w = weatherNow;
+  $('wxBigIcon').textContent = w.icon;
+  $('wxTemp').textContent = `${w.temp}°C`;
+  $('wxLabel').textContent = w.label;
+  $('wxNote').textContent = w.note;
+  $('wxWhy').textContent = w.manual
+    ? `Set by the café${w.until ? ' until ' + new Date(w.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''}.`
+    : "Cairo's weather today, by its real seasons. The light follows Cairo's clock.";
+}
+
+function openWeather() {
+  if (!weatherNow) refreshWeather();
+  fillWeatherPanel();
+  const admin = !!(state.me && state.me.isAdmin);
+  $('wxAdmin').classList.toggle('hidden', !admin);
+  if (admin) {
+    const o = state.content['cafe.weather'];
+    let pick = o && o.mode === 'set' ? o.condition : 'auto';
+    const box = $('wxChoices');
+    box.replaceChildren(...[['auto', '🗓️', "Cairo's own"], ...Object.entries(WEATHER).map(([k, v]) => [k, v.icon, v.label])].map(([k, icon, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip' + (k === pick ? ' on' : '');
+      b.textContent = `${icon} ${label}`;
+      b.onclick = () => { pick = k; [...box.children].forEach(x => x.classList.toggle('on', x === b)); };
+      return b;
+    }));
+    $('wxSave').onclick = async () => {
+      $('wxErr').textContent = '';
+      let value = { mode: 'auto' };
+      if (pick !== 'auto') {
+        const f = $('wxFor').value;
+        let until = null;
+        if (f === 'day') {
+          const d = new Date(); d.setHours(23, 59, 0, 0); until = d.toISOString();
+        } else if (f) until = new Date(Date.now() + Number(f) * 60e3).toISOString();
+        const t = $('wxSetTemp').value;
+        value = { mode: 'set', condition: pick, until, temp: t === '' ? null : Number(t) };
+      }
+      try {
+        await api('/admin/content/cafe.weather', { method: 'PUT', body: { value, description: "The café's weather. mode 'auto' = Cairo's own; mode 'set' = condition (clear, hazy, still, cloudy, rain, storm, fog, khamaseen) until a time (or for good), with an optional temp." } });
+        state.content['cafe.weather'] = value;
+        refreshWeather();
+        toast(pick === 'auto' ? "🗓️ Back to Cairo's own weather." : `${WEATHER[pick].icon} It's ${WEATHER[pick].label.toLowerCase()} now — for everyone.`);
+      } catch (e) { $('wxErr').textContent = e.message; }
+    };
+  }
+  openPanel('wxPanel');
+}
+$('wxChip').onclick = openWeather;
+
 function updateTime() {
   const h = cairoHour();
+  refreshWeather();
   const { night } = world.setTimeOfDay(h);
   sound.setNight(night > 0.5);
   $('cairoTime').textContent = 'Cairo ' + cairoClock();
@@ -140,6 +211,7 @@ const player = {
 function playerAvatar() {
   if (player.av) { scene.remove(player.av.group); disposeTree(player.av.group); }
   player.av = buildAvatar(state.me.avatar);
+  noFog(player.av.group);
   player.label = makeLabel(state.me.displayName, { bg: 'rgba(212,103,138,0.92)', color: '#fff' });
   player.label.position.y = player.av.height + 0.12;
   player.label.visible = false; // you know who you are; others see your name
@@ -282,6 +354,7 @@ function drinkMesh(placed, mine, who) {
   g.rotation.y = Math.random() * Math.PI;
   const label = mine ? 'Your drink — click to pick it up' : `${who}'s drink`;
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData = { kind: 'cup', mine, label }; } });
+  noFog(g);
   scene.add(g);
   return g;
 }
@@ -419,6 +492,7 @@ function addPerson(p) {
   if (!state.me || p.id === state.me.id) return;
   removePerson(p.id);
   const av = buildAvatar(p.avatar);
+  noFog(av.group);
   const label = makeLabel(p.displayName);
   label.position.y = av.height + 0.12;
   av.group.add(label);
@@ -1052,7 +1126,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -1160,6 +1234,7 @@ $('outBtn').onclick = async () => {
 
 function applyContent(key) {
   const c = state.content;
+  if (!key || key === 'cafe.weather') refreshWeather();
   if (!key || key === 'cafe.board') {
     const b = c['cafe.board'];
     if (b && b.title) world.setBoardSign(b.title, b.subtitle || '');
@@ -1357,15 +1432,16 @@ $('enterBtn').onclick = async () => {
   sound.muted = !!(prefs.sound && prefs.sound.muted);
   $('soundBtn').textContent = sound.muted ? '🔇' : '🔊';
   sound.start(levels);
+  if (weatherNow) sound.setWeather(weatherNow.look);
   sound.setNight(cairoHour() < 6 || cairoHour() >= 18.5);
   sound.setFirePosition(world.fire);
   if (prefs.quality) applyQuality(prefs.quality);
 
   playerAvatar();
   // walk in through the front door
-  player.pos.set(0, 0, 5.6);
+  player.pos.set(0, 0, mapZ(5.6));
   player.ry = Math.PI;
-  player.target = new THREE.Vector3(0, 0, 3.8);
+  player.target = new THREE.Vector3(0, 0, mapZ(3.8));
   cam.yaw = 0; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.6;
 
   $('hudTop').classList.remove('hidden');
@@ -1783,8 +1859,8 @@ function frame() {
   } else {
     // a slow drift around the room behind the sign-in card
     introAngle += dt * 0.05;
-    camera.position.set(Math.sin(introAngle) * 6.5, 2.4, Math.cos(introAngle) * 4.5 + 1);
-    camera.lookAt(0, 1.3, -2);
+    camera.position.set(Math.sin(introAngle) * 9, 2.6, Math.cos(introAngle) * 6.3 + 1.4);
+    camera.lookAt(0, 1.3, -2.8);
   }
   if (preview) preview.frame(dt);
   renderer.render(scene, camera);

@@ -232,6 +232,13 @@
   .up-more summary { cursor: pointer; font-weight: 700; font-size: 14px; color: var(--sakura-dark); }
   .up-more form { margin-top: 10px; }
   label.check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-mid); margin-bottom: 8px; }
+  .wx-chip { margin-top: 5px; align-self: flex-start; border: 1px solid var(--line); background: var(--sakura-light); color: var(--text-dark); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; font-weight: 700; }
+  .wx-chip:hover { border-color: var(--sakura); }
+  .wx-now { display: flex; align-items: center; gap: 14px; margin: 8px 0 6px; }
+  .wx-big { font-size: 46px; line-height: 1; }
+  .wx-temp { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; }
+  .wx-label { font-size: 12px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--sakura-dark); }
+  .wx-select { border: 1.5px solid var(--line); background: var(--field); color: var(--text-dark); border-radius: 10px; padding: 6px 8px; font: inherit; font-size: 13px; margin-left: 6px; }
   .help-list { list-style: none; display: grid; gap: 8px; margin-top: 10px; font-size: 14px; color: var(--text-mid); }
   .help-list kbd { font-family: inherit; font-weight: 700; background: var(--sakura-light); color: var(--sakura-dark); border-radius: 6px; padding: 1px 7px; font-size: 12.5px; }
 </style>
@@ -311,6 +318,7 @@
   <div class="brand card">
     <b>Sakura Slice Café</b>
     <small><span class="live"></span><span id="online">just you</span> · <span id="cairoTime">Cairo</span></small>
+    <button type="button" class="wx-chip" id="wxChip" title="The weather in Cairo"><span id="wxChipIcon">☀️</span> <span id="wxChipText">—</span></button>
   </div>
   <div class="iconbar">
     <button class="icon" id="soundBtn" title="Sound" aria-label="Sound">🔊</button>
@@ -434,6 +442,42 @@
   <div id="upOpenWrap" class="hidden">
     <p class="eyebrow" style="margin-top:16px">Open groups</p>
     <div id="upOpen" class="group-list"></div>
+  </div>
+</div>
+
+<div id="wxPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Outside, in Cairo</p>
+  <div class="wx-now">
+    <div class="wx-big" id="wxBigIcon">☀️</div>
+    <div>
+      <div class="wx-temp" id="wxTemp">—</div>
+      <div class="wx-label" id="wxLabel">—</div>
+    </div>
+  </div>
+  <p class="lede" id="wxNote" style="font-size:13.5px"></p>
+  <p class="fine" id="wxWhy"></p>
+  <div id="wxAdmin" class="hidden">
+    <div class="up-more" style="margin-top:14px">
+      <p class="eyebrow">🗝️ Change the weather</p>
+      <p class="fine" style="margin:4px 0 10px">Everyone in the café — and the website's weather card — sees it straight away.</p>
+      <div class="chips" id="wxChoices"></div>
+      <div class="row" style="margin-top:12px;flex-wrap:wrap">
+        <label class="fine" style="margin:0">For
+          <select id="wxFor" class="wx-select">
+            <option value="60">1 hour</option>
+            <option value="180" selected>3 hours</option>
+            <option value="day">the rest of today</option>
+            <option value="">until I change it back</option>
+          </select>
+        </label>
+        <label class="fine" style="margin:0">Temperature
+          <input type="number" id="wxSetTemp" class="wx-select" style="width:72px" placeholder="auto" min="-5" max="50">°
+        </label>
+      </div>
+      <div class="error" id="wxErr"></div>
+      <div class="row end"><button class="btn" id="wxSave" type="button">Make it so</button></div>
+    </div>
   </div>
 </div>
 

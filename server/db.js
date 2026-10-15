@@ -44,6 +44,8 @@ async function migrate() {
     );
   }
 
+  await moveNotesToTheBiggerCafe();
+
   // Promote the owner. Set ADMIN_EMAIL in Railway; whoever registers (or has
   // registered) with that email becomes an admin.
   if (process.env.ADMIN_EMAIL) {
@@ -51,6 +53,35 @@ async function migrate() {
   }
 
   await pool.query('DELETE FROM sessions WHERE expires_at < now()');
+}
+
+// The café grew from 22 × 16 m to 30 × 22 m (see public/cafe/layout.mjs).
+// Notes pinned before then are moved once, with the same rules as the
+// furniture, so they stay on their board, table or wall.
+async function moveNotesToTheBiggerCafe() {
+  await pool.query('ALTER TABLE cafe_notes ADD COLUMN IF NOT EXISTS layout INTEGER NOT NULL DEFAULT 1');
+  const { rows } = await pool.query('SELECT id, room, pos_x, pos_z FROM cafe_notes WHERE layout = 1');
+  if (rows.length) {
+    const { pathToFileURL } = require('url');
+    const layout = await import(pathToFileURL(path.join(__dirname, '..', 'public', 'cafe', 'layout.mjs')).href);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const n of rows) {
+        const [dx, dz] = layout.deltaAt(n.room === 'main' ? 'main' : 'up', n.pos_x, n.pos_z);
+        await client.query('UPDATE cafe_notes SET pos_x = pos_x + $2, pos_z = pos_z + $3, layout = 2 WHERE id = $1 AND layout = 1', [n.id, dx, dz]);
+      }
+      await client.query('COMMIT');
+      console.log(`moved ${rows.length} note(s) into the bigger café`);
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+  // notes pinned from now on are already on the new plan
+  await pool.query('ALTER TABLE cafe_notes ALTER COLUMN layout SET DEFAULT 2');
 }
 
 module.exports = { pool, query, migrate };

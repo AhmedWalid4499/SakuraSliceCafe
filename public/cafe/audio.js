@@ -17,6 +17,8 @@ export class Soundscape {
     this.muted = false;
     this.night = false;
     this.timers = [];
+    // the weather turns some channels up or down (on top of the guest's own mix)
+    this.weather = { rain: 0.55, birds: 1 };
   }
 
   // Must be called from a user gesture (browsers keep audio asleep until then).
@@ -78,13 +80,49 @@ export class Soundscape {
 
   setNight(n) { this.night = n; }
 
+  // look: see weather.js LOOK. Rain is softer on dry days, fuller when it
+  // actually rains; the birds go quiet in rain, storms and sandstorms.
+  setWeather(look) {
+    this.weather = {
+      rain: look.rain > 0 ? Math.min(1.35, 0.95 + look.rain * 0.25) : 0.55,
+      birds: look.birds,
+    };
+    this.apply(1.5);
+  }
+
+  // Far-off thunder: a long, low, rolling rumble.
+  thunder() {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') return;
+    const now = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = 0.35 + Math.random() * 0.15;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(420, now);
+    lp.frequency.exponentialRampToValueAtTime(90, now + 4);
+    const g = ctx.createGain();
+    const peak = 0.55 + Math.random() * 0.35;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(peak, now + 0.12 + Math.random() * 0.3);
+    g.gain.exponentialRampToValueAtTime(peak * 0.35, now + 1.2);
+    g.gain.exponentialRampToValueAtTime(peak * 0.5, now + 1.8);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 5 + Math.random() * 2);
+    src.connect(lp).connect(g);
+    g.connect(this.bus.rain);
+    g.connect(this.reverb);
+    src.start(now, Math.random() * 3);
+    src.stop(now + 7.5);
+  }
+
   apply(ramp = 0.3) {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
     this.master.gain.setTargetAtTime(this.muted ? 0 : this.levels.master, now, ramp);
     // perceptual curve: sliders feel even all the way along
     for (const [k, g] of Object.entries(this.bus)) {
-      const v = this.levels[k] ?? 0;
+      const v = (this.levels[k] ?? 0) * (this.weather[k] ?? 1);
       g.gain.setTargetAtTime(v * v * 1.4, now, ramp);
     }
   }

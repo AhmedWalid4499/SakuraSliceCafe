@@ -71,7 +71,7 @@ export function makeLabel(text, opts = {}) {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true }));
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true, fog: false }));
   const worldH = opts.height || 0.2;
   sprite.scale.set(worldH * w / h, worldH, 1);
   sprite.renderOrder = 10;

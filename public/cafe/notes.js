@@ -143,7 +143,10 @@ export function makeNote(note) {
     g.rotation.set(0, note.ry || 0, note.tilt || 0);
   }
 
-  g.traverse(o => { if (o.isMesh || o.isSprite) o.userData = { kind: 'note', note, label: 'A note from ' + note.author }; });
+  g.traverse(o => {
+    if (o.isMesh || o.isSprite) o.userData = { kind: 'note', note, label: 'A note from ' + note.author };
+    if (o.material) o.material.fog = false; // notes are indoors: no outdoor haze
+  });
   g.userData.note = note;
   g.userData.setHearts = setHearts;
   return g;
@@ -157,6 +160,7 @@ export function makeGhost() {
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.23, 0.255, 48),
     new THREE.MeshBasicMaterial({ color: '#d4678a', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
   g.add(m, ring);
+  m.material.fog = ring.material.fog = false;
   g.visible = false;
   g.renderOrder = 20;
   return g;
