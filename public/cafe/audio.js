@@ -73,6 +73,11 @@ export class Soundscape {
     this.apply(0.15);
   }
 
+  duckMusic(on) {
+    this.ducked = !!on;
+    this.apply(1.2);
+  }
+
   setMuted(m) {
     this.muted = m;
     this.apply(0.2);
@@ -122,7 +127,8 @@ export class Soundscape {
     this.master.gain.setTargetAtTime(this.muted ? 0 : this.levels.master, now, ramp);
     // perceptual curve: sliders feel even all the way along
     for (const [k, g] of Object.entries(this.bus)) {
-      const v = (this.levels[k] ?? 0) * (this.weather[k] ?? 1);
+      // while Spotify is playing, the café's own piano steps aside
+      const v = (this.levels[k] ?? 0) * (this.weather[k] ?? 1) * (k === 'music' && this.ducked ? 0 : 1);
       g.gain.setTargetAtTime(v * v * 1.4, now, ramp);
     }
   }

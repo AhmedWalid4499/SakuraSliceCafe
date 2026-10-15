@@ -187,6 +187,9 @@
   .menu-tabs { display: flex; gap: 6px; margin-top: 12px; background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
   .menu-tabs button { flex: 1; border: 0; background: transparent; border-radius: 999px; padding: 8px 10px; font-weight: 700; font-size: 13.5px; color: var(--text-mid); }
   .menu-tabs button.on { background: var(--sakura-dark); color: #fff; }
+  .spot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .spot-embed { margin-top: 8px; min-height: 152px; border-radius: 14px; overflow: hidden; background: var(--field); }
+  .spot-embed iframe { display: block; border: 0; border-radius: 14px; }
   .serve { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 12px; border-radius: 14px; background: var(--sakura-light); color: var(--sakura-dark); font-weight: 700; font-size: 13.5px; cursor: pointer; }
   .serve input { accent-color: var(--sakura-dark); width: 16px; height: 16px; }
   #menuShelves .chip { font-size: 12.5px; padding: 6px 11px; }
@@ -440,6 +443,16 @@
     <button class="btn ghost" id="muteBtn" type="button">Mute everything</button>
   </div>
   <div class="opt-group" style="margin-top:18px"><span>Picture</span><div class="chips" id="optQuality"></div></div>
+  <div class="spot">
+    <p class="eyebrow">🎧 Lofi from Spotify</p>
+    <p class="fine" id="spotNote">The café's playlist — the same one for everyone. Press play; the café's own piano steps aside while it plays. (Signed in to Spotify in this browser? Full songs. If not, 30-second previews.)</p>
+    <div id="spotEmbed" class="spot-embed"></div>
+    <div id="spotOwner" class="hidden">
+      <p class="fine" style="margin:10px 0 6px">🗝️ Change the playlist for everyone — paste a Spotify playlist, album or track link:</p>
+      <div class="row" style="gap:6px"><input type="text" inputmode="url" autocomplete="off" id="spotLink" placeholder="https://open.spotify.com/playlist/…" style="flex:1"><button class="btn" id="spotSave" type="button">Use it</button></div>
+      <div class="error" id="spotErr"></div>
+    </div>
+  </div>
 </div>
 
 <div id="talkPanel" class="panel card hidden">

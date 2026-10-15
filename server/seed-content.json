@@ -1552,5 +1552,11 @@
       ]
     },
     "description": "The book on the bookshelf (Read the Book card). cover = a Google Drive file id or URL for the cover image; empty shows the drawn cover."
+  },
+  "cafe.spotify": {
+    "value": {
+      "link": "https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn"
+    },
+    "description": "The café's Spotify playlist (the sound panel's player, the same for everyone). Any Spotify playlist, album or track link."
   }
 }
