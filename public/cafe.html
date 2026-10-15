@@ -188,7 +188,14 @@
   .menu-tabs button { flex: 1; border: 0; background: transparent; border-radius: 999px; padding: 8px 10px; font-weight: 700; font-size: 13.5px; color: var(--text-mid); }
   .menu-tabs button.on { background: var(--sakura-dark); color: #fff; }
   .spot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
-  .spot-embed { margin-top: 8px; min-height: 152px; border-radius: 14px; overflow: hidden; background: var(--field); }
+  .spot-embed { margin-top: 8px; min-height: 80px; border-radius: 14px; overflow: hidden; background: var(--field); }
+  #musicDock { left: 14px; top: 160px; width: min(340px, calc(100vw - 28px)); padding: 12px 14px; border-radius: 20px; }
+  #musicDock .md-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #musicDock .md-head b { font-size: 13.5px; color: var(--text-dark); }
+  #musicDock .md-head button { width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--sakura-light); color: var(--sakura-dark); font-weight: 700; }
+  #musicDock .fine { margin-top: 6px; }
+  @media (max-width: 640px) { #musicDock { top: auto; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 21; } }
+  #musicBtn.on { background: var(--sakura-light); }
   .spot-embed iframe { display: block; border: 0; border-radius: 14px; }
   .serve { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 12px; border-radius: 14px; background: var(--sakura-light); color: var(--sakura-dark); font-weight: 700; font-size: 13.5px; cursor: pointer; }
   .serve input { accent-color: var(--sakura-dark); width: 16px; height: 16px; }
@@ -361,6 +368,7 @@
     <button class="icon" id="soundBtn" title="Sound" aria-label="Sound">🔊</button>
     <button class="icon" id="avatarBtn" title="Change your avatar" aria-label="Change your avatar">🪞</button>
     <button class="icon" id="helpBtn" title="How to move" aria-label="Help">?</button>
+    <button class="icon" id="musicBtn" title="The café playlist" aria-label="The café playlist">🎧</button>
     <a class="icon hidden" id="adminLink" href="/admin" title="Café admin" aria-label="Admin">🗝️</a>
     <button class="icon" id="outBtn" title="Leave the café" aria-label="Sign out">🚪</button>
   </div>
@@ -445,13 +453,27 @@
   <div class="opt-group" style="margin-top:18px"><span>Picture</span><div class="chips" id="optQuality"></div></div>
   <div class="spot">
     <p class="eyebrow">🎧 Lofi from Spotify</p>
-    <p class="fine" id="spotNote">The café's playlist — the same one for everyone. Press play; the café's own piano steps aside while it plays. (Signed in to Spotify in this browser? Full songs. If not, 30-second previews.)</p>
-    <div id="spotEmbed" class="spot-embed"></div>
-    <div id="spotOwner" class="hidden">
-      <p class="fine" style="margin:10px 0 6px">🗝️ Change the playlist for everyone — paste a Spotify playlist, album or track link:</p>
-      <div class="row" style="gap:6px"><input type="text" inputmode="url" autocomplete="off" id="spotLink" placeholder="https://open.spotify.com/playlist/…" style="flex:1"><button class="btn" id="spotSave" type="button">Use it</button></div>
-      <div class="error" id="spotErr"></div>
+    <p class="fine">The café's playlist plays in its own little player.</p>
+    <button class="btn ghost" id="openMusic" type="button" style="margin-top:8px">🎧 Open the café playlist</button>
+  </div>
+</div>
+
+<!-- The café playlist: the owner picks it, everyone listens -->
+<div id="musicDock" class="hud card hidden">
+  <div class="md-head">
+    <b>🎧 The café playlist</b>
+    <button type="button" id="musicClose" title="Hide the player (the music keeps playing)" aria-label="Hide the player">✕</button>
+  </div>
+  <div id="spotEmbed" class="spot-embed"></div>
+  <p class="fine" id="spotNote">Chosen by the café, the same for everyone — press ▶ to listen. Signed in to Spotify in this browser? Full songs; otherwise 30-second previews.</p>
+  <div id="spotOwner" class="hidden">
+    <p class="fine" style="margin:8px 0 6px">🗝️ Paste a Spotify playlist, album or track link — it changes for everyone:</p>
+    <div class="row" style="gap:6px"><input type="text" inputmode="url" autocomplete="off" id="spotLink" placeholder="https://open.spotify.com/playlist/…" style="flex:1"><button class="btn" id="spotSave" type="button">Use it</button></div>
+    <div class="row" style="gap:6px;margin-top:8px">
+      <button class="btn" id="playAll" type="button">▶ Play for everyone</button>
+      <button class="btn ghost" id="pauseAll" type="button">⏸ Pause for everyone</button>
     </div>
+    <div class="error" id="spotErr"></div>
   </div>
 </div>
 
