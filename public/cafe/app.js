@@ -8,6 +8,7 @@ import { buildWorld, ROOM, STAIRS, noFog } from './world.js';
 import { mapZ } from './layout.mjs';
 import { currentWeather, WEATHER } from './weather.js';
 import { buildAvatar, makeLabel, makeCup, disposeTree } from './avatar.js';
+import { makeDessert } from './pastries.js';
 import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
 
@@ -113,6 +114,11 @@ function cairoClock() {
     return new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date());
   } catch (e) { return ''; }
 }
+function cairoDay() {
+  try {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', weekday: 'long' }).format(new Date()) + ' in Cairo';
+  } catch (e) { return 'Cairo'; }
+}
 // ── the weather: Cairo's own (seeded by the date), unless the owner set it
 let weatherNow = null;
 function refreshWeather() {
@@ -124,7 +130,7 @@ function refreshWeather() {
     sound.setWeather(w.look);
   }
   $('wxChipIcon').textContent = w.icon;
-  $('wxChipText').textContent = `${w.temp}° · ${w.label}`;
+  $('wxChipText').textContent = `${w.temp}° ${w.label}`;
   if (!$('wxPanel').classList.contains('hidden')) fillWeatherPanel();
 }
 
@@ -179,13 +185,16 @@ function openWeather() {
   openPanel('wxPanel');
 }
 $('wxChip').onclick = openWeather;
+$('wxOwnerBtn').onclick = openWeather;
 
 function updateTime() {
   const h = cairoHour();
   refreshWeather();
   const { night } = world.setTimeOfDay(h);
   sound.setNight(night > 0.5);
-  $('cairoTime').textContent = 'Cairo ' + cairoClock();
+  $('cairoTime').textContent = cairoClock();
+  $('cairoDay').textContent = cairoDay();
+  world.setClock(h, cairoClock(), weatherNow);
 }
 updateTime();
 setInterval(updateTime, 30000);
@@ -203,7 +212,8 @@ const player = {
   target: null,       // click-to-walk destination
   goingToSeat: null,
   seatDeadline: 0,
-  placed: null,       // { drink, x, y, z } — the drink this person set down
+  dessert: null,      // { id, bites } — a pastry on a plate, in the other hand
+  placed: null,       // { drink, dessert, bites, x, y, z } — what this person set down
   placedMesh: null,
   waving: 0,
 };
@@ -218,6 +228,7 @@ function playerAvatar() {
   player.av.group.add(player.label);
   scene.add(player.av.group);
   if (player.drink) player.av.setDrink(drinkColor(player.drink));
+  if (player.dessert) player.av.setDessert(pastryOf(player.dessert.id).shape, player.dessert.bites);
 }
 
 // third-person camera
@@ -349,10 +360,22 @@ function spotOnTable(from, reach = 2.2) {
 }
 
 function drinkMesh(placed, mine, who) {
-  const g = makeCup(drinkColor(placed.drink));
-  g.position.set(placed.x, placed.y + 0.056, placed.z);
+  const g = new THREE.Group();
+  const both = placed.drink && placed.dessert;
+  if (placed.drink) {
+    const cup = makeCup(drinkColor(placed.drink));
+    cup.position.set(both ? -0.08 : 0, 0.056, 0);
+    g.add(cup);
+  }
+  if (placed.dessert) {
+    const plate = makeDessert(pastryOf(placed.dessert).shape, placed.bites || 0);
+    plate.position.x = both ? 0.07 : 0;
+    g.add(plate);
+  }
+  g.position.set(placed.x, placed.y, placed.z);
   g.rotation.y = Math.random() * Math.PI;
-  const label = mine ? 'Your drink — click to pick it up' : `${who}'s drink`;
+  const what = placed.drink && placed.dessert ? 'things' : placed.drink ? 'drink' : pastryOf(placed.dessert).name;
+  const label = mine ? `Your ${what} — click to pick ${both ? 'them' : 'it'} up` : `${who}'s ${what}`;
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData = { kind: 'cup', mine, label }; } });
   noFog(g);
   scene.add(g);
@@ -366,12 +389,22 @@ function setPlaced(placed) {
 }
 
 function putDrinkDown(at = null) {
-  if (!player.drink) return toast('You aren\'t holding a drink — order one at the counter ☕');
+  if (!player.drink && !player.dessert) return toast('Your hands are empty — order something at the counter ☕');
   const spot = at || spotOnTable(player.pos);
-  if (!spot) return toast('Walk up to a table (or sit down) to put your drink down.');
-  setPlaced({ drink: player.drink, ...spot });
+  if (!spot) return toast('Walk up to a table (or sit down) to put it down.');
+  // Setting a plate down next to your cup (or a cup next to your plate) keeps both.
+  const prev = player.placed;
+  const keep = prev && Math.hypot(prev.x - spot.x, prev.z - spot.z) < 1.2 ? prev : {};
+  setPlaced({
+    ...spot,
+    drink: player.drink || keep.drink || null,
+    dessert: player.dessert ? player.dessert.id : keep.dessert || null,
+    bites: player.dessert ? player.dessert.bites : keep.bites || 0,
+  });
   player.drink = null;
+  player.dessert = null;
   player.av.setDrink(null);
+  player.av.setDessert(null);
   sound.cue('drink');
   sendMove(true);
   refreshActions();
@@ -380,9 +413,11 @@ function putDrinkDown(at = null) {
 function pickUpDrink() {
   if (!player.placed) return;
   const far = Math.hypot(player.placed.x - player.pos.x, player.placed.z - player.pos.z) > 2.6;
-  if (far) return toast('Walk back to your table to pick up your drink.');
-  player.drink = player.placed.drink;
-  player.av.setDrink(drinkColor(player.drink));
+  if (far) return toast('Walk back to your table to pick it up.');
+  const pl = player.placed;
+  if ((pl.drink && player.drink) || (pl.dessert && player.dessert)) return toast('Your hands are full — put down what you\'re holding first.');
+  if (pl.drink) { player.drink = pl.drink; player.av.setDrink(drinkColor(player.drink)); }
+  if (pl.dessert) { player.dessert = { id: pl.dessert, bites: pl.bites || 0 }; player.av.setDessert(pastryOf(pl.dessert).shape, player.dessert.bites); }
   setPlaced(null);
   sound.cue('sit');
   sendMove(true);
@@ -394,9 +429,36 @@ function refreshActions() {
   sitBtn.querySelector('.t').textContent = player.seat ? 'Stand up' : 'Sit';
   sitBtn.classList.toggle('on', !!player.seat);
   const drinkBtn = $('drinkAct');
-  const show = !!player.drink || !!player.placed;
+  const holding = !!player.drink || !!player.dessert;
+  const show = holding || !!player.placed;
   drinkBtn.classList.toggle('hidden', !show);
-  if (show) drinkBtn.querySelector('.t').textContent = player.drink ? 'Put drink down' : 'Pick up drink';
+  if (show) {
+    const what = player.drink && player.dessert ? '' : player.dessert ? ' plate' : player.drink ? ' drink' : '';
+    drinkBtn.querySelector('.t').textContent = holding ? `Put${what} down` : 'Pick up';
+    drinkBtn.title = drinkBtn.querySelector('.t').textContent;
+  }
+  $('biteAct').classList.toggle('hidden', !player.dessert || player.dessert.bites >= 3);
+}
+
+// A bite at a time; three and it's gone (Me3temed has a word about it).
+function takeBite() {
+  if (!player.dessert || player.dessert.bites >= 3) return;
+  const d = player.dessert;
+  d.bites += 1;
+  player.av.setDessert(pastryOf(d.id).shape, d.bites);
+  sound.cue('sit');
+  sendMove(true);
+  refreshActions();
+  if (d.bites < 3) return;
+  const p = pastryOf(d.id);
+  toast(p.me3temed ? `🍽️ All gone. Me3temed, from the shelf: “${p.me3temed}”` : `🍽️ All gone. Only crumbs left.`);
+  setTimeout(() => {
+    if (player.dessert !== d) return;
+    player.dessert = null;
+    player.av.setDessert(null);
+    sendMove(true);
+    refreshActions();
+  }, 2600);
 }
 
 function updatePlayer(dt) {
@@ -501,7 +563,7 @@ function addPerson(p) {
   av.group.rotation.y = s.ry || 0;
   av.group.traverse(o => { if (o.isMesh) o.userData = { kind: 'person', person: p, label: p.displayName }; });
   scene.add(av.group);
-  const person = { ...p, av, label, state: { ...s }, pos: av.group.position.clone(), ry: s.ry || 0, drinkShown: null };
+  const person = { ...p, av, label, state: { ...s }, pos: av.group.position.clone(), ry: s.ry || 0, drinkShown: null, dessertShown: null };
   state.people.set(p.id, person);
   setPersonDrink(person);
   updateOnline();
@@ -522,9 +584,14 @@ function setPersonDrink(p) {
     p.drinkShown = p.state.drink || null;
     p.av.setDrink(p.drinkShown ? drinkColor(p.drinkShown) : null);
   }
-  // the cup they set down on a table
+  const dKey = p.state.dessert ? `${p.state.dessert}:${p.state.bites || 0}` : null;
+  if (p.dessertShown !== dKey) {
+    p.dessertShown = dKey;
+    p.av.setDessert(p.state.dessert ? pastryOf(p.state.dessert).shape : null, p.state.bites || 0);
+  }
+  // what they set down on a table
   const pl = p.state.placed || null;
-  const key = pl ? `${pl.drink}@${pl.x},${pl.y},${pl.z}` : null;
+  const key = pl ? `${pl.drink}+${pl.dessert}:${pl.bites}@${pl.x},${pl.y},${pl.z}` : null;
   if (p.placedKey === key) return;
   p.placedKey = key;
   if (p.placedMesh) { scene.remove(p.placedMesh); disposeTree(p.placedMesh); p.placedMesh = null; }
@@ -666,8 +733,10 @@ function sendMove(force = false) {
   const msg = {
     t: 'move', x: +player.pos.x.toFixed(2), z: +player.pos.z.toFixed(2), ry: +player.ry.toFixed(2),
     seat: player.seat ? player.seat.id : null, drink: player.drink, moving: player.moving,
+    dessert: player.dessert ? player.dessert.id : null, bites: player.dessert ? player.dessert.bites : 0,
     placed: player.placed ? {
-      drink: player.placed.drink, x: +player.placed.x.toFixed(2), y: +player.placed.y.toFixed(3), z: +player.placed.z.toFixed(2),
+      drink: player.placed.drink || null, dessert: player.placed.dessert || null, bites: player.placed.bites || 0,
+      x: +player.placed.x.toFixed(2), y: +player.placed.y.toFixed(3), z: +player.placed.z.toFixed(2),
     } : null,
   };
   const key = JSON.stringify(msg);
@@ -856,29 +925,66 @@ const DEFAULT_MENU = [
 const menu = () => (Array.isArray(state.content['cafe.menu']) && state.content['cafe.menu'].length ? state.content['cafe.menu'] : DEFAULT_MENU);
 const drinkColor = id => (menu().find(d => d.id === id) || {}).color || '#d9b48f';
 
-function openMenu() {
-  const list = $('menuList');
-  list.replaceChildren();
-  for (const d of menu()) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.style.background = d.color;
-    const txt = document.createElement('span');
-    const name = document.createElement('b');
-    name.textContent = d.name;
-    const by = document.createElement('small');
-    by.textContent = `made by ${d.by}`;
-    txt.append(name, by);
-    b.append(dot, txt);
-    b.onclick = () => order(d);
-    list.appendChild(b);
+// The pastry counter — the same twelve as the website (site_content 'counter.pastries').
+const pastries = () => (Array.isArray(state.content['counter.pastries']) ? state.content['counter.pastries'] : []).filter(p => p && p.id && p.name);
+const pastryOf = id => pastries().find(p => p.id === id) || { id, name: 'pastry', shape: 'daifuku', by: 'yuki' };
+const bakerOf = p => (p.by === 'hana' ? 'Hana' : 'Yuki');
+
+// A picture: the Drive image when there is one, otherwise the drawing from /art.js.
+function picture(item, kind) {
+  const el = document.createElement('span');
+  el.className = 'pic';
+  const art = window.SakuraArt;
+  const draw = () => { if (art) el.innerHTML = kind === 'dessert' ? art.plateSVG(item.shape) : art.drinkSVG(item); };
+  draw();
+  if (item.image) {
+    const img = new Image();
+    img.alt = '';
+    img.onload = () => el.replaceChildren(img);
+    img.src = /^https?:\/\//.test(item.image) ? item.image : `https://drive.google.com/thumbnail?id=${encodeURIComponent(item.image)}&sz=w300`;
   }
-  openPanel('menuPanel');
-  const hana = world.npcs.find(n => n.id === 'hana');
-  if (hana) bubble(hana.av.group, 'What can I make you?', 'npc');
+  return el;
 }
+
+function menuRow(item, kind, onPick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  const txt = document.createElement('span');
+  txt.className = 'txt';
+  const name = document.createElement('b');
+  name.textContent = item.name;
+  const by = document.createElement('small');
+  by.textContent = kind === 'dessert' ? `${bakerOf(item)}'s · ${item.line || ''}` : `made by ${item.by}`;
+  txt.append(name, by);
+  if (kind === 'dessert' && item.drink) {
+    const pair = document.createElement('small');
+    pair.className = 'pair';
+    pair.textContent = `☕ with ${item.drink}`;
+    txt.append(pair);
+  }
+  b.append(picture(item, kind), txt);
+  b.onclick = () => onPick(item);
+  return b;
+}
+
+let menuTab = 'drinks';
+function openMenu(tab = menuTab) {
+  menuTab = pastries().length ? tab : 'drinks';
+  $('menuTabs').classList.toggle('hidden', !pastries().length);
+  document.querySelectorAll('#menuTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === menuTab));
+  const list = $('menuList');
+  list.replaceChildren(...(menuTab === 'desserts'
+    ? pastries().map(p => menuRow(p, 'dessert', orderDessert))
+    : menu().map(d => menuRow(d, 'drink', order))));
+  $('menuNote').textContent = menuTab === 'desserts'
+    ? 'Hana bakes the warm things, Yuki shapes the delicate ones. Take it on a plate.'
+    : 'Hana will bring it over. Nothing costs anything here.';
+  list.scrollTop = 0;
+  openPanel('menuPanel');
+  const who = world.npcs.find(n => n.id === (menuTab === 'desserts' ? 'yuki' : 'hana'));
+  if (who) bubble(who.av.group, menuTab === 'desserts' ? 'They\'re all fresh this morning.' : 'What can I make you?', 'npc');
+}
+document.querySelectorAll('#menuTabs button').forEach(b => { b.onclick = () => openMenu(b.dataset.tab); });
 
 function order(d) {
   closePanels();
@@ -891,6 +997,21 @@ function order(d) {
     sendMove(true);
     refreshActions();
     toast(`☕ Your ${d.name} is here. ${d.by} made it.`);
+  }, 1800);
+}
+
+function orderDessert(p) {
+  closePanels();
+  const who = bakerOf(p);
+  const maker = world.npcs.find(n => n.name === who);
+  if (maker) bubble(maker.av.group, who === 'Yuki' ? `One ${p.name}… here.` : `One ${p.name}. Still warm.`, 'npc');
+  setTimeout(() => {
+    player.dessert = { id: p.id, bites: 0 };
+    player.av.setDessert(p.shape, 0);
+    sound.cue('drink');
+    sendMove(true);
+    refreshActions();
+    toast(`🍡 Your ${p.name} is here. ${who} made it.${p.drink ? ` It goes with a ${p.drink}.` : ''}`);
   }, 1800);
 }
 
@@ -954,7 +1075,9 @@ function updateBubbles() {
     v3.project(camera);
     const behind = v3.z > 1;
     b.el.style.opacity = behind ? 0 : (b.until - now < 500 ? (b.until - now) / 500 : 1);
-    b.el.style.left = ((v3.x + 1) / 2) * window.innerWidth + 'px';
+    // keep the whole bubble on screen (it's up to 220px wide, centred on x)
+    const bx = ((v3.x + 1) / 2) * window.innerWidth;
+    b.el.style.left = Math.min(window.innerWidth - 118, Math.max(118, bx)) + 'px';
     b.el.style.top = ((1 - v3.y) / 2) * window.innerHeight + 'px';
   }
 }
@@ -983,7 +1106,10 @@ canvas.addEventListener('pointermove', e => {
   }
 });
 canvas.addEventListener('pointerup', e => {
-  if (drag && drag.moved <= 6 && state.started) click(e.clientX, e.clientY);
+  if (drag && drag.moved <= 6 && state.started) {
+    if (PANELS.some(p => !$(p).classList.contains('hidden'))) closePanels();
+    else click(e.clientX, e.clientY);
+  }
   drag = null;
 });
 canvas.addEventListener('pointerleave', () => { hoverPt = null; $('tip').classList.add('hidden'); });
@@ -1037,7 +1163,7 @@ function updateHover() {
   const h = pickInteractive(hoverPt.x, hoverPt.y);
   const ud = h ? h.object.userData : {};
   const label = ud.label || (ud.surface === 'table' && !ud.label
-    ? (player.drink ? 'Put your drink here' : 'Sit at this table')
+    ? (player.drink || player.dessert ? 'Put it down here' : 'Sit at this table')
     : null);
   canvas.style.cursor = label ? 'pointer' : 'default';
   if (label) {
@@ -1069,13 +1195,13 @@ function click(x, y) {
   if (d.surface === 'table') {
     // Holding a drink and close enough? Set it down right where you clicked.
     const near = Math.hypot(h.point.x - player.pos.x, h.point.z - player.pos.z) < 2.4;
-    if (player.drink && near) return putDrinkDown({ x: h.point.x, y: d.top ?? h.point.y, z: h.point.z });
+    if ((player.drink || player.dessert) && near) return putDrinkDown({ x: h.point.x, y: d.top ?? h.point.y, z: h.point.z });
     // Otherwise, sit at the closest free chair around that table.
     const c = new THREE.Vector3();
     h.object.getWorldPosition(c);
     const seat = nearestFreeSeat(player.pos, { x: c.x, z: c.z, r: 1.3 });
     if (seat) return goSit(seat);
-    if (player.drink) return toast('Walk a little closer to put your drink down.');
+    if (player.drink || player.dessert) return toast('Walk a little closer to put it down.');
     return;
   }
   if (d.kind === 'order') return openMenu();
@@ -1112,9 +1238,10 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (typing || !state.started) return;
-  if (e.key === 'Enter') { e.preventDefault(); $('chat').classList.remove('hidden'); $('chatInput').focus(); return; }
+  if (e.key === 'Enter') { e.preventDefault(); $('chat').classList.remove('hidden'); $('chatAct').classList.add('on'); $('chatInput').focus(); return; }
   if (e.key === 'e' || e.key === 'E') { toggleSit(); return; }
-  if (e.key === 'q' || e.key === 'Q') { if (player.drink) putDrinkDown(); else pickUpDrink(); return; }
+  if (e.key === 'q' || e.key === 'Q') { if (player.drink || player.dessert) putDrinkDown(); else pickUpDrink(); return; }
+  if (e.key === 'b' || e.key === 'B') { takeBite(); return; }
   const k = e.key.toLowerCase();
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
     keys.add(k);
@@ -1203,9 +1330,10 @@ $('helpBtn').onclick = () => openPanel('helpPanel');
 // ───────────────────────────────────────── actions
 
 $('noteAct').onclick = () => (state.placing ? stopPlacing() : startPlacing());
-$('orderAct').onclick = openMenu;
+$('orderAct').onclick = () => openMenu();
 $('sitAct').onclick = toggleSit;
-$('drinkAct').onclick = () => (player.drink ? putDrinkDown() : pickUpDrink());
+$('drinkAct').onclick = () => (player.drink || player.dessert ? putDrinkDown() : pickUpDrink());
+$('biteAct').onclick = takeBite;
 $('waveAct').onclick = () => {
   player.waving = 2;
   bubble(player.av.group, '👋', 'emote');
@@ -1223,6 +1351,10 @@ $('chatAct').onclick = () => {
   const c = $('chat');
   c.classList.toggle('hidden');
   $('chatAct').classList.toggle('on', !c.classList.contains('hidden'));
+};
+$('chatClose').onclick = () => {
+  $('chat').classList.add('hidden');
+  $('chatAct').classList.remove('on');
 };
 $('outBtn').onclick = async () => {
   if (!confirm('Leave the café for now?')) return;
@@ -1383,11 +1515,13 @@ function startPreview() {
     frame(dt) {
       if ($('creator').classList.contains('hidden')) return;
       const w = c.clientWidth, h = c.clientHeight;
-      if (c.width !== Math.floor(w * r.getPixelRatio())) { r.setSize(w, h, false); cam2.aspect = w / h; cam2.updateProjectionMatrix(); }
+      // match the drawing buffer to the box in both directions, or it gets stretched (and blurry)
+      const pr = r.getPixelRatio();
+      if (w && h && (c.width !== Math.floor(w * pr) || c.height !== Math.floor(h * pr))) { r.setSize(w, h, false); cam2.aspect = w / h; cam2.updateProjectionMatrix(); }
       t += dt;
       const owl = draft.body === 'owl';
-      cam2.position.set(0, owl ? 0.9 : 1.25, owl ? 3.0 : 4.2);
-      cam2.lookAt(0, owl ? 0.6 : 0.95, 0);
+      cam2.position.set(0, owl ? 0.9 : 1.3, owl ? 3.0 : 4.4);
+      cam2.lookAt(0, owl ? 0.6 : 1.0, 0);
       av.group.rotation.y = Math.sin(t * 0.6) * 0.6;
       av.update(dt, { waving: Math.sin(t * 0.4) > 0.85 ? 1 : 0 });
       r.render(s, cam2);
@@ -1446,8 +1580,12 @@ $('enterBtn').onclick = async () => {
 
   $('hudTop').classList.remove('hidden');
   $('actions').classList.remove('hidden');
-  $('chat').classList.remove('hidden');
+  // On a phone the chat starts tucked away (💬 opens it); there's more café to see.
+  const small = matchMedia('(max-width: 640px)').matches;
+  $('chat').classList.toggle('hidden', small);
+  $('chatAct').classList.toggle('on', !small);
   $('adminLink').classList.toggle('hidden', !state.me.isAdmin);
+  $('wxOwnerBtn').classList.toggle('hidden', !state.me.isAdmin);
   state.started = true;
   canvas.focus();
 
@@ -1485,23 +1623,22 @@ function talkLine(cls, text) {
 }
 
 function recCard(rec) {
-  const d = menu().find(x => x.id === rec.id) || rec;
+  const isPastry = rec.kind === 'pastry';
+  const d = isPastry ? { ...rec, ...pastryOf(rec.id) } : menu().find(x => x.id === rec.id) || rec;
   const card = document.createElement('div');
   card.className = 'rec';
-  const dot = document.createElement('span');
-  dot.className = 'dot';
-  dot.style.background = d.color || '#d9b48f';
+  const dot = picture(d, isPastry ? 'dessert' : 'drink');
   const txt = document.createElement('div');
   const b = document.createElement('b');
   b.textContent = d.name;
   const why = document.createElement('small');
-  why.textContent = rec.why || `made by ${d.by}`;
+  why.textContent = rec.why || (isPastry ? `made by ${bakerOf(d)}` : `made by ${d.by}`);
   txt.append(b, why);
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btn';
-  btn.textContent = 'Order this ☕';
-  btn.onclick = () => { order(d); btn.disabled = true; btn.textContent = 'Coming up…'; };
+  btn.textContent = isPastry ? 'I\'ll have it 🍡' : 'Order this ☕';
+  btn.onclick = () => { (isPastry ? orderDessert : order)(d); btn.disabled = true; btn.textContent = 'Coming up…'; };
   card.append(dot, txt, btn);
   $('talkLog').appendChild(card);
   $('talkLog').scrollTop = $('talkLog').scrollHeight;
@@ -1640,7 +1777,8 @@ $('talkForm').addEventListener('submit', async e => {
   talkBusy = true;
   $('talkSend').disabled = true;
   try {
-    const holding = player.drink ? (menu().find(d => d.id === player.drink) || {}).name : '';
+    const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
+      player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
     const where = state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();

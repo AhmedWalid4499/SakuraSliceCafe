@@ -47,9 +47,14 @@ function cleanState(m) {
     ry: clamp(m.ry, -10, 10) || 0,
     seat: typeof m.seat === 'string' ? m.seat.slice(0, 24) : null,
     drink: typeof m.drink === 'string' ? m.drink.slice(0, 24) : null,
-    // a drink this person has set down on a table (one at a time)
-    placed: m.placed && typeof m.placed.drink === 'string' ? {
-      drink: m.placed.drink.slice(0, 24),
+    // a pastry on a plate in the other hand, and how many bites are gone (0–3)
+    dessert: typeof m.dessert === 'string' ? m.dessert.slice(0, 40) : null,
+    bites: Math.round(clamp(m.bites, 0, 3)) || 0,
+    // what this person has set down on a table (one spot at a time): a cup, a plate, or both
+    placed: m.placed && (typeof m.placed.drink === 'string' || typeof m.placed.dessert === 'string') ? {
+      drink: typeof m.placed.drink === 'string' ? m.placed.drink.slice(0, 24) : null,
+      dessert: typeof m.placed.dessert === 'string' ? m.placed.dessert.slice(0, 40) : null,
+      bites: Math.round(clamp(m.placed.bites, 0, 3)) || 0,
       x: clamp(m.placed.x, -15, 15) || 0,
       y: clamp(m.placed.y, 0, 8.6) || 0,
       z: clamp(m.placed.z, -11, 11) || 0,
@@ -105,7 +110,8 @@ function attach(server, opts = {}) {
       const now = Date.now();
       // State changes (sitting, drinks) always go through; plain walking is
       // limited to ~15 updates a second.
-      const important = m.t === 'move' && (m.seat !== entry.state.seat || m.drink !== entry.state.drink || !!m.placed !== !!entry.state.placed);
+      const important = m.t === 'move' && (m.seat !== entry.state.seat || m.drink !== entry.state.drink
+        || (m.dessert || null) !== entry.state.dessert || (m.bites || 0) !== entry.state.bites || !!m.placed !== !!entry.state.placed);
       if (!important && now - entry.lastMsg < 60) return;
       entry.lastMsg = now;
 
