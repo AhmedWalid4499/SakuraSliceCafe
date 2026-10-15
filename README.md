@@ -42,11 +42,14 @@ SakuraSliceCafe/
 │   │   ├── avatar.js       ←   smooth rounded characters (people, fox, rabbit, cat, owl)
 │   │   ├── notes.js        ←   notes & pins drawn on high-res paper
 │   │   └── audio.js        ←   the generated soundscape (music, rain, fire, café hum…)
+│   │   (world.js also builds the upstairs loft and the street outside)
 │   └── admin.html          ← The back office — /admin
 ├── server/
 │   ├── index.js            ← Express server + WebSocket
 │   ├── api.js              ← All /api routes
 │   ├── realtime.js         ← Live café: who's here, where they stand, broadcasts
+│   ├── npc.js              ← The team's AI conversations (Claude API)
+│   ├── groups.js           ← Groups and the rooms upstairs
 │   ├── auth.js             ← Accounts + sessions
 │   ├── db.js               ← Postgres connection + migrations
 │   ├── schema.sql          ← Every table
@@ -64,6 +67,7 @@ SakuraSliceCafe/
    - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`
    - `ADMIN_EMAIL` = the email you'll register with (this account becomes the owner)
    - `NODE_ENV` = `production`
+   - `ANTHROPIC_API_KEY` = a Claude API key from [console.anthropic.com](https://console.anthropic.com) — gives the team their voices (without it they only use a few set lines)
    - `APPS_SCRIPT_URL` *(optional)* = your old email-collector web-app URL, so new signups also land in the Google Sheet the SendGrid sender reads
 3. Deploy. On start the server creates every table and seeds the content — safe to run on every deploy, it never overwrites what you've edited.
 4. Visit `/cafe`, register with your `ADMIN_EMAIL`, and `/admin` opens up for you.
@@ -83,6 +87,9 @@ Local: `cp .env.example .env`, point `DATABASE_URL` at any Postgres, then `npm i
 | `subscribers` | Morning & evening letter signups (CSV export in /admin) |
 | `site_content` | **Everything editable**: today's story, letters, moods, hero text, café menu, welcome card, default sound mix, board sign |
 | `site_content_history` | Every earlier version of each content row — nothing is ever lost |
+| `npc_sessions` / `npc_messages` | Conversations with the team, stored exactly as sent so each one can continue |
+| `guest_memories` | What the team remembers about each guest's tastes |
+| `groups` / `group_members` | Groups and who's in them (invite codes for private ones) |
 
 Change a `site_content` row (in `/admin`, or directly in Postgres) and the website and café pick it up immediately — no redeploy. People already inside the café see changes live.
 
@@ -100,6 +107,11 @@ Change a `site_content` row (in `/admin`, or directly in Postgres) and the websi
 - **Order a drink** — click Hana or the counter; the drink appears in your hand (and others see it). The menu is the `cafe.menu` content row.
 - **The team** — Yuto (tortoiseshell glasses, cream apron), Hana the fox, Yuki the rabbit, and Me3temed on his top shelf with his forest-green bowtie. Click them.
 - **Cairo, right now** — the light, the sky through the back door and windows, the stars, and whether the lamps carry the room all follow Cairo's real clock.
+
+- **Sit and set your drink down** — 🪑 *Sit* (or click a chair or a table) walks you to the closest free seat; 🍵 *Put drink down* leaves your cup on the table where everyone can see it.
+- **Talk with the team (AI)** — click Yuto, Hana, Yuki or Me3temed, or press 🗣️ *Talk*, for a real conversation in each one's own voice. Hana knows the menu by heart and will recommend a drink for your mood (it appears as a card with an *Order this* button). Tell them what you like — "I love cardamom", "no caffeine after six" — and all four remember it next time.
+- **Upstairs: rooms for groups** — climb the spiral stairs (or press 🪜 *Upstairs*). Start a group (private with an invite code, or open for anyone), and your group gets its own loft: a long shared table, a sofa nook by the big window onto the mosque, floor cushions, skylights, your group's name over its own board. Notes and chat up there are only for the group.
+- **A real street outside** — pavement, a road with cars going slowly by, people strolling, street lamps that come on at dusk, palms, a café terrace, shopfronts with striped awnings, shuttered windows and satellite dishes, the mosque behind the back street, clouds, birds, and Cairo Tower far off.
 
 Controls: **WASD / arrows** or click the floor to walk · **drag** to look · **scroll** to zoom · **Enter** to chat · **Esc** to close.
 
@@ -299,6 +311,7 @@ https://drive.google.com/thumbnail?id=FILE_ID&sz=w600
 HTML / CSS / vanilla JS  → The website and the café UI
 Three.js (r169, via npm) → The 3D café
 Web Audio API            → The generated soundscape — no audio files
+Claude API               → The team's conversations, drink recommendations and memory
 Node.js + Express        → Server and /api
 ws                       → Live presence, chat and note broadcasts
 PostgreSQL (Railway)     → Accounts, notes, chat, guestbook, subscribers, all site content

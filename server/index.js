@@ -8,6 +8,7 @@ const express = require('express');
 const { migrate } = require('./db');
 const api = require('./api');
 const realtime = require('./realtime');
+const groups = require('./groups');
 
 const app = express();
 app.set('trust proxy', 1); // Railway sits behind a proxy; needed for secure cookies + req.ip
@@ -47,7 +48,7 @@ const port = Number(process.env.PORT || 3000);
 migrate()
   .then(() => {
     const server = http.createServer(app);
-    realtime.attach(server);
+    realtime.attach(server, { canEnter: groups.canEnter });
     server.listen(port, () => console.log(`🌸 Sakura Slice Café is open on :${port}`));
   })
   .catch(err => {
