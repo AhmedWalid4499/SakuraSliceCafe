@@ -106,6 +106,8 @@ CREATE TABLE IF NOT EXISTS npc_sessions (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS npc_sessions_user_idx ON npc_sessions(user_id, npc, updated_at DESC);
+-- which version of the characters' prompt + tools a conversation started with
+ALTER TABLE npc_sessions ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
 
 -- Every message exactly as sent to / received from the model (content is
 -- the raw message content, replayed verbatim). `display` is what the guest

@@ -18,6 +18,9 @@ const { rateLimit, cleanText, wrap } = require('./util');
 const MODEL = process.env.NPC_MODEL || 'claude-opus-5-5';
 const SESSION_IDLE_MIN = 120;     // a new conversation after two quiet hours
 const SESSION_MAX_MESSAGES = 60;  // ...or once one gets long
+// Bump when the system prompt or tools change: a conversation always keeps
+// the prompt and tools it started with, so changes apply to new ones.
+const PROMPT_VERSION = 2;
 const DAILY_LIMIT = Number(process.env.NPC_DAILY_LIMIT || 120); // messages per guest per day
 const BETAS = ['server-side-fallback-2026-07-01', 'thinking-binding-controls-2026-08-01'];
 
@@ -46,6 +49,7 @@ const HOW_TO_TALK = `How to talk:
 - The voice of the café is intimate, never promotional. Warm, specific, unhurried. Small concrete details beat big words.
 - Be kind without being saccharine. Don't lecture. Ask at most one question at a time.
 - When a guest wants a drink, or tells you how they feel, or what they like, you may suggest one drink from the menu in the guest's notes, using the recommend_drink tool, and say a line about why in your reply. Only recommend drinks that are on that menu, by their exact id. Don't recommend a drink every turn.
+- When a guest asks how to make a drink or a treat — at home, step by step, "what's the recipe" — give it with the share_recipe tool, so it appears as a tidy recipe card: real home-kitchen measures (cups, tablespoons, grams, ml), ingredients in the order they're used, short numbered steps, and one small tip in your own voice. Keep your chat line to a sentence or two around it; don't repeat the recipe in your text. Recipes should be safe and sensible for a home kitchen. (Yuki will never give the Sakura Slice recipe — she can share any other one.)
 - When a guest tells you something lasting about their tastes or needs (favourite flavours, no caffeine at night, dairy-free, loves cardamom, hates cinnamon), save it with remember_about_guest, in a few plain words. Don't save passing moods or anything private beyond what a good barista would remember.
 - The guest's notes list what the team already remembers about them. Use it naturally; don't recite it.
 - If a guest seems to be in real distress or danger, stay warm, take it seriously, and gently encourage them to reach out to someone they trust or to local emergency services or a crisis line. Do not pretend the café can replace real help.`;
@@ -87,6 +91,37 @@ const TOOLS = [
         why: { type: 'string', description: 'A short, warm reason this drink suits the guest right now (one sentence).' },
       },
       required: ['drink_id', 'why'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'share_recipe',
+    description: "Give the guest a recipe as a tidy card in the chat: ingredients with measures, then numbered steps. Use it whenever a guest asks how to make a drink or treat.",
+    strict: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Name of the drink or treat.' },
+        drink_id: { type: 'string', description: "The menu id if this drink is on the café's menu, otherwise an empty string." },
+        serves: { type: 'string', description: "How many it serves, e.g. '1 mug' or '2 glasses'." },
+        time: { type: 'string', description: "Roughly how long it takes, e.g. '5 minutes'." },
+        ingredients: {
+          type: 'array',
+          description: 'Ingredients in the order they are used.',
+          items: {
+            type: 'object',
+            properties: {
+              amount: { type: 'string', description: "Quantity with unit, e.g. '1 cup', '2 tsp', 'a pinch'." },
+              item: { type: 'string', description: "The ingredient, e.g. 'oat milk', 'green cardamom pods, lightly crushed'." },
+            },
+            required: ['amount', 'item'],
+            additionalProperties: false,
+          },
+        },
+        steps: { type: 'array', description: 'Short steps, in order, one action each.', items: { type: 'string' } },
+        tip: { type: 'string', description: 'One small tip or note in your own voice (or an empty string).' },
+      },
+      required: ['name', 'drink_id', 'serves', 'time', 'ingredients', 'steps', 'tip'],
       additionalProperties: false,
     },
   },
@@ -149,10 +184,11 @@ async function currentSession(userId, npc, fresh) {
       `SELECT s.id, (SELECT count(*)::int FROM npc_messages m WHERE m.session_id = s.id) AS n
        FROM npc_sessions s
        WHERE s.user_id = $1 AND s.npc = $2 AND s.updated_at > now() - ($3 || ' minutes')::interval
-       ORDER BY s.updated_at DESC LIMIT 1`, [userId, npc, String(SESSION_IDLE_MIN)]);
+         AND s.version = $4
+       ORDER BY s.updated_at DESC LIMIT 1`, [userId, npc, String(SESSION_IDLE_MIN), PROMPT_VERSION]);
     if (rows[0] && rows[0].n < SESSION_MAX_MESSAGES) return { id: rows[0].id, isNew: false };
   }
-  const { rows } = await query('INSERT INTO npc_sessions (user_id, npc) VALUES ($1, $2) RETURNING id', [userId, npc]);
+  const { rows } = await query('INSERT INTO npc_sessions (user_id, npc, version) VALUES ($1, $2, $3) RETURNING id', [userId, npc, PROMPT_VERSION]);
   return { id: rows[0].id, isNew: true };
 }
 
@@ -255,6 +291,7 @@ router.post('/npc/:npc', auth.requireUser, talkLimit, wrap(async (req, res) => {
 
   let reply = '';
   let recommendation = null;
+  let recipe = null;
   const menuNow = await menu();
 
   try {
@@ -269,17 +306,40 @@ router.post('/npc/:npc', auth.requireUser, talkLimit, wrap(async (req, res) => {
       const assistantText = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
       const toolUses = response.content.filter(b => b.type === 'tool_use');
 
-      let meta = null;
+      const meta = {};
       const results = [];
       for (const t of toolUses) {
         if (t.name === 'recommend_drink') {
           const d = menuNow.find(x => x.id === t.input.drink_id);
           if (d) {
             recommendation = { id: d.id, name: d.name, by: d.by, color: d.color, why: cleanText(t.input.why, 200) };
-            meta = { recommendation };
+            meta.recommendation = recommendation;
             results.push({ type: 'tool_result', tool_use_id: t.id, content: 'Shown to the guest with an order button.' });
           } else {
             results.push({ type: 'tool_result', tool_use_id: t.id, is_error: true, content: 'That id is not on the menu. Use an id from the menu in the guest notes.' });
+          }
+        } else if (t.name === 'share_recipe') {
+          const r = t.input || {};
+          const ingredients = (Array.isArray(r.ingredients) ? r.ingredients : []).slice(0, 25)
+            .map(i => ({ amount: cleanText(i && i.amount, 40), item: cleanText(i && i.item, 120) }))
+            .filter(i => i.item);
+          const steps = (Array.isArray(r.steps) ? r.steps : []).slice(0, 15).map(x => cleanText(x, 300)).filter(Boolean);
+          if (!ingredients.length || !steps.length) {
+            results.push({ type: 'tool_result', tool_use_id: t.id, is_error: true, content: 'A recipe needs at least one ingredient and one step.' });
+          } else {
+            const onMenu = menuNow.find(x => x.id === r.drink_id);
+            recipe = {
+              name: cleanText(r.name, 80) || 'A recipe',
+              serves: cleanText(r.serves, 40),
+              time: cleanText(r.time, 40),
+              ingredients,
+              steps,
+              tip: cleanText(r.tip, 300),
+              by: CHARACTERS[npc].name,
+              drink: onMenu ? { id: onMenu.id, name: onMenu.name, by: onMenu.by, color: onMenu.color } : null,
+            };
+            meta.recipe = recipe;
+            results.push({ type: 'tool_result', tool_use_id: t.id, content: 'Shown to the guest as a recipe card they can copy.' });
           }
         } else if (t.name === 'remember_about_guest') {
           const note = cleanText(t.input.note, 140);
@@ -297,7 +357,8 @@ router.post('/npc/:npc', auth.requireUser, talkLimit, wrap(async (req, res) => {
       }
 
       if (assistantText) reply = reply ? `${reply}\n${assistantText}` : assistantText;
-      await append(session.id, 'assistant', response.content, assistantText || null, meta);
+      const hasMeta = Object.keys(meta).length > 0;
+      await append(session.id, 'assistant', response.content, assistantText || (hasMeta ? '' : null), hasMeta ? meta : null);
       messages.push({ role: 'assistant', content: response.content });
 
       if (response.stop_reason !== 'tool_use' || !results.length) break;
@@ -332,8 +393,8 @@ router.post('/npc/:npc', auth.requireUser, talkLimit, wrap(async (req, res) => {
     throw err;
   }
 
-  if (!reply) reply = npc === 'me3temed' ? '(he blinks, slowly.)' : '…';
-  res.json({ reply, recommendation });
+  if (!reply) reply = recipe ? (npc === 'me3temed' ? '(he nudges a folded card toward you.)' : 'Here — I wrote it down for you.') : npc === 'me3temed' ? '(he blinks, slowly.)' : '…';
+  res.json({ reply, recommendation, recipe });
 }));
 
 module.exports = router;

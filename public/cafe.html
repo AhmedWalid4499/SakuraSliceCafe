@@ -195,7 +195,7 @@
   .talk-who { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
   .talk-who button { border: 1.5px solid var(--line); background: var(--field); color: var(--text-mid); border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 700; }
   .talk-who button.on { border-color: var(--sakura-dark); color: var(--sakura-dark); background: var(--sakura-light); }
-  .talk-log { display: flex; flex-direction: column; gap: 8px; max-height: 38vh; overflow-y: auto; padding: 4px 2px; }
+  .talk-log { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; padding: 4px 2px; }
   .talk-log .say { max-width: 86%; padding: 9px 13px; border-radius: 16px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
   .talk-log .say.them { align-self: flex-start; background: var(--sakura-light); color: var(--text-dark); border-bottom-left-radius: 5px; font-family: 'Playfair Display', serif; font-style: italic; }
   .talk-log .say.me { align-self: flex-end; background: var(--sakura-dark); color: #fff; border-bottom-right-radius: 5px; }
@@ -205,6 +205,21 @@
   .rec b { display: block; font-size: 14px; }
   .rec small { color: var(--text-soft); font-size: 12.5px; display: block; }
   .rec .btn { padding: 8px 14px; font-size: 12.5px; margin-left: auto; flex-shrink: 0; }
+  .recipe { align-self: stretch; border: 1.5px solid var(--line); border-radius: 18px; padding: 14px 16px; background: var(--field); box-shadow: 0 6px 18px rgba(80,40,50,0.08); }
+  .recipe h4 { font-family: 'Playfair Display', serif; font-size: 18px; margin: 0 0 6px; color: var(--text-dark); }
+  .recipe-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+  .recipe-meta span { font-size: 12px; font-weight: 700; color: var(--sakura-dark); background: var(--sakura-light); border-radius: 999px; padding: 3px 10px; }
+  .recipe-label { font-size: 11px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: var(--sakura-dark); margin: 12px 0 6px; }
+  .recipe ul { list-style: none; display: grid; gap: 4px; font-size: 13.5px; color: var(--text-mid); }
+  .recipe ul li { padding-left: 16px; position: relative; line-height: 1.45; }
+  .recipe ul li::before { content: '•'; position: absolute; left: 2px; color: var(--sakura); font-weight: 700; }
+  .recipe ul b { color: var(--text-dark); }
+  .recipe ol { counter-reset: step; list-style: none; display: grid; gap: 7px; font-size: 13.5px; color: var(--text-mid); line-height: 1.5; }
+  .recipe ol li { counter-increment: step; position: relative; padding-left: 30px; }
+  .recipe ol li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 21px; height: 21px; border-radius: 50%; background: var(--sakura-dark); color: #fff; font-size: 11.5px; font-weight: 700; display: grid; place-items: center; }
+  .recipe-tip { margin-top: 12px; font-family: 'Dancing Script', cursive; font-size: 18px; color: var(--sakura-dark); line-height: 1.35; }
+  .recipe .row { margin-top: 12px; gap: 8px; flex-wrap: wrap; }
+  .recipe .btn { padding: 8px 14px; font-size: 12.5px; }
   .group-list { display: grid; gap: 8px; margin-top: 12px; }
   .group { border: 1.5px solid var(--line); border-radius: 16px; padding: 12px 14px; background: var(--field); }
   .group .gname { font-weight: 700; display: flex; align-items: center; gap: 8px; }
@@ -441,7 +456,7 @@
     <li>Click <b>Hana or the counter</b> to order a drink</li>
     <li>📌 <b>Leave a note</b> on the board, a table, or a wall — everyone will see it</li>
     <li>Click any note to read it and leave a ♥</li>
-    <li>🗣️ <b>Talk</b> — or click Yuto, Hana, Yuki or Me3temed — to have a real conversation. Ask Hana what to drink.</li>
+    <li>🗣️ <b>Talk</b> — or click Yuto, Hana, Yuki or Me3temed — to have a real conversation. Ask Hana what to drink, or ask anyone how to make it: the recipe comes as a card you can copy.</li>
     <li>🪜 <b>Upstairs</b> — or click the spiral stairs — for rooms just for your group.</li>
     <li><kbd>E</kbd> sit / stand · <kbd>Q</kbd> put down / pick up your drink</li>
     <li><kbd>Enter</kbd> to chat · <kbd>Esc</kbd> to close things</li>

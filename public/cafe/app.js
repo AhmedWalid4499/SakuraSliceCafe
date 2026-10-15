@@ -1431,6 +1431,91 @@ function recCard(rec) {
   $('talkLog').scrollTop = $('talkLog').scrollHeight;
 }
 
+// A recipe, laid out properly: what it makes, ingredients, numbered steps.
+function recipeText(r) {
+  return [
+    r.name,
+    [r.serves && `Serves: ${r.serves}`, r.time && `Time: ${r.time}`].filter(Boolean).join(' · '),
+    '',
+    'Ingredients',
+    ...r.ingredients.map(i => `• ${i.amount ? i.amount + ' ' : ''}${i.item}`),
+    '',
+    'Method',
+    ...r.steps.map((st, k) => `${k + 1}. ${st}`),
+    r.tip ? `\nTip from ${r.by}: ${r.tip}` : '',
+    '\n— from Sakura Slice Café 🌸',
+  ].filter(x => x !== undefined).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function recipeCard(r) {
+  const card = document.createElement('div');
+  card.className = 'recipe';
+  const head = document.createElement('div');
+  head.className = 'recipe-head';
+  const title = document.createElement('h4');
+  title.textContent = r.name;
+  const meta = document.createElement('div');
+  meta.className = 'recipe-meta';
+  for (const [icon, val] of [['🍵', r.serves], ['⏱', r.time]]) {
+    if (!val) continue;
+    const chip = document.createElement('span');
+    chip.textContent = `${icon} ${val}`;
+    meta.appendChild(chip);
+  }
+  head.append(title, meta);
+
+  const ingH = document.createElement('p');
+  ingH.className = 'recipe-label';
+  ingH.textContent = 'Ingredients';
+  const ul = document.createElement('ul');
+  for (const i of r.ingredients) {
+    const li = document.createElement('li');
+    const amt = document.createElement('b');
+    amt.textContent = i.amount;
+    li.append(amt, document.createTextNode(' ' + i.item));
+    ul.appendChild(li);
+  }
+  const stepH = document.createElement('p');
+  stepH.className = 'recipe-label';
+  stepH.textContent = 'Method';
+  const ol = document.createElement('ol');
+  for (const st of r.steps) {
+    const li = document.createElement('li');
+    li.textContent = st;
+    ol.appendChild(li);
+  }
+  card.append(head, ingH, ul, stepH, ol);
+  if (r.tip) {
+    const tip = document.createElement('p');
+    tip.className = 'recipe-tip';
+    tip.textContent = `${r.tip} — ${r.by}`;
+    card.appendChild(tip);
+  }
+  const row = document.createElement('div');
+  row.className = 'row';
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn ghost';
+  copy.textContent = 'Copy recipe';
+  copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(recipeText(r)); copy.textContent = 'Copied ✓'; }
+    catch (e) { prompt('Copy the recipe:', recipeText(r)); }
+  };
+  row.appendChild(copy);
+  if (r.drink) {
+    const ord = document.createElement('button');
+    ord.type = 'button';
+    ord.className = 'btn';
+    ord.textContent = 'Or have it made ☕';
+    ord.onclick = () => { order(menu().find(d => d.id === r.drink.id) || r.drink); ord.disabled = true; ord.textContent = 'Coming up…'; };
+    row.appendChild(ord);
+  }
+  card.appendChild(row);
+  $('talkLog').appendChild(card);
+  // show the recipe from its title down
+  $('talkLog').scrollTop = card.offsetTop - $('talkLog').offsetTop - 8;
+}
+
 async function openTalk(id) {
   const npc = world.npcs.find(n => n.id === id);
   if (!npc) return;
@@ -1456,7 +1541,8 @@ async function openTalk(id) {
     const { messages } = await api('/npc/' + id);
     if (talkTo !== id) return;
     for (const m of messages) {
-      talkLine(m.role === 'user' ? 'me' : 'them', m.display);
+      if (m.display) talkLine(m.role === 'user' ? 'me' : 'them', m.display);
+      if (m.meta && m.meta.recipe) recipeCard(m.meta.recipe);
       if (m.meta && m.meta.recommendation) recCard(m.meta.recommendation);
       had = true;
     }
@@ -1485,6 +1571,7 @@ $('talkForm').addEventListener('submit', async e => {
     if (talkTo !== id) return;
     talkLine('them', r.reply);
     if (r.recommendation) recCard(r.recommendation);
+    if (r.recipe) recipeCard(r.recipe);
     if (state.room === 'main') bubble(npc.av.group, r.reply.length > 120 ? r.reply.slice(0, 117) + '…' : r.reply, 'npc');
     sound.cue('chat');
   } catch (err) {
