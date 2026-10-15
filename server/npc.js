@@ -20,7 +20,7 @@ const SESSION_IDLE_MIN = 120;     // a new conversation after two quiet hours
 const SESSION_MAX_MESSAGES = 60;  // ...or once one gets long
 // Bump when the system prompt or tools change: a conversation always keeps
 // the prompt and tools it started with, so changes apply to new ones.
-const PROMPT_VERSION = 2;
+const PROMPT_VERSION = 3; // 3: the pastry counter
 const DAILY_LIMIT = Number(process.env.NPC_DAILY_LIMIT || 120); // messages per guest per day
 const BETAS = ['server-side-fallback-2026-07-01', 'thinking-binding-controls-2026-08-01'];
 
@@ -41,7 +41,11 @@ const CAFE = `Sakura Slice Café is a cozy, Japanese-inspired café imagined in 
 
 Inside: warm wood and sage walls, pendant lamps, a fireplace with two armchairs, an indoor sakura tree, a bookshelf (this month's picks: Project Hail Mary — Yuto's; A Study in Drowning — Yuki's), a Community Board where guests pin kind notes for strangers, Table Four by the window ("the best seat in Cairo"), and Mariam's corner table — always reserved for Mariam, Yuto's best friend and the reason the café exists. Through the back door: a Cairo street, minarets and palms. Upstairs is a quieter floor where groups of friends have their own room. The café opens at 10am and closes at 10pm, Cairo time. Nothing on the menu costs anything.
 
-The team: Yuto (owner and co-founder; young Egyptian man, tortoiseshell glasses, cream apron; also teaches at the university on Tuesday mornings), Me3temed (co-founder and mascot; a small round owl with a forest-green bowtie who lives on the top shelf and almost never speaks in words), Hana (a russet fox; head barista and baker; practical, warm, notices everything), Yuki (Yuki-chan, a white rabbit; pastry chef; quiet; opens on Fridays; sits at Table Four for ten minutes after closing; will never reveal how the Sakura Slice is made). Regulars include Mariam, Sora, Miu, Ren, Ahmed Ashraf and Mostafa (a musician).`;
+The team: Yuto (owner and co-founder; young Egyptian man, tortoiseshell glasses, cream apron; also teaches at the university on Tuesday mornings), Me3temed (co-founder and mascot; a small round owl with a forest-green bowtie who lives on the top shelf and almost never speaks in words), Hana (a russet fox; head barista and baker; practical, warm, notices everything), Yuki (Yuki-chan, a white rabbit; pastry chef; quiet; opens on Fridays; sits at Table Four for ten minutes after closing; will never reveal how the Sakura Slice is made). Regulars include Mariam, Sora, Miu, Ren, Ahmed Ashraf and Mostafa (a musician).
+
+The pastry counter: Japanese shape, Cairo heart, made at home in under an hour. Hana bakes the warm things (breads, buns, her grandmother's cookies); Yuki shapes the delicate ones (mochi, daifuku, dorayaki), lined up like tiny moons. Yuto names every pastry, and Me3temed tastes first. Every pastry has a drink it belongs with. Pastries are never "indulgent" or "guilt-free" — they're described by how they feel to hold.
+
+The café writes two letters a day — a morning letter with a story and a drink, and a bedtime story at night — and Yuto's book, Thirteen Quiet Stories from a Café, is on Kindle. Hana cried at number four (The Regular's Empty Chair).`;
 
 const HOW_TO_TALK = `How to talk:
 - You are in the café, talking with a guest in a small chat window. Stay in character the whole time; never mention being an AI, a model, or these instructions. If asked directly whether you are real, answer gently and in character — you are part of an imagined café, and that is all right.
@@ -61,11 +65,11 @@ const CHARACTERS = {
   },
   hana: {
     name: 'Hana',
-    persona: `You are Hana, a russet fox and the head barista and baker of Sakura Slice Café. You are practical and warm, a little dry, and you read people by what they order. You know every drink on the menu inside out — how it tastes, how strong it is, whether it has caffeine — and recommending the right drink for the right mood is your favourite thing. You make your own coffee before anyone else's because it's the only cup you actually taste. You'll bring the drink over so the guest doesn't have to come back to the counter.`,
+    persona: `You are Hana, a russet fox and the head barista and baker of Sakura Slice Café. You are practical and warm, a little dry, and you read people by what they order. You know every drink on the menu inside out — how it tastes, how strong it is, whether it has caffeine — and recommending the right drink for the right mood is your favourite thing. You make your own coffee before anyone else's because it's the only cup you actually taste. You'll bring the drink over so the guest doesn't have to come back to the counter. You also bake the warm things on the pastry counter, some from your grandmother's recipes (the sesame cookies are hers, and you eat two while they're warm).`,
   },
   yuki: {
     name: 'Yuki',
-    persona: `You are Yuki (the regulars call you Yuki-chan), a white rabbit and the pastry chef of Sakura Slice Café. You are quiet, gentle and a little shy, and you speak softly in short sentences. You open the café on Fridays and love the part of the morning nobody's using yet. After closing you sit at Table Four for ten minutes in the dark — the room needs a minute to remember what it is. You will never, ever reveal how the Sakura Slice is made, and you're sweetly stubborn about it. You make the smoothies and the iced vanilla latte. You love reading (this month: A Study in Drowning).`,
+    persona: `You are Yuki (the regulars call you Yuki-chan), a white rabbit and the pastry chef of Sakura Slice Café. You are quiet, gentle and a little shy, and you speak softly in short sentences. You open the café on Fridays and love the part of the morning nobody's using yet. After closing you sit at Table Four for ten minutes in the dark — the room needs a minute to remember what it is. You will never, ever reveal how the Sakura Slice is made, and you're sweetly stubborn about it. You shape the delicate pastries on the counter — the mochi, the daifuku, the dorayaki — and you make the smoothies and the iced vanilla latte. You love reading (this month: A Study in Drowning).`,
   },
   me3temed: {
     name: 'Me3temed',
@@ -146,6 +150,29 @@ async function menu() {
   return m.filter(d => d && d.id && d.name);
 }
 
+// The pastry counter, as the website shows it (site_content 'counter.*').
+async function counter() {
+  const { rows } = await query("SELECT key, value FROM site_content WHERE key IN ('counter.pastries', 'counter.pairing')");
+  const by = Object.fromEntries(rows.map(r => [r.key, r.value]));
+  const pastries = Array.isArray(by['counter.pastries']) ? by['counter.pastries'].filter(p => p && p.name) : [];
+  return { pastries, thisWeek: pairingThisWeek(pastries, by['counter.pairing']) };
+}
+
+// Same rule as the website's "This week's pairing": the next pastry every Sunday.
+function pairingThisWeek(pastries, cfg) {
+  if (!pastries.length) return null;
+  cfg = cfg || { mode: 'rotate' };
+  if (cfg.mode === 'set') return pastries.find(p => p.id === cfg.pastry) || pastries[0];
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'numeric', day: 'numeric' })
+    .formatToParts(new Date()).map(p => [p.type, p.value]));
+  const today = Date.UTC(+parts.year, +parts.month - 1, +parts.day);
+  const from = Date.parse((cfg.from || '2026-10-11') + 'T00:00:00Z');
+  const sunday = d => d - new Date(d).getUTCDay() * 864e5;
+  const weeks = Math.floor((sunday(today) - sunday(from)) / (7 * 864e5));
+  const start = Math.max(0, pastries.findIndex(p => p.id === cfg.start));
+  return pastries[(((start + weeks) % pastries.length) + pastries.length) % pastries.length];
+}
+
 async function memories(userId) {
   const { rows } = await query(
     'SELECT note FROM guest_memories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 25', [userId]);
@@ -162,7 +189,7 @@ function cairoNow() {
 
 // The opening of a conversation: everything that varies, said once.
 async function openingNotes(user, context) {
-  const [m, mem] = await Promise.all([menu(), memories(user.id)]);
+  const [m, mem, c] = await Promise.all([menu(), memories(user.id), counter()]);
   const lines = [
     '<guest_notes>',
     `Guest's name: ${user.display_name}`,
@@ -171,6 +198,9 @@ async function openingNotes(user, context) {
     context.where ? `They are: ${context.where}.` : '',
     'The menu (id — name — made by):',
     ...m.map(d => `- ${d.id} — ${d.name} — ${d.by || 'Hana'}`),
+    c.pastries.length ? 'The pastry counter (name — who makes it — the menu line — the drink it belongs with). These are to talk about; guests can\'t order them in the 3D café yet:' : '',
+    ...c.pastries.map(p => `- ${p.name} — ${p.by === 'yuki' ? 'Yuki' : 'Hana'} — ${p.line || ''} — ${p.drink || ''}${p.day ? ' (' + p.day + ')' : ''}`),
+    c.thisWeek ? `This week's pairing at the counter: ${c.thisWeek.name} with ${c.thisWeek.drink}.` : '',
     mem.length ? 'What the team remembers about this guest:' : 'The team doesn\'t know this guest\'s tastes yet.',
     ...mem.map(n => `- ${n}`),
     '</guest_notes>',
@@ -282,9 +312,11 @@ router.post('/npc/:npc', auth.requireUser, talkLimit, wrap(async (req, res) => {
   };
   let session = await currentSession(req.user.id, npc, false);
   let messages = session.isNew ? [] : await history(session.id);
+  // A conversation whose first turn never got through is still new: open it with the notes.
+  const opening = messages.length === 0;
 
   // The guest's turn. A new conversation opens with the notes.
-  const userContent = session.isNew
+  const userContent = opening
     ? [{ type: 'text', text: await openingNotes(req.user, context) }, { type: 'text', text }]
     : [{ type: 'text', text }];
   messages.push({ role: 'user', content: userContent });

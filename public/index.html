@@ -21,6 +21,10 @@
     --border: rgba(242,167,187,0.25);
     --shadow: 0 8px 40px rgba(180,100,120,0.10);
     --shadow-hover: 0 16px 56px rgba(180,100,120,0.18);
+    --blush: #fde8ef;      /* light pink text on dark cards — the same in both modes */
+    --paper: #fbf3ee;
+    --plate-bg: #fbf1e6;
+    --plate-glow: #e9f3e3;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -97,7 +101,7 @@
     font-weight: 600;
     letter-spacing: 4px;
     text-transform: uppercase;
-    color: var(--sakura-light);
+    color: var(--blush);
     margin-bottom: 14px;
     opacity: 0;
     animation: fadeUp 0.8s ease 0.3s forwards;
@@ -268,7 +272,6 @@
   .card-story     { grid-column: span 5; grid-row: span 5; }
   .card-table     { grid-column: span 7; grid-row: span 4; }
   .card-window    { grid-column: span 5; grid-row: span 4; }
-  .card-menu-peek { grid-column: span 12; grid-row: span 2; }
 
   /* ── Card: Cairo, right now (clock + weather) ── */
   .card-cairo {
@@ -356,7 +359,7 @@
   .card-now.is-closed .now-status {
     background: rgba(242,167,187,0.13);
     border-color: rgba(242,167,187,0.3);
-    color: var(--sakura-light);
+    color: var(--blush);
   }
   .now-live-dot {
     width: 7px; height: 7px; border-radius: 50%;
@@ -385,7 +388,7 @@
   .now-chip {
     background: rgba(242,167,187,0.13);
     border: 1px solid rgba(242,167,187,0.25);
-    color: var(--sakura-light);
+    color: var(--blush);
     font-size: 12px;
     padding: 4px 11px;
     border-radius: 14px;
@@ -896,7 +899,7 @@
   .team-card-quote {
     font-family: 'Dancing Script', cursive;
     font-size: 15px;
-    color: var(--sakura-light);
+    color: var(--blush);
     margin-top: 10px;
     padding-top: 10px;
     border-top: 1px solid rgba(255,255,255,0.08);
@@ -1178,7 +1181,7 @@
   .mood-btn {
     background: rgba(255,255,255,0.07);
     border: 1px solid rgba(242,167,187,0.28);
-    color: var(--sakura-light);
+    color: var(--blush);
     font-family: 'Nunito', sans-serif;
     font-size: 13.5px;
     font-weight: 600;
@@ -1220,7 +1223,7 @@
   .mood-answer-note {
     font-family: 'Dancing Script', cursive;
     font-size: 19px;
-    color: var(--sakura-light);
+    color: var(--blush);
     line-height: 1.6;
     max-width: 620px;
   }
@@ -1440,7 +1443,7 @@
   }
   .book-quote-text {
     font-family: 'Dancing Script', cursive;
-    font-size: 16px; color: var(--sakura-light); line-height: 1.6;
+    font-size: 16px; color: var(--blush); line-height: 1.6;
   }
 
   .book-card-who {
@@ -1502,6 +1505,271 @@
   .book-item.hidden {
     display: none;
   }
+
+  /* ══════════════════════════════════════════════════════════
+     THE COUNTER · THE MENU (drinks) · THE LETTERS · THE BOOK
+     All colour comes from the tokens, so dark mode is free.
+     ══════════════════════════════════════════════════════════ */
+  .counter-section, .drinks-section, .archive-section {
+    position: relative; z-index: 1; padding: 80px 0;
+  }
+  .counter-section { background: var(--cream); }
+  .drinks-section  { background: var(--warm-white); }
+  .archive-section { background: var(--paper, #fbf3ee); }
+  .counter-section::before, .drinks-section::before, .archive-section::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(to right, transparent, var(--sakura), transparent);
+  }
+  .drinks-section::before { background: linear-gradient(to right, transparent, var(--matcha), transparent); }
+  .wide-inner { max-width: 1280px; margin: 0 auto; padding: 0 40px; }
+  .wide-inner .section-title { margin-bottom: 14px; }
+  .section-intro {
+    font-size: 15px; color: var(--text-mid); line-height: 1.75;
+    max-width: 620px; margin-bottom: 30px;
+  }
+  .drinks-section .section-label { color: var(--matcha-dark); }
+
+  /* Counter cards */
+  .pastry-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  }
+  .pastry-card {
+    position: relative; overflow: hidden; cursor: pointer;
+    background: var(--warm-white); border: 1px solid var(--border);
+    border-radius: 20px; box-shadow: var(--shadow);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    display: flex; flex-direction: column; text-align: left;
+    font: inherit; color: inherit; padding: 0;
+  }
+  .pastry-card:hover, .pastry-card:focus-visible { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+  .pastry-card:focus-visible { outline: 2px solid var(--sakura-dark); outline-offset: 3px; }
+  .pastry-plate {
+    aspect-ratio: 10 / 7; display: block; width: 100%;
+    background: radial-gradient(ellipse at 50% 30%, var(--plate-glow) 0%, var(--plate-bg) 75%);
+  }
+  .pastry-card[data-by="yuki"] .pastry-plate { --plate-glow: var(--sakura-light); }
+  .pastry-plate svg, .pastry-plate img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .pastry-body { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .pastry-name { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--text-dark); line-height: 1.25; }
+  .pastry-line { font-size: 13.5px; color: var(--text-mid); line-height: 1.6; }
+  .maker-tag {
+    align-self: flex-start; font-size: 10.5px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; padding: 4px 10px; border-radius: 20px;
+    background: var(--matcha-light); color: var(--matcha-dark);
+  }
+  .maker-tag.yuki { background: var(--sakura-light); color: var(--sakura-dark); }
+  .pastry-pair { margin-top: auto; padding-top: 8px; font-size: 12px; color: var(--text-soft); }
+  .pastry-pair b { color: var(--text-mid); font-weight: 600; }
+  .me3-says {
+    position: absolute; left: 0; right: 0; top: 0;
+    aspect-ratio: 10 / 7;
+    display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
+    padding: 18px 20px;
+    background: linear-gradient(to top, rgba(29,17,21,0.88) 0%, rgba(29,17,21,0.55) 55%, rgba(29,17,21,0) 100%);
+    color: #fde8ef; opacity: 0; transition: opacity 0.25s ease; pointer-events: none;
+  }
+  .me3-says span { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sakura); }
+  .me3-says q { font-family: 'Dancing Script', cursive; font-size: 19px; line-height: 1.35; quotes: '“' '”'; }
+  .pastry-card:hover .me3-says, .pastry-card:focus-visible .me3-says, .pastry-card.show-me3 .me3-says { opacity: 1; }
+
+  .season-card { cursor: default; }
+  .season-card.now { border: 1.5px solid var(--sakura-dark); }
+  .season-when { font-size: 10.5px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sakura-dark); display: flex; gap: 8px; align-items: center; }
+  .now-pill { background: var(--sakura-dark); color: #fff; border-radius: 20px; padding: 2px 8px; letter-spacing: 1px; }
+  .season-months { font-size: 12px; color: var(--text-soft); }
+  .counter-foot { margin-top: 26px; font-size: 13px; color: var(--text-soft); font-style: italic; }
+
+  /* Drinks */
+  .drink-tabs .shelf-tab .count { opacity: 0.6; font-weight: 400; margin-left: 4px; }
+  .drink-grid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+  .drink-card {
+    background: var(--cream); border: 1px solid var(--border); border-radius: 18px;
+    padding: 18px 20px; cursor: pointer; text-align: left; font: inherit; color: inherit;
+    display: flex; gap: 14px; align-items: flex-start;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s;
+  }
+  .drink-card:hover, .drink-card:focus-visible { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--matcha); }
+  .drink-card:focus-visible { outline: 2px solid var(--matcha-dark); outline-offset: 3px; }
+  .drink-glass { font-size: 26px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+  .drink-name { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 16px; color: var(--text-dark); line-height: 1.3; }
+  .drink-mood { font-size: 13px; color: var(--text-mid); line-height: 1.55; margin-top: 4px; }
+  .drink-meta { font-size: 11px; color: var(--text-soft); margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .recipe-pill { background: var(--matcha-light); color: var(--matcha-dark); font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+
+  /* Recipe / edition modal (same frame as Today's Café Story) */
+  /* plain block (no flex, no overflow): anything that starts a new formatting
+     context would shrink away from the floated close button */
+  .recipe-cover {
+    height: 170px; border-radius: 28px 28px 0 0; display: block; text-align: center; line-height: 170px;
+    font-size: 64px; margin-top: -50px;
+    background: linear-gradient(135deg, var(--sakura-light), var(--matcha-light));
+  }
+  .recipe-cover svg { height: 100%; width: auto; vertical-align: top; }
+  .recipe-cover.spring { background: linear-gradient(135deg, #fde3ec, #eaf5e4); }
+  .recipe-cover.summer { background: linear-gradient(135deg, #ffe9c7, #fbd6d6); }
+  .recipe-cover.autumn { background: linear-gradient(135deg, #f4dcc0, #e9d2c4); }
+  .recipe-cover.winter { background: linear-gradient(135deg, #e5e3f1, #f6e7ea); }
+  .recipe-cover.letters { background: linear-gradient(135deg, #fbe7d8, #fde8ef); }
+  .story-text h3 {
+    font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--matcha-dark); margin: 22px 0 10px;
+  }
+  .story-text h3:first-child { margin-top: 0; }
+  .story-text ul, .story-text ol { padding-left: 22px; margin-bottom: 8px; }
+  .story-text li { margin-bottom: 6px; }
+  .story-text .me3-line {
+    font-family: 'Dancing Script', cursive; font-size: 21px; color: var(--sakura-dark);
+    margin: 22px 0 6px; line-height: 1.4;
+  }
+  .story-text .muted { color: var(--text-soft); font-size: 14px; }
+  .soft-btn {
+    display: inline-block; margin-top: 10px; background: var(--sakura-dark); color: #fff !important;
+    border: none; border-radius: 50px; padding: 11px 22px; font: 600 14px 'Nunito', sans-serif;
+    text-decoration: none; cursor: pointer; transition: transform 0.2s, background 0.2s;
+  }
+  .soft-btn:hover { background: #b84d72; transform: translateY(-2px); }
+  .soft-btn.ghost { background: transparent; color: var(--sakura-dark) !important; border: 1.5px solid var(--sakura-dark); }
+  .soft-btn.ghost:hover { background: var(--sakura-light); }
+  .week-table { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.5; }
+  .week-table th { text-align: left; font-size: 10.5px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-soft); padding: 0 8px 8px 0; font-weight: 700; }
+  .week-table td { padding: 9px 8px 9px 0; border-top: 1px solid var(--border); vertical-align: top; color: var(--text-mid); }
+  .week-table td:first-child { font-weight: 700; color: var(--text-dark); white-space: nowrap; }
+  .week-table .gap { color: var(--text-soft); font-style: italic; }
+  .week-table button { all: unset; cursor: pointer; color: var(--matcha-dark); text-decoration: underline dotted; text-underline-offset: 3px; }
+
+  /* Letters archive */
+  .edition-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); margin-bottom: 40px; }
+  .edition-card {
+    background: var(--warm-white); border: 1px solid var(--border); border-radius: 18px;
+    padding: 20px 22px; text-align: left; font: inherit; color: inherit; cursor: pointer;
+    display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .edition-card:hover, .edition-card:focus-visible { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
+  .edition-card:focus-visible { outline: 2px solid var(--sakura-dark); outline-offset: 3px; }
+  .edition-num { font-size: 10.5px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sakura-dark); }
+  .edition-theme { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--text-dark); line-height: 1.3; }
+  .edition-blurb { font-size: 13px; color: var(--text-mid); line-height: 1.6; }
+  .edition-peek { font-size: 12px; color: var(--text-soft); font-style: italic; margin-top: auto; padding-top: 6px; }
+  .archive-signup {
+    background: var(--warm-white); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow);
+    padding: 26px 28px; display: flex; gap: 22px; align-items: center; flex-wrap: wrap; justify-content: space-between;
+  }
+  .archive-signup h4 { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--text-dark); margin-bottom: 4px; }
+  .archive-signup p { font-size: 13.5px; color: var(--text-mid); }
+  .archive-signup .email-input-row { margin: 0; flex: 1; min-width: 260px; max-width: 460px; }
+
+  /* This week's pairing (bento) */
+  .card-pairing { grid-column: span 12; grid-row: span 2; display: flex; gap: 26px; align-items: center; cursor: pointer;
+    background: linear-gradient(120deg, var(--pair-a, #fff6ec) 0%, var(--pair-b, #fdf0f4) 100%); }
+  .card-menu-peek { grid-column: span 12; grid-row: span 2; }
+  .pairing-art { width: 170px; flex-shrink: 0; border-radius: 16px; overflow: hidden; background: var(--plate-bg); }
+  .pairing-go { margin-left: auto; flex-shrink: 0; }
+  .pairing-art svg, .pairing-art img { display: block; width: 100%; height: auto; }
+  .pairing-label { font-size: 10.5px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--sakura-dark); margin-bottom: 6px; }
+  .pairing-title { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 700; color: var(--text-dark); line-height: 1.3; }
+  .pairing-title em { color: var(--matcha-dark); }
+  .pairing-note { font-size: 13px; color: var(--text-mid); margin-top: 6px; line-height: 1.55; }
+  .pairing-me3 { font-family: 'Dancing Script', cursive; font-size: 16px; color: var(--sakura-dark); margin-top: 6px; }
+
+  /* The book on the shelf */
+  .book-cover-drawn {
+    width: 100%; height: 100%; border-radius: 20px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; gap: 14px; padding: 30px;
+    background: radial-gradient(ellipse at 50% 25%, #fbe2ea 0%, #f2c7d4 45%, #d98fa8 100%);
+    color: #3a1f27;
+  }
+  .book-cover-drawn .bc-kicker { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; font-weight: 700; opacity: 0.75; }
+  .book-cover-drawn .bc-title { font-family: 'Playfair Display', serif; font-size: clamp(22px, 2.6vw, 30px); font-weight: 700; line-height: 1.15; }
+  .book-cover-drawn .bc-title em { display: block; font-weight: 400; font-size: 0.62em; margin-top: 6px; }
+  .book-cover-drawn .bc-cups { font-size: 26px; letter-spacing: 6px; }
+  .book-toc { font-size: 13px; color: var(--text-mid); }
+  .book-toc summary { cursor: pointer; font-weight: 700; color: var(--sakura-dark); list-style: none; }
+  .book-toc summary::-webkit-details-marker { display: none; }
+  .book-toc ol { margin: 10px 0 0 20px; line-height: 1.55; columns: 2; column-gap: 28px; }
+  .book-toc li { break-inside: avoid; margin-bottom: 6px; }
+  .book-toc .hana-cried { font-size: 11.5px; color: var(--sakura-dark); }
+  .book-toc li span { display: block; color: var(--text-soft); font-size: 12px; }
+  .book-item.our-book .book-card-who { grid-row: span 4; align-items: flex-start; flex-direction: column; flex-wrap: nowrap; }
+  .book-item.our-book .book-card-img { grid-row: span 7; }
+
+  /* Walk-in hint under the hero button */
+  .hero-cta-wrap { display: inline-flex; flex-direction: column; gap: 8px; }
+  .hero-cta-hint { font-size: 13px; color: rgba(255,255,255,0.82); opacity: 0; transform: translateY(-4px); transition: opacity 0.3s, transform 0.3s; }
+  .hero-cta-wrap:hover .hero-cta-hint, .hero-cta-wrap:focus-within .hero-cta-hint { opacity: 1; transform: none; }
+
+  @media (max-width: 900px) {
+    .card-pairing, .card-menu-peek { grid-column: span 4; grid-row: auto; }
+    .card-pairing { order: 7; }
+    .card-menu-peek { order: 8; }
+    .wide-inner { padding: 0 24px; }
+    .book-toc ol { columns: 1; }
+    /* The book cards are declared after the older tablet/phone rules, so they
+       restate the stacking here (otherwise phones get five 80px slivers). */
+    .book-bento { grid-auto-rows: auto; }
+    .book-card-img, .book-card-info, .book-card-quote, .book-card-who,
+    .book-item.our-book .book-card-img, .book-item.our-book .book-card-who { grid-column: span 6; grid-row: auto; }
+    .book-card-img, .book-item.our-book .book-card-img { grid-column: span 12; position: relative; aspect-ratio: 4 / 3; }
+    .book-card-img img, .book-card-img .book-cover-drawn { position: absolute; inset: 0; }
+  }
+  @media (max-width: 600px) {
+    .card-pairing { grid-column: span 2; flex-direction: column; align-items: flex-start; }
+    .pairing-art { width: 100%; }
+    .pairing-go { margin-left: 0; }
+    .archive-signup { padding: 22px; }
+    .hero-cta-hint { opacity: 1; transform: none; }
+    .card-menu-peek { grid-column: span 2; }
+    .book-card-info, .book-card-quote, .book-card-who,
+    .book-item.our-book .book-card-who { grid-column: span 12; }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     DARK MODE — the same evening palette as the letters.
+     Most of the page runs on the tokens; the few hand-mixed
+     gradients get their own evening version here.
+     ══════════════════════════════════════════════════════════ */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --sakura-light: #3b2630;
+      --matcha-light: #213022;
+      --matcha-dark: #9fcf9f;
+      --cream: #1a1315;
+      --warm-white: #241a1d;
+      --paper: #1f1619;
+      --text-dark: #f5e8eb;
+      --text-mid: #d5bcc2;
+      --text-soft: #a98e95;
+      --border: rgba(242,167,187,0.16);
+      --shadow: 0 8px 40px rgba(0,0,0,0.35);
+      --shadow-hover: 0 16px 56px rgba(0,0,0,0.5);
+      --plate-bg: #2a2023;
+      --plate-glow: #2f3a2c;
+      --pair-a: #2b2019;
+      --pair-b: #2b1d23;
+    }
+    .team-section { background: #120c0e; }
+    .card-cairo { background: linear-gradient(120deg, #2a1e1c 0%, #2b1d23 55%, #1e2620 100%); }
+    .card-tagline, .card-menu-peek, .book-card-info { background: linear-gradient(135deg, #33222a 0%, #271c20 100%); }
+    .card-letters { background: linear-gradient(135deg, #2a1f1c 0%, #2b1e23 100%); }
+    .letter-toggle { background: rgba(255,255,255,0.06); }
+    .letter { background: #2d2226; }
+    .table-form input, .email-input-row input { background: #1d1517; color: var(--text-dark); }
+    .menu-item { background: rgba(255,255,255,0.06); }
+    .menu-item:hover { background: #33262a; }
+    .story-close { background: rgba(40,30,33,0.92); }
+    .story-close:hover { background: #3a2a2f; }
+    .recipe-cover.spring { background: linear-gradient(135deg, #3b2630, #243022); }
+    .recipe-cover.summer { background: linear-gradient(135deg, #3a2e1f, #3a2427); }
+    .recipe-cover.autumn { background: linear-gradient(135deg, #36281d, #33242a); }
+    .recipe-cover.winter { background: linear-gradient(135deg, #25243a, #33242a); }
+    .recipe-cover.letters { background: linear-gradient(135deg, #36281f, #3b2630); }
+    .book-cover-drawn { background: radial-gradient(ellipse at 50% 25%, #6b3a4b 0%, #4a2633 55%, #2e1820 100%); color: #fde8ef; }
+  }
 </style>
 </head>
 <body>
@@ -1528,7 +1796,10 @@
     <p class="hero-label" id="heroLabel">A dream café &nbsp;·&nbsp; Est. in imagination, 2024</p>
     <h1 class="hero-title" id="heroTitle">Where every cup<br>holds a <em>little story.</em></h1>
     <p class="hero-sub" id="heroSub">A Japanese-inspired cozy café — imagined with love 🌸</p>
-    <a class="hero-cta" href="/cafe">Step inside the café →</a>
+    <div class="hero-cta-wrap">
+      <a class="hero-cta" href="/cafe" title="Make an avatar. Find Me3temed's shelf. Mariam's table is reserved.">Walk into the café →</a>
+      <span class="hero-cta-hint">Make an avatar. Find Me3temed's shelf. Mariam's table is reserved.</span>
+    </div>
   </div>
 
   <div class="scroll-hint">
@@ -1645,6 +1916,18 @@
       </div>
     </div>
 
+    <!-- This week's pairing — rotates every Sunday (counter.pairing) -->
+    <div class="bento-card card-pairing" id="pairingCard" role="button" tabindex="0" aria-label="This week's pairing">
+      <div class="pairing-art" id="pairingArt"></div>
+      <div>
+        <div class="pairing-label">This week at the counter</div>
+        <div class="pairing-title" id="pairingTitle">Honey Dorayaki with an <em>Iced Honey Vanilla Latte.</em></div>
+        <div class="pairing-note" id="pairingNote">Friday's order, available all week.</div>
+        <div class="pairing-me3" id="pairingMe3"></div>
+      </div>
+      <a class="menu-cta pairing-go" href="#counterSection" onclick="event.stopPropagation()">See the counter</a>
+    </div>
+
     <!-- Menu strip -->
     <div class="bento-card card-menu-peek">
       <h4>🍃 A taste of the menu</h4>
@@ -1662,10 +1945,32 @@
   </div>
 </section>
 
-<!-- ── THE MENU ── -->
+<!-- ── THE LETTERS (archive) ── -->
+<section class="archive-section" id="lettersArchive">
+  <div class="wide-inner">
+    <p class="section-label">The Letters</p>
+    <h2 class="section-title">Every morning since March.<br><em>Twelve editions, eighty-four mornings.</em></h2>
+    <p class="section-intro">The café writes two letters a day: one to begin with, one to end with. Here are the themes we have written about so far. Open one to see its week.</p>
+    <div class="edition-grid" id="editionGrid"></div>
+    <div class="archive-signup">
+      <div>
+        <h4>The next one is already being written.</h4>
+        <p>A story and a drink at sunrise, a bedtime story at closing.</p>
+      </div>
+      <div class="email-input-row">
+        <input type="email" id="archiveEmail" placeholder="your@email.com" aria-label="Your email" />
+        <button id="archiveJoin" onclick="submitEmail('archive')">Join ✨</button>
+      </div>
+      <div class="email-success" id="archiveSuccess">🌸 You're in! Warm letters on their way.</div>
+      <div class="email-error" id="archiveError">Something went wrong. Please try again.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── THE HOUSE MENU ── -->
 <section class="menu-section" id="menuSection">
   <div class="menu-inner">
-    <p class="section-label">The Menu</p>
+    <p class="section-label">The House Menu</p>
     <h2 class="section-title">Everything we'd<br><em>make for you.</em></h2>
     <p class="menu-intro">Nothing here has a price, because the café doesn't exist yet and you can't buy anything from a place that isn't there. What it has instead is a method for everything. Open any of them. Someday somebody should be able to make these.</p>
 
@@ -2026,6 +2331,39 @@
   </div>
 </section>
 
+<!-- ── THE COUNTER (pastries) ── -->
+<section class="counter-section" id="counterSection">
+  <div class="wide-inner">
+    <p class="section-label">The Counter</p>
+    <h2 class="section-title">Small things, made by hand,<br><em>lined up like tiny moons.</em></h2>
+    <p class="section-intro">Hana bakes the warm things. Yuki shapes the delicate ones. Yuto names them. Me3temed tastes first. Twelve pastries, two kitchens, one counter.</p>
+    <div class="shelf-tabs" id="counterTabs">
+      <button class="shelf-tab active" onclick="filterCounter('all', this)">✨ All</button>
+      <button class="shelf-tab" onclick="filterCounter('hana', this)">Hana's kitchen</button>
+      <button class="shelf-tab" onclick="filterCounter('yuki', this)">Yuki's counter</button>
+      <button class="shelf-tab" onclick="filterCounter('seasonal', this)">Seasonal</button>
+    </div>
+    <div class="pastry-grid" id="pastryGrid"></div>
+    <p class="counter-foot">Hover a pastry (or tap it) for what Me3temed said when he tasted it.</p>
+  </div>
+</section>
+
+<!-- ── THE MENU (drinks from the letters) ── -->
+<section class="drinks-section" id="drinksSection">
+  <div class="wide-inner">
+    <p class="section-label">The Menu</p>
+    <h2 class="section-title">Sixty-three drinks and counting.<br><em>Every one you can make at home.</em></h2>
+    <p class="section-intro">Each morning letter comes with a drink. Here they all are, by season. Click one for the recipe.</p>
+    <div class="shelf-tabs drink-tabs" id="drinkTabs">
+      <button class="shelf-tab" data-season="spring" onclick="filterDrinks('spring', this)">🌸 Spring</button>
+      <button class="shelf-tab" data-season="summer" onclick="filterDrinks('summer', this)">☀️ Summer</button>
+      <button class="shelf-tab" data-season="autumn" onclick="filterDrinks('autumn', this)">🍂 Autumn</button>
+      <button class="shelf-tab" data-season="winter" onclick="filterDrinks('winter', this)">❄️ Winter</button>
+    </div>
+    <div class="drink-grid" id="drinkGrid"></div>
+  </div>
+</section>
+
 <!-- ── OUR BOOKSHELF ── -->
 <section class="bookshelf-section">
   <div class="bookshelf-inner">
@@ -2043,6 +2381,41 @@
 
     <!-- Book grid -->
     <div class="book-grid" id="bookGrid">
+
+      <!-- ── OUR OWN BOOK (site.book) ── -->
+      <div class="book-item our-book" data-recommender="yuto hana yuki me3temed">
+        <div class="book-bento">
+
+          <div class="book-card book-card-img" id="bookCover">
+            <div class="book-cover-drawn">
+              <span class="bc-kicker">Sakura Slice Café</span>
+              <span class="bc-title">Thirteen Quiet Stories<em>from a Café</em></span>
+              <span class="bc-cups">☕🌸☕</span>
+            </div>
+          </div>
+
+          <div class="book-card book-card-info">
+            <span class="book-genre">📖 Our book · On Kindle</span>
+            <div class="book-title" id="bookTitle">Thirteen Quiet Stories from a Café</div>
+            <div class="book-author">Written in Yuto's voice</div>
+            <div class="book-desc" id="bookLine">Thirteen Quiet Stories from a Café is on Kindle. Yuto wrote them. Hana cried at number four.</div>
+            <div><a class="soft-btn" id="bookLink" href="https://www.amazon.com/dp/B0H1499X4M" target="_blank" rel="noopener">Read on Kindle →</a></div>
+          </div>
+
+          <div class="book-card book-card-quote">
+            <div class="book-quote-mark">"</div>
+            <div class="book-quote-text" id="bookDedication">For everyone who thought they were alone, you're not alone. We are waiting for you.</div>
+          </div>
+
+          <div class="book-card book-card-who">
+            <details class="book-toc" open>
+              <summary>The thirteen stories ⌄</summary>
+              <ol id="bookToc"></ol>
+            </details>
+          </div>
+
+        </div>
+      </div>
 
       <!-- ── PROJECT HAIL MARY ── -->
       <div class="book-item" data-recommender="yuto" data-loved="yuto,hana,yuki,me3temed">
@@ -2106,7 +2479,6 @@
             <div class="book-who-tags">
               <span class="book-who-tag first-picker">🌟 Yuki — chain recommended</span>
             </div>
-            <span class="book-shelf-note">More books coming soon 🌸</span>
           </div>
 
         </div>
@@ -2190,6 +2562,20 @@
         <p>They are Tuesdays.</p>
         <p><em>They are always Tuesdays.</em> 🌿🌸</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── RECIPE / EDITION MODAL (same frame as the story) ── -->
+<div class="story-overlay" id="recipeOverlay" onclick="if (event.target === this) closeRecipe()">
+  <div class="story-modal" role="dialog" aria-modal="true" aria-labelledby="recipeTitle">
+    <button class="story-close" onclick="closeRecipe()" aria-label="Close">✕</button>
+    <div class="recipe-cover" id="recipeCover">🍵</div>
+    <div class="story-body">
+      <div class="story-date" id="recipeKicker"></div>
+      <h2 class="story-title" id="recipeTitle"></h2>
+      <div class="story-divider"></div>
+      <div class="story-text" id="recipeText"></div>
     </div>
   </div>
 </div>
@@ -2814,11 +3200,15 @@
   // 🔧 REPLACE THIS URL after you deploy the Apps Script web app:
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyPx6TziWg6PjpNiW15YAa8aE5jJuElxhL6hOYpnDxKGxtQ8xF9nLZYt3Q_u0vvxbn3/exec';
 
-  async function submitEmail() {
-    const input = document.getElementById('emailInput');
-    const btn = document.getElementById('joinBtn');
-    const successEl = document.getElementById('emailSuccess');
-    const errorEl = document.getElementById('emailError');
+  // Two forms share this: the Letters card (default) and the Letters archive.
+  async function submitEmail(form) {
+    const ids = form === 'archive'
+      ? { input: 'archiveEmail', btn: 'archiveJoin', ok: 'archiveSuccess', err: 'archiveError' }
+      : { input: 'emailInput', btn: 'joinBtn', ok: 'emailSuccess', err: 'emailError', row: 'emailInputRow' };
+    const input = document.getElementById(ids.input);
+    const btn = document.getElementById(ids.btn);
+    const successEl = document.getElementById(ids.ok);
+    const errorEl = document.getElementById(ids.err);
     const email = input.value.trim();
 
     // Basic validation
@@ -2858,7 +3248,7 @@
           body: JSON.stringify({ email })
         });
       }
-      document.getElementById('emailInputRow').style.display = 'none';
+      (ids.row ? document.getElementById(ids.row) : input.parentElement).style.display = 'none';
       successEl.style.display = 'flex';
     } catch (err) {
       btn.textContent = 'Join ✨';
@@ -2872,6 +3262,9 @@
   document.getElementById('emailInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') submitEmail();
   });
+  document.getElementById('archiveEmail').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitEmail('archive');
+  });
 
   // ── Bookshelf filter
   function filterShelf(person, btn) {
@@ -2880,7 +3273,7 @@
 
     // Show/hide books — only the ones this person specifically recommended
     document.querySelectorAll('.book-item').forEach(item => {
-      const show = person === 'all' || item.dataset.recommender === person;
+      const show = person === 'all' || item.dataset.recommender.split(' ').includes(person);
       item.classList.toggle('hidden', !show);
     });
   }
@@ -2899,7 +3292,7 @@
   function closeOnOverlay(e) {
     if (e.target === document.getElementById('storyOverlay')) closeStory();
   }
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeStory(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeStory(); closeRecipe(); } });
 
   // ══════════════════════════════════════════════════════════
   //  CONTENT FROM THE DATABASE
@@ -2924,6 +3317,287 @@
 
   function driveImage(idOrUrl, size) {
     return /^https?:\/\//.test(idOrUrl) ? idOrUrl : `https://drive.google.com/thumbnail?id=${idOrUrl}&sz=${size}`;
+  }
+
+
+  // ══════════════════════════════════════════════════════════
+  //  THE COUNTER · THE MENU · THE LETTERS · THIS WEEK'S PAIRING
+  //  Data comes from site_content (counter.pastries, counter.seasonal,
+  //  counter.pairing, menu.drinks, letters.archive, site.book) so the
+  //  owner can change all of it from /admin. Text is set with
+  //  textContent; the only markup strings are the plate drawings below.
+  // ══════════════════════════════════════════════════════════
+  let PASTRIES = [], SEASONAL = [], DRINKS = [], EDITIONS = [], PAIRING = null;
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  function mk(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v == null || v === false) continue;
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid);
+    return el;
+  }
+
+  // Little drawn plates until the pixel-art pictures are on Drive.
+  const PLATE = '<ellipse cx="100" cy="112" rx="78" ry="17" fill="#e9dccb"/><ellipse cx="100" cy="108" rx="78" ry="17" fill="#fffaf2"/><ellipse cx="100" cy="108" rx="58" ry="11" fill="none" stroke="#efe2d0" stroke-width="2"/>';
+  const dots = (pts, c, r = 1.6) => pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>`).join('');
+  const SHAPES = {
+    slice: `<path d="M48 96 L150 96 L150 74 L48 74 Z" fill="#fff4f0"/><path d="M48 86 L150 86 L150 80 L48 80 Z" fill="#f5a8b8"/><path d="M48 74 L150 74 L150 68 L48 68 Z" fill="#fbe0e6"/><path d="M48 96 L150 96 L150 92 L48 92 Z" fill="#f0d8c6"/>${[0,72,144,216,288].map(a => `<ellipse cx="99" cy="57" rx="5" ry="8" fill="#f2a7bb" transform="rotate(${a} 99 64)"/>`).join('')}<circle cx="99" cy="64" r="3" fill="#d4678a"/>`,
+    domes: [62, 100, 138].map(x => `<path d="M${x-17} 100 Q${x-17} 72 ${x} 72 Q${x+17} 72 ${x+17} 100 Z" fill="#fffdf9" stroke="#eadfd2"/><path d="M${x-10} 92 Q${x} 78 ${x+10} 92 M${x-6} 86 L${x+6} 86 M${x} 80 L${x} 96" stroke="#e3d3c2" stroke-width="1.5" fill="none"/>${dots([[x-8,79],[x+7,83],[x-2,75],[x+11,92],[x-12,93]], '#ffffff', 1.4)}`).join(''),
+    square: `<path d="M62 100 L138 100 L138 70 L62 70 Z" fill="#e8b45c"/><path d="M62 70 L138 70 L138 64 L62 64 Z" fill="#8fbf6a"/><path d="M62 100 L138 100 L138 95 L62 95 Z" fill="#cf9640"/>${dots([[75,82],[90,88],[110,79],[124,90],[98,76]], '#d7a24e', 1.3)}<ellipse cx="100" cy="60" rx="8" ry="4.5" fill="#f3e2c4" stroke="#d8c09a"/>`,
+    cookies: [100, 92, 84, 76].map((y, i) => `<ellipse cx="${100 + (i % 2 ? 4 : -3)}" cy="${y}" rx="40" ry="10" fill="${i % 2 ? '#e2b77a' : '#d9a865'}" stroke="#c48f4c"/>`).join('') + dots([[82,74],[95,71],[110,73],[118,77],[88,79],[103,78],[74,77],[124,74]], '#fff6e2', 1.5),
+    nest: `<ellipse cx="100" cy="88" rx="44" ry="18" fill="#e3a23f"/>${Array.from({length: 18}, (_, i) => { const a = i / 18 * Math.PI * 2; return `<path d="M${100 + Math.cos(a) * 26} ${88 + Math.sin(a) * 10} q${Math.cos(a + 1) * 12} ${Math.sin(a + 1) * 6} ${Math.cos(a) * 16} ${Math.sin(a) * 7}" stroke="#c97f22" stroke-width="2" fill="none"/>`; }).join('')}<ellipse cx="100" cy="83" rx="25" ry="10" fill="#b98a62"/><ellipse cx="96" cy="80" rx="15" ry="5" fill="#cfa47c"/><path d="M84 80 q8 6 16 0 q8 -6 16 2" stroke="#f3c64f" stroke-width="2.5" fill="none" stroke-linecap="round"/>`,
+    melonpan: `<path d="M56 100 Q56 58 100 58 Q144 58 144 100 Z" fill="#f2c56a"/><clipPath id="mpc"><path d="M56 100 Q56 58 100 58 Q144 58 144 100 Z"/></clipPath><g clip-path="url(#mpc)" stroke="#d99e3a" stroke-width="2">${[70, 85, 100, 115, 130].map(x => `<line x1="${x - 20}" y1="100" x2="${x + 20}" y2="58"/><line x1="${x + 20}" y1="100" x2="${x - 20}" y2="58"/>`).join('')}</g>${dots([[80,72],[100,66],[120,74],[92,84],[112,86]], '#fff3d6', 1.4)}`,
+    daifuku: `<ellipse cx="100" cy="86" rx="34" ry="24" fill="#f7c3cf"/><ellipse cx="90" cy="76" rx="12" ry="6" fill="#fde3ea"/><path d="M100 60 q8 -9 12 0 q-6 6 -12 0 Z" fill="#e7849f"/><path d="M80 98 q20 8 40 0" stroke="#eba7b7" stroke-width="1.5" fill="none"/>`,
+    dorayaki: `<ellipse cx="100" cy="94" rx="44" ry="11" fill="#c9823f"/><ellipse cx="100" cy="88" rx="42" ry="6" fill="#7b3a35"/><ellipse cx="100" cy="80" rx="44" ry="12" fill="#d28d48"/><ellipse cx="100" cy="77" rx="40" ry="9" fill="#e0a35c"/><path d="M78 74 q4 14 2 22 M118 73 q3 10 0 16" stroke="#f0b93a" stroke-width="4" stroke-linecap="round" fill="none"/>`,
+    anpan: `<path d="M56 100 Q56 62 96 62 L96 100 Z" fill="#b8763f"/><path d="M104 100 L104 62 Q144 62 144 100 Z" fill="#b8763f"/><path d="M104 100 L104 64 Q140 66 140 100 Z" fill="#f2deba"/><ellipse cx="122" cy="88" rx="12" ry="9" fill="#7c3f6a"/>${dots([[118,85],[125,90],[121,92]], '#a9668f', 1.3)}<ellipse cx="78" cy="68" rx="2.5" ry="1.5" fill="#fff4dc"/>`,
+    shells: [64, 100, 136].map((x, i) => `<g transform="rotate(${(i - 1) * 8} ${x} 86)"><path d="M${x - 20} 90 Q${x - 22} 66 ${x} 66 Q${x + 22} 66 ${x + 20} 90 Q${x} 100 ${x - 20} 90 Z" fill="#f3cc6c"/>${[-12, -6, 0, 6, 12].map(d => `<path d="M${x} 94 L${x + d * 1.4} 70" stroke="#ddaa45" stroke-width="1.4"/>`).join('')}<path d="M${x - 15} 74 Q${x} 64 ${x + 15} 74" stroke="#fffbea" stroke-width="3" fill="none" opacity="0.9"/></g>`).join(''),
+    waffle: `<rect x="62" y="64" width="76" height="40" rx="12" fill="#e5ad5a"/><g stroke="#c58a37" stroke-width="2">${[78, 92, 106, 120].map(x => `<line x1="${x}" y1="66" x2="${x}" y2="102"/>`).join('')}${[76, 88].map(y => `<line x1="64" y1="${y}" x2="136" y2="${y}"/>`).join('')}</g><path d="M74 64 q12 -12 26 -4 q14 -10 26 4 Z" fill="#a9cf86"/><path d="M106 52 q10 -8 18 -2 q-8 10 -18 2 Z" fill="#5a3826"/><path d="M107 52 L122 51" stroke="#7a5038" stroke-width="1"/>`,
+    bites: [[70, 92], [100, 96], [130, 92], [85, 78], [115, 78]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="13" fill="#e9cf9e"/>${dots([[x - 5, y - 4], [x + 4, y - 6], [x + 6, y + 3], [x - 3, y + 5], [x, y]], '#b9894b', 1.3)}`).join(''),
+  };
+  function plateSVG(shape) {
+    const body = SHAPES[shape] || SHAPES.daifuku;
+    return `<svg viewBox="0 0 200 140" role="img" aria-hidden="true">${PLATE}${body}</svg>`;
+  }
+  function pastryArt(p, holder) {
+    holder.innerHTML = plateSVG(p.shape);
+    if (p.image) {
+      const img = mk('img', { alt: p.name, loading: 'lazy', src: driveImage(p.image, 'w600') });
+      img.onerror = () => { holder.innerHTML = plateSVG(p.shape); };
+      img.onload = () => holder.replaceChildren(img);
+    }
+  }
+
+  // Cairo's season right now (the café keeps Cairo time).
+  function cairoSeason() {
+    const m = cairoNow().monthIndex;
+    return m === 11 || m <= 1 ? 'winter' : m <= 4 ? 'spring' : m <= 7 ? 'summer' : 'autumn';
+  }
+
+  // ── The Counter
+  let counterFilter = 'all';
+  function renderCounter() {
+    const grid = document.getElementById('pastryGrid');
+    if (counterFilter === 'seasonal') {
+      const now = cairoSeason();
+      grid.replaceChildren(...SEASONAL.map(s => {
+        const isNow = s.when.toLowerCase().startsWith(now);
+        const art = mk('div', { class: 'pastry-plate' });
+        pastryArt({ shape: s.shape, name: s.when }, art);
+        return mk('div', { class: 'pastry-card season-card' + (isNow ? ' now' : '') },
+          art,
+          mk('div', { class: 'pastry-body' },
+            mk('div', { class: 'season-when' }, s.when, isNow && mk('span', { class: 'now-pill', text: 'now' })),
+            s.months && mk('div', { class: 'season-months', text: s.months }),
+            mk('div', { class: 'pastry-name', text: (s.pastries || []).join(' · ') }),
+            mk('div', { class: 'pastry-line', text: s.note || '' })));
+      }));
+      return;
+    }
+    const list = PASTRIES.filter(p => counterFilter === 'all' || p.by === counterFilter);
+    grid.replaceChildren(...list.map(p => {
+      const art = mk('div', { class: 'pastry-plate' });
+      pastryArt(p, art);
+      const drink = DRINKS.find(d => d.name === p.drink);
+      const card = mk('button', { class: 'pastry-card', type: 'button', 'data-by': p.by, title: p.what },
+        art,
+        mk('div', { class: 'me3-says' }, mk('span', { text: 'Me3temed says' }), mk('q', { text: p.me3temed || '' })),
+        mk('div', { class: 'pastry-body' },
+          mk('span', { class: 'maker-tag ' + p.by, text: p.by === 'yuki' ? "Yuki's counter" : "Hana's kitchen" }),
+          mk('div', { class: 'pastry-name', text: p.name }),
+          mk('div', { class: 'pastry-line', text: p.line }),
+          p.drink && mk('div', { class: 'pastry-pair' }, 'With ', mk('b', { text: p.drink }), p.day ? ` · ${p.day}` : '')));
+      let touched = false;
+      card.addEventListener('pointerdown', e => { touched = e.pointerType === 'touch'; });
+      card.addEventListener('click', () => {
+        // first tap shows Me3temed (touch screens have no hover); the next opens the pastry
+        if (touched && !card.classList.contains('show-me3')) {
+          grid.querySelectorAll('.show-me3').forEach(c => c.classList.remove('show-me3'));
+          card.classList.add('show-me3');
+          return;
+        }
+        openPastry(p, drink);
+      });
+      return card;
+    }));
+  }
+  function filterCounter(which, btn) {
+    counterFilter = which;
+    document.querySelectorAll('#counterTabs .shelf-tab').forEach(t => t.classList.toggle('active', t === btn));
+    renderCounter();
+  }
+
+  // ── The Menu (drinks)
+  let drinkSeason = null;
+  const GLASS = { warm: '☕', iced: '🧊', cold: '🥤' };
+  function renderDrinks() {
+    drinkSeason = drinkSeason || cairoSeason();
+    document.querySelectorAll('#drinkTabs .shelf-tab').forEach(t => {
+      const s = t.dataset.season;
+      t.classList.toggle('active', s === drinkSeason);
+      t.querySelector('.count')?.remove();
+      t.append(mk('span', { class: 'count', text: String(DRINKS.filter(d => d.season === s).length) }));
+    });
+    const list = DRINKS.filter(d => d.season === drinkSeason);
+    document.getElementById('drinkGrid').replaceChildren(...list.map(d =>
+      mk('button', { class: 'drink-card', type: 'button', onclick: () => openDrink(d) },
+        mk('span', { class: 'drink-glass', text: GLASS[d.temp] || '🍵' }),
+        mk('span', {},
+          mk('div', { class: 'drink-name', text: d.name }),
+          mk('div', { class: 'drink-mood', text: d.mood || '' }),
+          mk('div', { class: 'drink-meta' },
+            mk('span', { text: [d.edition, d.day].filter(Boolean).join(' · ') }),
+            d.recipe && mk('span', { class: 'recipe-pill', text: 'full recipe' }))))));
+  }
+  function filterDrinks(season, btn) { drinkSeason = season; renderDrinks(); }
+
+  // ── Recipe / edition modal
+  function openRecipe({ cover, coverClass, kicker, title, body }) {
+    const c = document.getElementById('recipeCover');
+    c.className = 'recipe-cover ' + (coverClass || '');
+    if (typeof cover === 'string' && cover.startsWith('<svg')) c.innerHTML = cover; else c.textContent = cover || '🍵';
+    document.getElementById('recipeKicker').textContent = kicker || '';
+    document.getElementById('recipeTitle').textContent = title;
+    document.getElementById('recipeText').replaceChildren(...body.filter(Boolean));
+    const overlay = document.getElementById('recipeOverlay');
+    overlay.classList.add('open');
+    overlay.querySelector('.story-modal').scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+    overlay.querySelector('.story-close').focus({ preventScroll: true });
+  }
+  function closeRecipe() {
+    const overlay = document.getElementById('recipeOverlay');
+    if (!overlay.classList.contains('open')) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  const SEASON_NAME = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' };
+  function openDrink(d) {
+    const pastry = PASTRIES.find(p => p.drink === d.name);
+    const r = d.recipe;
+    const body = [mk('p', {}, mk('em', { text: d.mood || '' }))];
+    if (r && Array.isArray(r.steps)) {
+      body.push(mk('h3', { text: "You'll need" }), mk('ul', {}, (r.ingredients || []).map(i => mk('li', { text: i }))));
+      body.push(mk('h3', { text: r.steps.length === 4 ? 'Four steps' : 'Steps' }), mk('ol', {}, r.steps.map(st => mk('li', { text: st }))));
+      if (r.me3temed) body.push(mk('p', { class: 'me3-line', text: '“' + r.me3temed + '” — Me3temed' }));
+      const pair = pastry ? pastry.name : r.pair;
+      if (pair) body.push(mk('p', { class: 'muted' }, 'Pair it with ', mk('b', { text: pair.replace(/\.$/, '') }), '.'));
+    } else {
+      body.push(mk('p', { text: `The full recipe lives in the ${d.edition} morning letter${d.day ? ', the ' + d.day + ' one' : ''}. It's four steps, made at home, and nothing you can't find in a Cairo supermarket.` }));
+      if (pastry) body.push(mk('p', { class: 'muted' }, 'It belongs with ', mk('b', { text: pastry.name }), ` from the counter${pastry.day ? ', on ' + pastry.day + 's' : ''}.`));
+      body.push(mk('p', { class: 'muted', text: 'Or ask Hana. She knows every one of them by heart and will walk you through it, step by step.' }));
+      body.push(mk('a', { class: 'soft-btn', href: '/cafe', text: 'Ask Hana in the café →' }));
+    }
+    openRecipe({ cover: GLASS[d.temp] || '🍵', coverClass: d.season, kicker: [SEASON_NAME[d.season], d.edition, d.day].filter(Boolean).join(' · '), title: d.name, body });
+  }
+  function openPastry(p, drink) {
+    const body = [
+      mk('p', {}, mk('em', { text: p.line })),
+      mk('p', { text: p.what + '.' }),
+      p.me3temed && mk('p', { class: 'me3-line', text: '“' + p.me3temed + '” — Me3temed' }),
+    ];
+    if (p.drink) {
+      body.push(mk('h3', { text: 'It belongs with' }));
+      body.push(mk('p', {}, mk('b', { text: p.drink }), p.day ? `, on ${p.day}s.` : '.'));
+      if (drink) body.push(mk('button', { class: 'soft-btn ghost', type: 'button', onclick: () => openDrink(drink), text: 'See the drink →' }));
+    }
+    openRecipe({ cover: plateSVG(p.shape), coverClass: p.by === 'yuki' ? 'spring' : 'autumn', kicker: p.by === 'yuki' ? "Yuki's counter" : "Hana's kitchen", title: p.name, body });
+  }
+
+  // ── The Letters archive
+  function renderEditions() {
+    const grid = document.getElementById('editionGrid');
+    grid.replaceChildren(...EDITIONS.map(e => {
+      const firstMorning = (e.morning || []).find(Boolean);
+      return mk('button', { class: 'edition-card', type: 'button', onclick: () => openEdition(e) },
+        mk('span', { class: 'edition-num', text: e.edition }),
+        mk('span', { class: 'edition-theme', text: e.theme }),
+        mk('span', { class: 'edition-blurb', text: e.blurb || '' }),
+        firstMorning && mk('span', { class: 'edition-peek', text: '☀️ ' + firstMorning }));
+    }));
+  }
+  function openEdition(e) {
+    const morning = e.morning || [], night = e.night || [], drinks = e.drinks || [];
+    const cols = [['☀️ Morning', morning], ['🌙 Night', night], ['Drink', drinks]].filter(([, list]) => list.length);
+    const cell = (v, isDrink) => {
+      if (!v) return mk('td', { class: 'gap', text: '—' });
+      const d = isDrink && DRINKS.find(x => x.name === v);
+      return mk('td', {}, d ? mk('button', { type: 'button', onclick: () => openDrink(d), text: v }) : v);
+    };
+    const body = [mk('p', {}, mk('em', { text: e.blurb || '' }))];
+    if (e.nightTheme) body.push(mk('p', { class: 'muted', text: 'Night stories: ' + e.nightTheme + '.' }));
+    if (cols.length) {
+      body.push(mk('table', { class: 'week-table' },
+        mk('thead', {}, mk('tr', {}, mk('th', { text: 'Day' }), cols.map(([label]) => mk('th', { text: label })))),
+        mk('tbody', {}, DAYS.map((day, i) => mk('tr', {}, mk('td', { text: day.slice(0, 3) }), cols.map(([label, list]) => cell(list[i], label === 'Drink')))))));
+    }
+    if (e.note) body.push(mk('p', { class: 'muted', text: e.note }));
+    body.push(mk('a', { class: 'soft-btn', href: '#lettersArchive', onclick: () => { closeRecipe(); setTimeout(() => document.getElementById('archiveEmail').focus(), 300); }, text: 'Get the next one →' }));
+    openRecipe({ cover: '💌', coverClass: 'letters', kicker: 'The Letters · ' + e.edition, title: e.theme, body });
+  }
+
+  // ── This week's pairing
+  function pairingPastry() {
+    if (!PASTRIES.length) return null;
+    const cfg = PAIRING || { mode: 'rotate' };
+    if (cfg.mode === 'set') return PASTRIES.find(p => p.id === cfg.pastry) || PASTRIES[0];
+    // Weeks start on Sunday, Cairo time.
+    const t = cairoNow();
+    const today = Date.UTC(t.year, t.monthIndex, t.dayNum);
+    const from = Date.parse((cfg.from || '2026-10-11') + 'T00:00:00Z');
+    const sunday = d => d - new Date(d).getUTCDay() * 864e5;
+    const weeks = Math.floor((sunday(today) - sunday(from)) / (7 * 864e5));
+    const start = Math.max(0, PASTRIES.findIndex(p => p.id === cfg.start));
+    return PASTRIES[(((start + weeks) % PASTRIES.length) + PASTRIES.length) % PASTRIES.length];
+  }
+  function renderPairing() {
+    const p = pairingPastry();
+    if (!p) return;
+    const article = /^[aeiou]/i.test(p.drink || '') ? 'an' : 'a';
+    const title = document.getElementById('pairingTitle');
+    title.replaceChildren(p.name + (p.drink ? ` with ${article} ` : ''), p.drink ? mk('em', { text: p.drink + '.' }) : '');
+    document.getElementById('pairingNote').textContent = (PAIRING && PAIRING.mode === 'set' && PAIRING.note) || (p.day ? `${p.day}'s order, available all week.` : 'Available all week.');
+    document.getElementById('pairingMe3').textContent = p.me3temed ? '“' + p.me3temed + '” — Me3temed' : '';
+    pastryArt(p, document.getElementById('pairingArt'));
+    const card = document.getElementById('pairingCard');
+    card.onclick = () => openPastry(p, DRINKS.find(d => d.name === p.drink));
+    card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.onclick(); } };
+  }
+
+  // ── Our book
+  function renderBook(b) {
+    if (!b) return;
+    if (b.title) document.getElementById('bookTitle').textContent = b.title;
+    if (b.line) document.getElementById('bookLine').textContent = b.line;
+    if (b.dedication) document.getElementById('bookDedication').textContent = b.dedication;
+    if (b.url && /^https:\/\//.test(b.url)) document.getElementById('bookLink').href = b.url;
+    if (Array.isArray(b.stories)) {
+      document.getElementById('bookToc').replaceChildren(...b.stories.map(([t, line], i) =>
+        mk('li', {}, t, i === 3 && mk('em', { class: 'hana-cried', text: ' 🦊 Hana cried at this one' }), line && mk('span', { text: line }))));
+    }
+    if (b.cover) {
+      const holder = document.getElementById('bookCover');
+      const img = mk('img', { alt: b.title || 'The book', src: driveImage(b.cover, 'w800') });
+      img.onload = () => holder.replaceChildren(img);
+    }
+  }
+
+  function applyCounterContent(c) {
+    if (Array.isArray(c['counter.pastries'])) PASTRIES = c['counter.pastries'];
+    if (Array.isArray(c['counter.seasonal'])) SEASONAL = c['counter.seasonal'];
+    if (Array.isArray(c['menu.drinks'])) DRINKS = c['menu.drinks'];
+    if (Array.isArray(c['letters.archive'])) EDITIONS = c['letters.archive'];
+    if (c['counter.pairing']) PAIRING = c['counter.pairing'];
+    document.getElementById('counterSection').hidden = !PASTRIES.length;
+    document.getElementById('drinksSection').hidden = !DRINKS.length;
+    document.getElementById('lettersArchive').hidden = !EDITIONS.length;
+    renderCounter(); renderDrinks(); renderEditions(); renderPairing();
+    renderBook(c['site.book']);
   }
 
   async function loadContent() {
@@ -2964,6 +3638,7 @@
     if (c.moods && typeof c.moods === 'object') MOODS = c.moods;
     if (c['cafe.weather']) { WX_OVERRIDE = c['cafe.weather']; renderWeather(cairoNow()); }
     if (Array.isArray(c['guestbook.seed'])) { SEED_NOTES = c['guestbook.seed']; renderNotes(); }
+    applyCounterContent(c);
   }
   loadContent();
 </script>
