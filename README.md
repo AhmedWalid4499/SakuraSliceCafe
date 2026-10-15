@@ -68,6 +68,7 @@ SakuraSliceCafe/
    - `ADMIN_EMAIL` = the email you'll register with (this account becomes the owner)
    - `NODE_ENV` = `production`
    - `ANTHROPIC_API_KEY` = a Claude API key from [console.anthropic.com](https://console.anthropic.com) — gives the team their voices (without it they only use a few set lines)
+   - `ANTHROPIC_WORKSPACE_ID` *(only for organisation-level keys)* = the workspace ID (`wrkspc_…`) from console.anthropic.com → Settings → Workspaces. Not needed if the key was created inside a workspace.
    - `APPS_SCRIPT_URL` *(optional)* = your old email-collector web-app URL, so new signups also land in the Google Sheet the SendGrid sender reads
 3. Deploy. On start the server creates every table and seeds the content — safe to run on every deploy, it never overwrites what you've edited.
 4. Visit `/cafe`, register with your `ADMIN_EMAIL`, and `/admin` opens up for you.
