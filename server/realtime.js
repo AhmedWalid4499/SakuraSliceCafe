@@ -39,7 +39,7 @@ function attach(server) {
     const entry = {
       user,
       profile: { id: p.id, displayName: p.displayName, avatar: p.avatar },
-      state: { x: 0, z: 6.5, ry: Math.PI, seat: null, drink: null, moving: false },
+      state: { x: 0, z: 6.5, ry: Math.PI, seat: null, drink: null, placed: null, moving: false },
       lastMsg: 0,
     };
     clients.set(ws, entry);
@@ -64,6 +64,13 @@ function attach(server) {
           ry: clamp(m.ry, -10, 10) || 0,
           seat: typeof m.seat === 'string' ? m.seat.slice(0, 24) : null,
           drink: typeof m.drink === 'string' ? m.drink.slice(0, 24) : null,
+          // a drink this person has set down on a table (one at a time)
+          placed: m.placed && typeof m.placed.drink === 'string' ? {
+            drink: m.placed.drink.slice(0, 24),
+            x: clamp(m.placed.x, -11, 11) || 0,
+            y: clamp(m.placed.y, 0, 1.5) || 0,
+            z: clamp(m.placed.z, -8, 8) || 0,
+          } : null,
           moving: !!m.moving,
         };
         broadcast({ t: 'move', id: entry.user.id, state: entry.state }, ws);

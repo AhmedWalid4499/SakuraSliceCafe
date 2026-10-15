@@ -124,14 +124,37 @@
     animation: fadeUp 0.9s ease 0.7s forwards;
   }
   .hero-cta {
-    display: inline-flex; align-items: center; gap: 8px; margin-top: 26px;
-    padding: 13px 24px; border-radius: 50px; text-decoration: none;
-    background: rgba(255,250,247,0.92); color: var(--sakura-dark);
-    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.3px;
+    display: inline-flex; align-items: center; gap: 10px; margin-top: 30px;
+    padding: 18px 34px; border-radius: 50px; text-decoration: none;
+    background: var(--sakura-dark); color: #fff;
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: clamp(16px, 2vw, 19px); letter-spacing: 0.3px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.18); opacity: 0;
     animation: fadeUp 0.9s ease 0.95s forwards; transition: transform 0.2s, background 0.2s;
   }
-  .hero-cta:hover { transform: translateY(-2px); background: #fff; }
+  .hero-cta:hover { transform: translateY(-2px); background: #b84d72; }
+
+  /* Always-visible doorway into the 3D café */
+  .cafe-door {
+    position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 120;
+    display: inline-flex; align-items: center; gap: 10px; white-space: nowrap;
+    padding: 15px 30px; border-radius: 50px; text-decoration: none;
+    background: var(--sakura-dark); color: #fff; border: 2px solid rgba(255,255,255,0.85);
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: 0.3px;
+    box-shadow: 0 10px 34px rgba(212,103,138,0.45);
+    animation: doorGlow 2.8s ease-in-out infinite;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .cafe-door:hover { background: #b84d72; transform: translateX(-50%) translateY(-2px); }
+  .cafe-door .door-emoji { font-size: 22px; line-height: 1; }
+  @keyframes doorGlow {
+    0%, 100% { box-shadow: 0 10px 34px rgba(212,103,138,0.45), 0 0 0 0 rgba(242,167,187,0.55); }
+    50%      { box-shadow: 0 10px 34px rgba(212,103,138,0.45), 0 0 0 10px rgba(242,167,187,0); }
+  }
+  @media (max-width: 600px) {
+    .cafe-door { top: 16px; left: 16px; transform: none; padding: 12px 18px; font-size: 15px; }
+    .cafe-door:hover { transform: translateY(-2px); }
+  }
+  @media (prefers-reduced-motion: reduce) { .cafe-door { animation: none; } }
   .hero-logo {
     position: absolute;
     top: 36px;
@@ -1483,6 +1506,9 @@
 </head>
 <body>
 
+<!-- Always-visible doorway into the 3D café -->
+<a class="cafe-door" href="/cafe" aria-label="Enter the 3D café"><span class="door-emoji">🪑</span> Enter the 3D café</a>
+
 <!-- Falling petals -->
 <div class="petals-bg" id="petals"></div>
 
@@ -2708,6 +2734,18 @@
     } catch (e) { /* keep seeds + local */ }
   }
   loadSharedNotes();
+  // Keep the table fresh, so notes other people leave appear without a reload.
+  setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      const res = await fetch(GUESTBOOK_URL);
+      const data = await res.json();
+      if (Array.isArray(data) && JSON.stringify(data) !== JSON.stringify(sharedNotes)) {
+        sharedNotes = data;
+        renderNotes();
+      }
+    } catch (e) { /* offline — try again next time */ }
+  }, 20000);
 
   document.getElementById('noteText').addEventListener('keydown', e => {
     if (e.key === 'Enter') leaveNote();
