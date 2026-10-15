@@ -11,6 +11,8 @@ import { buildAvatar, makeLabel, makeCup, disposeTree } from './avatar.js';
 import { makeDessert } from './pastries.js';
 import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
+import { createStaff } from './staff.js';
+import { fullMenu, SEASONS } from './drinks.mjs';
 
 const $ = id => document.getElementById(id);
 
@@ -81,6 +83,8 @@ await Promise.all([
 ]).catch(() => {});
 
 const world = buildWorld(renderer);
+// the team walks about, and brings orders to your table (see staff.js)
+const staff = createStaff(world, { say: (n, line) => bubble(n.av.group, line, 'npc') });
 world.onThunder = () => sound.thunder();
 const scene = world.scene;
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -227,7 +231,7 @@ function playerAvatar() {
   player.label.visible = false; // you know who you are; others see your name
   player.av.group.add(player.label);
   scene.add(player.av.group);
-  if (player.drink) player.av.setDrink(drinkColor(player.drink));
+  if (player.drink) player.av.setDrink(drinkColor(player.drink), levelOf(player.sips));
   if (player.dessert) player.av.setDessert(pastryOf(player.dessert.id).shape, player.dessert.bites);
 }
 
@@ -236,11 +240,32 @@ const cam = { yaw: Math.PI, pitch: 0.32, dist: 4.2, targetDist: 4.2 };
 const camTarget = new THREE.Vector3();
 const keys = new Set();
 
+// Stay inside the nearest of a few rectangles (the room, the kitchen doorway, the kitchen).
+function clampToRects(p, rects) {
+  let best = null, bd = Infinity;
+  for (const q of rects) {
+    const x = Math.min(q.maxX, Math.max(q.minX, p.x)), z = Math.min(q.maxZ, Math.max(q.minZ, p.z));
+    const d = (x - p.x) ** 2 + (z - p.z) ** 2;
+    if (d < bd) { bd = d; best = [x, z]; }
+  }
+  if (best) { p.x = best[0]; p.z = best[1]; }
+}
+
 function collide(p, r = 0.3) {
+  // the team are people too: walk round them
+  if (world.floor === 'main') {
+    for (const q of staff.positions()) {
+      const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz), min = r + 0.28;
+      if (d < min && d > 1e-4) { p.x = q.x + (dx / d) * min; p.z = q.z + (dz / d) * min; }
+    }
+  }
   for (const c of world.colliders) {
     if (c.type === 'room') {
-      p.x = Math.min(c.maxX, Math.max(c.minX, p.x));
-      p.z = Math.min(c.maxZ, Math.max(c.minZ, p.z));
+      if (c.walk) clampToRects(p, c.walk);
+      else {
+        p.x = Math.min(c.maxX, Math.max(c.minX, p.x));
+        p.z = Math.min(c.maxZ, Math.max(c.minZ, p.z));
+      }
     } else if (c.type === 'circle') {
       const dx = p.x - c.x, dz = p.z - c.z;
       const d = Math.hypot(dx, dz);
@@ -275,11 +300,31 @@ function standUp() {
   refreshActions();
 }
 
+// Walk somewhere: round the furniture, and through the kitchen doors if that's the way.
+function walkTo(point) {
+  player.path = null;
+  const path = world.floor === 'main' ? staff.findPath(player.pos, point, { guest: true }) : null;
+  if (path && path.length > 1) {
+    player.path = path.slice(1);
+    player.path[player.path.length - 1] = point.clone(); // end exactly where asked
+    player.target = player.path.shift();
+  } else player.target = point;
+}
+
+// Where to put someone sitting on a seat: a little forward of its middle, so
+// their back isn't in the backrest.
+function seatSpot(seat) {
+  const k = seat.h != null && seat.h < 0.5 ? 0 : 0.08;
+  return { x: seat.x + Math.sin(seat.ry) * k, z: seat.z + Math.cos(seat.ry) * k };
+}
+
 function sitAt(seat) {
   player.goingToSeat = null;
   player.target = null;
+  player.path = null;
   player.seat = seat;
-  player.pos.set(seat.x, seat.y, seat.z);
+  const sp = seatSpot(seat);
+  player.pos.set(sp.x, seat.y, sp.z);
   player.ry = seat.ry;
   sound.cue('sit');
   sendMove(true);
@@ -313,7 +358,7 @@ function goSit(seat) {
   }
   if (player.seat) standUp();
   player.goingToSeat = seat;
-  player.target = new THREE.Vector3(seat.x, 0, seat.z);
+  walkTo(new THREE.Vector3(seat.x, 0, seat.z));
   // If the way is blocked, don't leave anyone hovering by a chair forever.
   player.seatDeadline = performance.now() + 7000;
   // Already right next to it? Sit straight away.
@@ -359,11 +404,15 @@ function spotOnTable(from, reach = 2.2) {
   return best;
 }
 
+const SIPS = 4;    // sips in a drink
+const BITES = 3;   // bites in a pastry
+const levelOf = sips => 1 - (sips || 0) / SIPS;
+
 function drinkMesh(placed, mine, who) {
   const g = new THREE.Group();
   const both = placed.drink && placed.dessert;
   if (placed.drink) {
-    const cup = makeCup(drinkColor(placed.drink));
+    const cup = makeCup(drinkColor(placed.drink), 1 - (placed.sips || 0) / SIPS);
     cup.position.set(both ? -0.08 : 0, 0.056, 0);
     g.add(cup);
   }
@@ -398,10 +447,12 @@ function putDrinkDown(at = null) {
   setPlaced({
     ...spot,
     drink: player.drink || keep.drink || null,
+    sips: player.drink ? player.sips || 0 : keep.sips || 0,
     dessert: player.dessert ? player.dessert.id : keep.dessert || null,
     bites: player.dessert ? player.dessert.bites : keep.bites || 0,
   });
   player.drink = null;
+  player.sips = 0;
   player.dessert = null;
   player.av.setDrink(null);
   player.av.setDessert(null);
@@ -416,13 +467,36 @@ function pickUpDrink() {
   if (far) return toast('Walk back to your table to pick it up.');
   const pl = player.placed;
   if ((pl.drink && player.drink) || (pl.dessert && player.dessert)) return toast('Your hands are full — put down what you\'re holding first.');
-  if (pl.drink) { player.drink = pl.drink; player.av.setDrink(drinkColor(player.drink)); }
+  if (pl.drink) { player.drink = pl.drink; player.sips = pl.sips || 0; player.av.setDrink(drinkColor(player.drink), levelOf(player.sips)); }
   if (pl.dessert) { player.dessert = { id: pl.dessert, bites: pl.bites || 0 }; player.av.setDessert(pastryOf(pl.dessert).shape, player.dessert.bites); }
   setPlaced(null);
   sound.cue('sit');
   sendMove(true);
   refreshActions();
 }
+
+function takeFromTable(kind) {
+  const pl = player.placed;
+  if (!pl || !pl[kind] || Math.hypot(pl.x - player.pos.x, pl.z - player.pos.z) > 2.6) return false;
+  if (kind === 'drink') {
+    if (player.drink) return false;
+    player.drink = pl.drink; player.sips = pl.sips || 0;
+    player.av.setDrink(drinkColor(player.drink), levelOf(player.sips));
+    setPlaced(pl.dessert ? { ...pl, drink: null, sips: 0 } : null);
+  } else {
+    if (player.dessert) return false;
+    player.dessert = { id: pl.dessert, bites: pl.bites || 0 };
+    player.av.setDessert(pastryOf(pl.dessert).shape, player.dessert.bites);
+    setPlaced(pl.drink ? { ...pl, dessert: null, bites: 0 } : null);
+  }
+  return true;
+}
+
+// what's within reach to sip from or bite into: in your hand, or on your table
+const canSip = () => (player.drink && (player.sips || 0) < SIPS) || (!player.drink && player.placed?.drink && (player.placed.sips || 0) < SIPS
+  && Math.hypot(player.placed.x - player.pos.x, player.placed.z - player.pos.z) <= 2.6);
+const canBite = () => (player.dessert && player.dessert.bites < BITES) || (!player.dessert && player.placed?.dessert && (player.placed.bites || 0) < BITES
+  && Math.hypot(player.placed.x - player.pos.x, player.placed.z - player.pos.z) <= 2.6);
 
 function refreshActions() {
   const sitBtn = $('sitAct');
@@ -437,19 +511,45 @@ function refreshActions() {
     drinkBtn.querySelector('.t').textContent = holding ? `Put${what} down` : 'Pick up';
     drinkBtn.title = drinkBtn.querySelector('.t').textContent;
   }
-  $('biteAct').classList.toggle('hidden', !player.dessert || player.dessert.bites >= 3);
+  $('biteAct').classList.toggle('hidden', !canBite());
+  $('sipAct').classList.toggle('hidden', !canSip());
+}
+
+// A sip at a time — the cup goes down; four and it's finished.
+function takeSip() {
+  if (!canSip()) return;
+  if (!player.drink && !takeFromTable('drink')) return;
+  player.sips = Math.min(SIPS, (player.sips || 0) + 1);
+  player.av.play('sip');
+  setTimeout(() => player.drink && player.av.setDrink(drinkColor(player.drink), levelOf(player.sips)), 500);
+  sound.sip();
+  sendMove(true);
+  refreshActions();
+  if (player.sips < SIPS) return;
+  const id = player.drink;
+  const d = menu().find(x => x.id === id) || {};
+  toast(`☕ That was the last of your ${d.name || 'drink'}. ${d.by || 'Hana'} can always make another.`);
+  setTimeout(() => {
+    if (player.drink !== id || player.sips < SIPS) return;
+    player.drink = null; player.sips = 0;
+    player.av.setDrink(null);
+    sendMove(true);
+    refreshActions();
+  }, 2600);
 }
 
 // A bite at a time; three and it's gone (Me3temed has a word about it).
 function takeBite() {
-  if (!player.dessert || player.dessert.bites >= 3) return;
+  if (!canBite()) return;
+  if (!player.dessert && !takeFromTable('dessert')) return;
   const d = player.dessert;
   d.bites += 1;
-  player.av.setDessert(pastryOf(d.id).shape, d.bites);
-  sound.cue('sit');
+  player.av.play('bite');
+  setTimeout(() => player.dessert === d && player.av.setDessert(pastryOf(d.id).shape, d.bites), 500);
+  sound.bite();
   sendMove(true);
   refreshActions();
-  if (d.bites < 3) return;
+  if (d.bites < BITES) return;
   const p = pastryOf(d.id);
   toast(p.me3temed ? `🍽️ All gone. Me3temed, from the shelf: “${p.me3temed}”` : `🍽️ All gone. Only crumbs left.`);
   setTimeout(() => {
@@ -475,6 +575,7 @@ function updatePlayer(dt) {
   if (mx || mz) {
     if (player.seat) standUp();
     player.target = null;
+    player.path = null;
     player.goingToSeat = null;
     // relative to where the camera is looking
     const fwd = new THREE.Vector3(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw));
@@ -486,7 +587,8 @@ function updatePlayer(dt) {
   } else if (player.target) {
     const dx = player.target.x - player.pos.x, dz = player.target.z - player.pos.z;
     const d = Math.hypot(dx, dz);
-    const stopAt = player.goingToSeat ? 1.0 : 0.05; // chairs tuck under tables, so close enough is enough
+    const last = !(player.path && player.path.length);
+    const stopAt = last && player.goingToSeat ? 1.0 : last ? 0.05 : 0.15; // chairs tuck under tables, so close enough is enough
     if (d > stopAt) {
       const step = Math.min(d, speed * dt);
       const before = player.pos.clone();
@@ -502,8 +604,11 @@ function updatePlayer(dt) {
           player.stuck = 0;
           if (player.goingToSeat) sitAt(player.goingToSeat);
           player.target = null;
+          player.path = null;
         }
       } else player.stuck = 0;
+    } else if (!last) {
+      player.target = player.path.shift();
     } else {
       if (player.goingToSeat) sitAt(player.goingToSeat);
       player.target = null;
@@ -515,7 +620,7 @@ function updatePlayer(dt) {
   if (player.waving > 0) player.waving -= dt;
   player.av.group.position.copy(player.pos);
   player.av.group.rotation.y = player.ry;
-  player.av.update(dt, { moving, sitting: !!player.seat, waving: player.waving });
+  player.av.update(dt, { moving, sitting: !!player.seat, sitH: player.seat?.h ?? 0.54, waving: player.waving });
   if (moving) sendMove();
 }
 
@@ -537,9 +642,12 @@ function updateCamera(dt) {
     camTarget.z + Math.cos(cam.yaw) * cp * cam.dist,
   );
   // keep the camera inside the room, under the ceiling
-  camPos.x = Math.min(ROOM.maxX - 0.25, Math.max(ROOM.minX + 0.25, camPos.x));
-  camPos.z = Math.min(ROOM.maxZ - 0.25, Math.max(ROOM.minZ + 0.25, camPos.z));
-  camPos.y = Math.min(world.floorY + world.floorH - 0.3, Math.max(world.floorY + 0.4, camPos.y));
+  const K = world.kitchen;
+  const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : ROOM;
+  camPos.x = Math.min(box.maxX - 0.25, Math.max(box.minX + 0.25, camPos.x));
+  camPos.z = Math.min(box.maxZ - 0.25, Math.max(box.minZ + 0.25, camPos.z));
+  camPos.y = Math.min(world.floorY + (inKitchen ? 3.2 : world.floorH) - 0.3, Math.max(world.floorY + 0.4, camPos.y));
   camera.position.copy(camPos);
   camera.lookAt(camTarget);
 
@@ -580,9 +688,10 @@ function removePerson(id) {
 }
 
 function setPersonDrink(p) {
-  if (p.drinkShown !== (p.state.drink || null)) {
-    p.drinkShown = p.state.drink || null;
-    p.av.setDrink(p.drinkShown ? drinkColor(p.drinkShown) : null);
+  const cupKey = p.state.drink ? `${p.state.drink}:${p.state.sips || 0}` : null;
+  if (p.drinkShown !== cupKey) {
+    p.drinkShown = cupKey;
+    p.av.setDrink(p.state.drink ? drinkColor(p.state.drink) : null, levelOf(p.state.sips));
   }
   const dKey = p.state.dessert ? `${p.state.dessert}:${p.state.bites || 0}` : null;
   if (p.dessertShown !== dKey) {
@@ -591,7 +700,7 @@ function setPersonDrink(p) {
   }
   // what they set down on a table
   const pl = p.state.placed || null;
-  const key = pl ? `${pl.drink}+${pl.dessert}:${pl.bites}@${pl.x},${pl.y},${pl.z}` : null;
+  const key = pl ? `${pl.drink}:${pl.sips}+${pl.dessert}:${pl.bites}@${pl.x},${pl.y},${pl.z}` : null;
   if (p.placedKey === key) return;
   p.placedKey = key;
   if (p.placedMesh) { scene.remove(p.placedMesh); disposeTree(p.placedMesh); p.placedMesh = null; }
@@ -602,7 +711,8 @@ function updatePeople(dt) {
   for (const p of state.people.values()) {
     const s = p.state;
     const seat = s.seat ? world.seats.find(x => x.id === s.seat) : null;
-    const tx = seat ? seat.x : s.x, tz = seat ? seat.z : s.z;
+    const sp = seat ? seatSpot(seat) : null;
+    const tx = seat ? sp.x : s.x, tz = seat ? sp.z : s.z;
     const k = Math.min(1, dt * 8);
     const before = p.pos.clone();
     p.pos.x += (tx - p.pos.x) * k;
@@ -613,7 +723,7 @@ function updatePeople(dt) {
     p.av.group.position.copy(p.pos);
     p.av.group.rotation.y = p.ry;
     if (p.waving > 0) p.waving -= dt;
-    p.av.update(dt, { moving, sitting: !!seat, waving: p.waving || 0 });
+    p.av.update(dt, { moving, sitting: !!seat, sitH: seat?.h ?? 0.54, waving: p.waving || 0 });
   }
 }
 
@@ -696,7 +806,7 @@ function handle(m) {
       if (m.msg.userId !== state.me?.id) {
         const p = state.people.get(m.msg.userId);
         if (p) bubble(p.av.group, m.msg.text);
-        sound.cue('chat');
+        sound.chatGet();
       }
       break;
     case 'chat:delete':
@@ -732,10 +842,10 @@ function sendMove(force = false) {
   const now = performance.now();
   const msg = {
     t: 'move', x: +player.pos.x.toFixed(2), z: +player.pos.z.toFixed(2), ry: +player.ry.toFixed(2),
-    seat: player.seat ? player.seat.id : null, drink: player.drink, moving: player.moving,
+    seat: player.seat ? player.seat.id : null, drink: player.drink, sips: player.drink ? player.sips || 0 : 0, moving: player.moving,
     dessert: player.dessert ? player.dessert.id : null, bites: player.dessert ? player.dessert.bites : 0,
     placed: player.placed ? {
-      drink: player.placed.drink || null, dessert: player.placed.dessert || null, bites: player.placed.bites || 0,
+      drink: player.placed.drink || null, sips: player.placed.sips || 0, dessert: player.placed.dessert || null, bites: player.placed.bites || 0,
       x: +player.placed.x.toFixed(2), y: +player.placed.y.toFixed(3), z: +player.placed.z.toFixed(2),
     } : null,
   };
@@ -922,7 +1032,15 @@ const DEFAULT_MENU = [
   { id: 'hojicha', name: 'Hojicha with Oat Milk', by: 'Hana', color: '#a0714f' },
   { id: 'cardamom', name: 'Honey Cardamom Milk', by: 'Yuto', color: '#efe0c4' },
 ];
-const menu = () => (Array.isArray(state.content['cafe.menu']) && state.content['cafe.menu'].length ? state.content['cafe.menu'] : DEFAULT_MENU);
+let menuCache = { a: null, b: null, list: null };
+function menu() {
+  const a = state.content['cafe.menu'], b = state.content['menu.drinks'];
+  if (menuCache.a !== a || menuCache.b !== b || !menuCache.list) {
+    const list = fullMenu(a, b);
+    menuCache = { a, b, list: list.length ? list : DEFAULT_MENU };
+  }
+  return menuCache.list;
+}
 const drinkColor = id => (menu().find(d => d.id === id) || {}).color || '#d9b48f';
 
 // The pastry counter — the same twelve as the website (site_content 'counter.pastries').
@@ -954,7 +1072,7 @@ function menuRow(item, kind, onPick) {
   const name = document.createElement('b');
   name.textContent = item.name;
   const by = document.createElement('small');
-  by.textContent = kind === 'dessert' ? `${bakerOf(item)}'s · ${item.line || ''}` : `made by ${item.by}`;
+  by.textContent = kind === 'dessert' ? `${bakerOf(item)}'s · ${item.line || ''}` : item.mood ? `${item.by}'s · ${item.mood}` : `made by ${item.by}`;
   txt.append(name, by);
   if (kind === 'dessert' && item.drink) {
     const pair = document.createElement('small');
@@ -968,17 +1086,36 @@ function menuRow(item, kind, onPick) {
 }
 
 let menuTab = 'drinks';
+let drinkShelf = 'house';
+const SHELVES = [['house', '☕ House'], ['spring', '🌸 Spring'], ['summer', '☀️ Summer'], ['autumn', '🍂 Autumn'], ['winter', '❄️ Winter']];
 function openMenu(tab = menuTab) {
   menuTab = pastries().length ? tab : 'drinks';
   $('menuTabs').classList.toggle('hidden', !pastries().length);
   document.querySelectorAll('#menuTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === menuTab));
+  // drinks come on shelves: the house menu and the four seasons of the letters
+  const shelves = $('menuShelves');
+  const all = menu();
+  const have = SHELVES.filter(([k]) => all.some(d => d.season === k));
+  shelves.classList.toggle('hidden', menuTab !== 'drinks' || have.length < 2);
+  if (!have.some(([k]) => k === drinkShelf)) drinkShelf = have[0]?.[0] || 'house';
+  shelves.replaceChildren(...have.map(([k, label]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (k === drinkShelf ? ' on' : '');
+    b.textContent = `${label} · ${all.filter(d => d.season === k).length}`;
+    b.onclick = () => { drinkShelf = k; openMenu('drinks'); };
+    return b;
+  }));
+  // sitting at a table? the team can bring it to you
+  const spot = player.seat && world.floor === 'main' ? spotOnTable(player.pos) : null;
+  $('serveRow').classList.toggle('hidden', !spot);
   const list = $('menuList');
   list.replaceChildren(...(menuTab === 'desserts'
     ? pastries().map(p => menuRow(p, 'dessert', orderDessert))
-    : menu().map(d => menuRow(d, 'drink', order))));
+    : all.filter(d => have.length < 2 || d.season === drinkShelf).map(d => menuRow(d, 'drink', order))));
   $('menuNote').textContent = menuTab === 'desserts'
     ? 'Hana bakes the warm things, Yuki shapes the delicate ones. Take it on a plate.'
-    : 'Hana will bring it over. Nothing costs anything here.';
+    : drinkShelf === 'house' ? 'The house drinks. Nothing costs anything here.' : 'Every drink from the morning letters, by season.';
   list.scrollTop = 0;
   openPanel('menuPanel');
   const who = world.npcs.find(n => n.id === (menuTab === 'desserts' ? 'yuki' : 'hana'));
@@ -986,13 +1123,48 @@ function openMenu(tab = menuTab) {
 }
 document.querySelectorAll('#menuTabs button').forEach(b => { b.onclick = () => openMenu(b.dataset.tab); });
 
+const serveToTable = () => !$('serveRow').classList.contains('hidden') && $('serveToggle').checked;
+const SERVED = ['Here you are.', 'Take your time with it.', 'Careful — it\'s still warm.', 'Enjoy it slowly.', 'For you. 🌸'];
+
+// Hana (or Yuki, or Yuto) carries it over and sets it down in front of you.
+function bringToTable(kind, item) {
+  const spot = spotOnTable(player.pos);
+  if (!spot) return false;
+  const maker = kind === 'drink' ? (item.by || 'Hana').toLowerCase() : item.by === 'hana' ? 'hana' : 'yuki';
+  const servers = [maker, 'hana', 'yuki', 'yuto'].filter((x, i, a) => a.indexOf(x) === i);
+  const who = servers.find(id => !staff.busy(id));
+  if (!who) { setTimeout(() => bringToTable(kind, item), 2500); return true; }
+  const npc = world.npcs.find(n => n.id === who);
+  const where = player.seat ? player.seat.label : 'your table';
+  bubble(npc.av.group, kind === 'drink' ? `One ${item.name}. I'll bring it over.` : `One ${item.name}. Coming to you.`, 'npc');
+  toast(`🛎️ ${npc.name} is bringing your ${item.name} to ${where}.`);
+  staff.deliver(who, kind === 'drink' ? { drinkColor: item.color } : { dessertShape: item.shape }, spot, () => {
+    const prev = player.placed;
+    const keep = prev && Math.hypot(prev.x - spot.x, prev.z - spot.z) < 1.2 ? prev : {};
+    setPlaced({
+      ...spot,
+      drink: kind === 'drink' ? item.id : keep.drink || null,
+      sips: kind === 'drink' ? 0 : keep.sips || 0,
+      dessert: kind === 'dessert' ? item.id : keep.dessert || null,
+      bites: kind === 'dessert' ? 0 : keep.bites || 0,
+    });
+    sound.cue('drink');
+    bubble(npc.av.group, SERVED[Math.floor(Math.random() * SERVED.length)], 'npc');
+    sendMove(true);
+    refreshActions();
+  });
+  return true;
+}
+
 function order(d) {
   closePanels();
+  if (serveToTable() && bringToTable('drink', d)) return;
   const maker = world.npcs.find(n => n.name === d.by) || world.npcs.find(n => n.id === 'hana');
   if (maker) bubble(maker.av.group, `One ${d.name}, coming right up.`, 'npc');
   setTimeout(() => {
     player.drink = d.id;
-    player.av.setDrink(d.color);
+    player.sips = 0;
+    player.av.setDrink(d.color, 1);
     sound.cue('drink');
     sendMove(true);
     refreshActions();
@@ -1002,6 +1174,7 @@ function order(d) {
 
 function orderDessert(p) {
   closePanels();
+  if (serveToTable() && bringToTable('dessert', p)) return;
   const who = bakerOf(p);
   const maker = world.npcs.find(n => n.name === who);
   if (maker) bubble(maker.av.group, who === 'Yuki' ? `One ${p.name}… here.` : `One ${p.name}. Still warm.`, 'npc');
@@ -1049,11 +1222,17 @@ $('chatForm').addEventListener('submit', async e => {
     const { msg } = await api('/chat', { method: 'POST', body: { text, room: state.room } });
     addChat(msg);
     bubble(player.av.group, text);
+    sound.chatSend();
   } catch (err) { toast(err.message); input.value = text; }
 });
 
 const bubbles = [];
 function bubble(obj, text, kind = '') {
+  // the team say it out loud, in their own little voices
+  if (kind === 'npc') {
+    const n = world.npcs.find(x => x.av.group === obj);
+    if (n) sound.voice(n.id, text);
+  }
   // one bubble per speaker
   for (const b of bubbles.filter(b => b.obj === obj)) { b.el.remove(); bubbles.splice(bubbles.indexOf(b), 1); }
   const el = document.createElement('div');
@@ -1163,7 +1342,8 @@ function updateHover() {
   const h = pickInteractive(hoverPt.x, hoverPt.y);
   const ud = h ? h.object.userData : {};
   const label = ud.label || (ud.surface === 'table' && !ud.label
-    ? (player.drink || player.dessert ? 'Put it down here' : 'Sit at this table')
+    ? (ud.tableName ? ud.tableName + ' · ' + (player.drink || player.dessert ? 'put it down here' : 'sit here')
+      : (player.drink || player.dessert ? 'Put it down here' : 'Sit at this table'))
     : null);
   canvas.style.cursor = label ? 'pointer' : 'default';
   if (label) {
@@ -1222,7 +1402,7 @@ function click(x, y) {
   if (h.object.userData.floor) {
     if (player.seat) standUp();
     player.goingToSeat = null;
-    player.target = new THREE.Vector3(h.point.x, 0, h.point.z);
+    walkTo(new THREE.Vector3(h.point.x, 0, h.point.z));
   }
 }
 
@@ -1242,6 +1422,7 @@ window.addEventListener('keydown', e => {
   if (e.key === 'e' || e.key === 'E') { toggleSit(); return; }
   if (e.key === 'q' || e.key === 'Q') { if (player.drink || player.dessert) putDrinkDown(); else pickUpDrink(); return; }
   if (e.key === 'b' || e.key === 'B') { takeBite(); return; }
+  if (e.key === 'c' || e.key === 'C') { takeSip(); return; }
   const k = e.key.toLowerCase();
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
     keys.add(k);
@@ -1334,6 +1515,7 @@ $('orderAct').onclick = () => openMenu();
 $('sitAct').onclick = toggleSit;
 $('drinkAct').onclick = () => (player.drink || player.dessert ? putDrinkDown() : pickUpDrink());
 $('biteAct').onclick = takeBite;
+$('sipAct').onclick = takeSip;
 $('waveAct').onclick = () => {
   player.waving = 2;
   bubble(player.av.group, '👋', 'emote');
@@ -1422,6 +1604,8 @@ $('loginForm').addEventListener('submit', async e => {
 
 const OPTIONS = {
   body: [['person', 'A person'], ['fox', 'A fox'], ['rabbit', 'A rabbit'], ['cat', 'A cat'], ['owl', 'An owl']],
+  gender: [['she', 'She'], ['he', 'He']],
+  bottom: [['trousers', 'Trousers'], ['skirt', 'A skirt']],
   skin: {
     person: ['#f6dcc6', '#ecc3a0', '#e0b48c', '#c99a74', '#a8764f', '#7d5236', '#5a3a26'],
     fur: ['#b5562b', '#d98a4e', '#f6f2ee', '#c9b8a8', '#8a7a6a', '#4a3a32', '#9c8a6a', '#e6c79c'],
@@ -1458,6 +1642,12 @@ function chips(el, list, key) {
     b.onclick = () => {
       draft[key] = id;
       if (key === 'body') draft.skin = id === 'person' ? OPTIONS.skin.person[2] : { fox: '#b5562b', rabbit: '#f6f2ee', cat: '#c9b8a8', owl: '#9c8a6a' }[id];
+      if (key === 'gender') {
+        // a sensible start for each; everything can still be changed
+        draft.bottom = id === 'she' ? 'skirt' : 'trousers';
+        if (id === 'she' && draft.hairStyle === 'short') draft.hairStyle = 'long';
+        if (id === 'he' && draft.hairStyle === 'long') draft.hairStyle = 'short';
+      }
       renderCreator();
     };
     el.appendChild(b);
@@ -1477,6 +1667,11 @@ function swatches(el, list, key) {
 }
 function renderCreator() {
   chips($('optBody'), OPTIONS.body, 'body');
+  if (!draft.gender) draft.gender = 'she';
+  if (!draft.bottom) draft.bottom = 'trousers';
+  chips($('optGender'), OPTIONS.gender, 'gender');
+  chips($('optBottom'), OPTIONS.bottom, 'bottom');
+  $('bottomGroup').classList.toggle('hidden', draft.body === 'owl');
   const person = draft.body === 'person';
   $('skinLabel').textContent = person ? 'Skin' : 'Fur / feathers';
   swatches($('optSkin'), person ? OPTIONS.skin.person : OPTIONS.skin.fur, 'skin');
@@ -1566,6 +1761,7 @@ $('enterBtn').onclick = async () => {
   sound.muted = !!(prefs.sound && prefs.sound.muted);
   $('soundBtn').textContent = sound.muted ? '🔇' : '🔊';
   sound.start(levels);
+  setTimeout(() => sound.doorBell(), 250); // the bell over the door, as you come in
   if (weatherNow) sound.setWeather(weatherNow.look);
   sound.setNight(cairoHour() < 6 || cairoHour() >= 18.5);
   sound.setFirePosition(world.fire);
@@ -1619,6 +1815,24 @@ function talkLine(cls, text) {
   el.textContent = text;
   $('talkLog').appendChild(el);
   $('talkLog').scrollTop = $('talkLog').scrollHeight;
+  return el;
+}
+
+// The team's replies appear a few letters at a time, with their voice.
+function talkSay(id, text) {
+  const el = talkLine('them', '');
+  sound.voice(id, text);
+  const n = world.npcs.find(x => x.id === id);
+  if (n) bubble(n.av.group, text.length > 90 ? text.slice(0, 88) + '…' : text, '');
+  const step = Math.max(1, Math.ceil(text.length / 60));
+  let i = 0;
+  const tick = () => {
+    i = Math.min(text.length, i + step);
+    el.textContent = text.slice(0, i);
+    $('talkLog').scrollTop = $('talkLog').scrollHeight;
+    if (i < text.length) setTimeout(tick, 22);
+  };
+  tick();
   return el;
 }
 
@@ -1748,6 +1962,7 @@ async function openTalk(id) {
   }));
   $('talkLog').replaceChildren();
   openPanel('talkPanel');
+  staff.attend(id, player.pos, 40); // they stop and turn to you
   setTimeout(() => $('talkInput').focus(), 50);
   let had = false;
   try {
@@ -1760,7 +1975,7 @@ async function openTalk(id) {
       had = true;
     }
   } catch (e) { /* fine — start fresh */ }
-  if (!had) talkLine('them', npc.lines[0]);
+  if (!had) talkSay(id, npc.lines[0]);
   if (state.room === 'main') bubble(npc.av.group, npc.lines[0], 'npc');
 }
 
@@ -1783,7 +1998,7 @@ $('talkForm').addEventListener('submit', async e => {
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
-    talkLine('them', r.reply);
+    talkSay(id, r.reply);
     if (r.recommendation) recCard(r.recommendation);
     if (r.recipe) recipeCard(r.recipe);
     if (state.room === 'main') bubble(npc.av.group, r.reply.length > 120 ? r.reply.slice(0, 117) + '…' : r.reply, 'npc');
@@ -1991,6 +2206,8 @@ function frame() {
   if (state.started) {
     updatePlayer(dt);
     updatePeople(dt);
+    staff.update(dt);
+    if (world.floor === 'main') world.updateDoors(dt, [player.pos, ...[...state.people.values()].map(p => p.pos), ...staff.positions()]);
     updateCamera(dt);
     updateHover();
     updateBubbles();
@@ -2006,7 +2223,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff };
 
 // ───────────────────────────────────────── start
 

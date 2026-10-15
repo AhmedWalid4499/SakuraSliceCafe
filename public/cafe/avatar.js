@@ -31,8 +31,9 @@ function shade(hex, amt) {
   return c;
 }
 
-// A cup with a drink in it, held in the right hand.
-export function makeCup(drinkColor) {
+// A cup with a drink in it, held in the right hand. `level` (0–1) is how
+// full it is; g.userData.setLevel changes it as the drink goes down.
+export function makeCup(drinkColor, level = 1) {
   const g = new THREE.Group();
   const cup = new THREE.Mesh(
     new THREE.CylinderGeometry(0.055, 0.045, 0.11, SEG, 1, true),
@@ -42,10 +43,16 @@ export function makeCup(drinkColor) {
   base.position.y = -0.055;
   const drink = new THREE.Mesh(new THREE.CircleGeometry(0.052, SEG), mat(drinkColor, { roughness: 0.2 }));
   drink.rotation.x = -Math.PI / 2;
-  drink.position.y = 0.04;
   const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.057, 0.052, 0.04, SEG, 1, true), mat('#d4678a'));
   cup.castShadow = true;
   g.add(cup, base, drink, sleeve);
+  g.userData.setLevel = l => {
+    l = Math.max(0, Math.min(1, l));
+    drink.visible = l > 0.02;
+    drink.position.y = -0.048 + 0.088 * l;
+    drink.scale.setScalar(0.85 + 0.15 * l); // the cup narrows towards the bottom
+  };
+  g.userData.setLevel(level);
   return g;
 }
 
@@ -99,6 +106,8 @@ export function buildAvatar(avatar = {}, extra = {}) {
   const isOwl = a.body === 'owl';
   const furry = a.body !== 'person';
   const isFox = a.body === 'fox', isCat = a.body === 'cat', isRabbit = a.body === 'rabbit';
+  const she = a.gender === 'she', he = a.gender === 'he';
+  const skirt = a.bottom === 'skirt' && !isOwl;
   const skinM = mat(a.skin, { roughness: furry ? 0.95 : 0.55 });
   const outfitM = mat(a.outfit, { roughness: 0.85 });
   const accentM = mat(a.accent, { roughness: 0.95 });
@@ -111,7 +120,7 @@ export function buildAvatar(avatar = {}, extra = {}) {
 
   // ── legs and shoes (or paws)
   if (!isOwl) {
-    const legM = furry ? pawM : mat(shade(a.outfit, -0.28), { roughness: 0.9 });
+    const legM = furry ? pawM : skirt ? mat(shade(a.skin, -0.04), { roughness: 0.6 }) : mat(shade(a.outfit, -0.28), { roughness: 0.9 });
     const shoeM = furry ? pawM : mat('#5a3e36', { roughness: 0.5 });
     for (const side of [-1, 1]) {
       const hip = new THREE.Group();
@@ -153,7 +162,9 @@ export function buildAvatar(avatar = {}, extra = {}) {
       rig.add(toe);
     }
   } else {
-    const prof = [[0, 0], [0.19, 0], [0.215, 0.05], [0.223, 0.16], [0.216, 0.3], [0.2, 0.4], [0.15, 0.48], [0.07, 0.52], [0, 0.53]]
+    // he: a little broader across the shoulders; she: a softer waist
+    const sh = he ? 1.07 : she ? 0.95 : 1, wa = she ? 0.93 : 1;
+    const prof = [[0, 0], [0.19, 0], [0.215, 0.05], [0.223 * wa, 0.16], [0.216 * wa, 0.3], [0.2 * sh, 0.4], [0.15 * sh, 0.48], [0.07, 0.52], [0, 0.53]]
       .map(([r, y]) => new THREE.Vector2(r, y));
     torso = new THREE.Mesh(new THREE.LatheGeometry(prof, SEG), outfitM);
     torso.castShadow = true;
@@ -180,6 +191,14 @@ export function buildAvatar(avatar = {}, extra = {}) {
   }
   rig.add(torso);
   parts.torso = torso;
+
+  if (skirt) {
+    const sk = [[0.218, 0.13], [0.24, 0.04], [0.29, -0.14], [0.325, -0.27], [0.3, -0.285]].map(([r, y]) => new THREE.Vector2(r, y));
+    const skirtMesh = new THREE.Mesh(new THREE.LatheGeometry(sk, SEG * 2), mat(shade(a.outfit, -0.1), { roughness: 0.85, side: THREE.DoubleSide }));
+    skirtMesh.castShadow = true;
+    skirtMesh.position.y = TORSO;
+    rig.add(skirtMesh);
+  }
 
   // Apron (the café team wear them): bib, skirt, waist tie, neck strap, a pocket.
   if (extra.apron && !isOwl) {
@@ -363,11 +382,20 @@ export function buildAvatar(avatar = {}, extra = {}) {
       iris.position.z = -0.012;
       eye.add(iris);
     }
+    if (she && !isOwl) {
+      // lashes, flicking out at the corner
+      for (const [x, y, r] of [[0.03, 0.036, -0.85], [0.018, 0.047, -0.45]]) {
+        const lash = capsule(0.0045, 0.018, null, darkM);
+        lash.position.set(x * side, y, 0.014);
+        lash.rotation.z = r * side;
+        eye.add(lash);
+      }
+    }
     head.add(eye);
     blinkers.push(eye);
     if (!isOwl) {
       // brows
-      const brow = capsule(0.008, 0.035, null, mat(furry ? shade(a.skin, -0.3) : a.hair, { roughness: 0.6 }));
+      const brow = capsule(he ? 0.011 : 0.008, 0.035, null, mat(furry ? shade(a.skin, -0.3) : a.hair, { roughness: 0.6 }));
       brow.rotation.z = Math.PI / 2 + 0.18 * side;
       brow.position.set(eyeX * side, eyeY + 0.075, eyeZ + 0.01);
       brow.rotation.y = side * 0.4;
@@ -381,7 +409,7 @@ export function buildAvatar(avatar = {}, extra = {}) {
   }
   // a small smile
   if (!isOwl) {
-    const smile = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.0065, 8, 18, Math.PI), mat('#8a4a4a', { roughness: 0.5 }));
+    const smile = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.0065, 8, 18, Math.PI), mat(she ? '#c25a6a' : '#8a4a4a', { roughness: 0.5 }));
     smile.rotation.z = Math.PI;
     const mz = isFox ? 0.33 : isCat ? 0.27 : isRabbit ? 0.237 : 0.232;
     smile.position.set(0, isFox ? -0.115 : isRabbit ? -0.105 : -0.085, mz);
@@ -647,11 +675,13 @@ export function buildAvatar(avatar = {}, extra = {}) {
   root.scale.setScalar(extra.scale || 1);
 
   // ── a drink in the right hand
-  let cup = null;
-  function setDrink(color) {
-    if (cup) { cup.parent.remove(cup); cup = null; }
+  let cup = null, cupColor = null;
+  function setDrink(color, level = 1) {
+    if (cup && color && color === cupColor) { cup.userData.setLevel(level); return; }
+    if (cup) { cup.parent.remove(cup); cup = null; cupColor = null; }
     if (!color || isOwl) return;
-    cup = makeCup(color);
+    cup = makeCup(color, level);
+    cupColor = color;
     cup.position.set(0, -0.44, 0.08);
     parts.armR.add(cup);
   }
@@ -677,14 +707,20 @@ export function buildAvatar(avatar = {}, extra = {}) {
   let walkPhase = 0;
   let sitBlend = 0;
   let nextBlink = 1 + Math.random() * 3;
-  function update(dt, { moving = false, sitting = false, waving = 0 } = {}) {
+  // a sip or a bite: the hand comes up to the mouth and back (about a second)
+  let gesture = null, gestureT = 0;
+  function play(kind) { if (!isOwl) { gesture = kind; gestureT = 0; } }
+  let sitDrop = 0.13;
+  // sitH: how high the seat's cushion is, so you sit on it rather than in it
+  function update(dt, { moving = false, sitting = false, sitH = 0.54, waving = 0 } = {}) {
     t += dt;
     sitBlend += ((sitting ? 1 : 0) - sitBlend) * Math.min(1, dt * 8);
+    if (sitting) sitDrop = 0.48 - sitH;
     if (moving) walkPhase += dt * 9;
     const swing = moving ? Math.sin(walkPhase) * 0.55 : 0;
 
     const breathe = Math.sin(t * 1.6) * 0.012;
-    rig.position.y = breathe + (moving ? Math.abs(Math.sin(walkPhase)) * 0.04 : 0) - sitBlend * 0.13;
+    rig.position.y = breathe + (moving ? Math.abs(Math.sin(walkPhase)) * 0.04 : 0) - sitBlend * sitDrop;
     head.rotation.y = moving ? 0 : Math.sin(t * 0.35) * 0.25;
     head.rotation.z = Math.sin(t * 0.5) * 0.04;
 
@@ -712,6 +748,20 @@ export function buildAvatar(avatar = {}, extra = {}) {
         parts.armR.rotation.z = waving > 0 ? 2.6 + Math.sin(t * 12) * 0.3 : -0.09;
       }
     }
+    if (gesture) {
+      gestureT += dt / 1.1;
+      const k = Math.sin(Math.min(1, gestureT) * Math.PI); // up, then down
+      if (gesture === 'sip' && parts.armR) {
+        parts.armR.rotation.x = parts.armR.rotation.x * (1 - k) - 2.25 * k;
+        parts.armR.rotation.z = -0.09 + 0.45 * k;
+        if (cup) cup.rotation.x = 0.9 * k;
+      } else if (gesture === 'bite' && parts.armL) {
+        parts.armL.rotation.x = parts.armL.rotation.x * (1 - k) - 1.75 * k;
+        parts.armL.rotation.z = -0.45 * k;
+      }
+      head.rotation.x = 0.12 * k;
+      if (gestureT >= 1) { gesture = null; head.rotation.x = 0; if (cup) cup.rotation.x = 0; }
+    }
     if (plate) plate.rotation.x = -parts.armL.rotation.x; // keep the plate level
     if (parts.tail) {
       parts.tail.rotation.y = Math.sin(t * 2.2) * (moving ? 0.5 : 0.3);
@@ -727,7 +777,7 @@ export function buildAvatar(avatar = {}, extra = {}) {
   }
 
   const height = (isOwl ? 1.35 : 1.92) * (extra.scale || 1);
-  return { group: root, parts, setDrink, setDessert, update, height };
+  return { group: root, parts, setDrink, setDessert, update, height, play };
 }
 
 export function disposeTree(obj) {

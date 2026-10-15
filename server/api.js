@@ -30,9 +30,11 @@ const chatLimit = rateLimit({ windowMs: 30e3, max: 10, message: 'The café is a 
 const HAIR_STYLES = ['short', 'long', 'bun', 'curly', 'bob', 'none'];
 const ACCESSORIES = ['none', 'glasses', 'beanie', 'flower', 'headphones', 'scarf'];
 const BODY_TYPES = ['person', 'fox', 'rabbit', 'owl', 'cat'];
+const GENDERS = ['he', 'she'];
+const BOTTOMS = ['trousers', 'skirt'];
 const AVATAR_DEFAULTS = {
   body: 'person', skin: '#e0b48c', hair: '#3b2a22', hairStyle: 'short',
-  outfit: '#7aab7a', accent: '#fef9f5', accessory: 'none',
+  outfit: '#7aab7a', accent: '#fef9f5', accessory: 'none', gender: 'she', bottom: 'trousers',
 };
 
 function cleanAvatar(a) {
@@ -45,6 +47,8 @@ function cleanAvatar(a) {
     outfit: isHexColor(a.outfit) ? a.outfit : AVATAR_DEFAULTS.outfit,
     accent: isHexColor(a.accent) ? a.accent : AVATAR_DEFAULTS.accent,
     accessory: ACCESSORIES.includes(a.accessory) ? a.accessory : AVATAR_DEFAULTS.accessory,
+    gender: GENDERS.includes(a.gender) ? a.gender : AVATAR_DEFAULTS.gender,
+    bottom: BOTTOMS.includes(a.bottom) ? a.bottom : AVATAR_DEFAULTS.bottom,
   };
 }
 

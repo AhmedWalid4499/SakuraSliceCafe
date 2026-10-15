@@ -187,6 +187,9 @@
   .menu-tabs { display: flex; gap: 6px; margin-top: 12px; background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
   .menu-tabs button { flex: 1; border: 0; background: transparent; border-radius: 999px; padding: 8px 10px; font-weight: 700; font-size: 13.5px; color: var(--text-mid); }
   .menu-tabs button.on { background: var(--sakura-dark); color: #fff; }
+  .serve { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 12px; border-radius: 14px; background: var(--sakura-light); color: var(--sakura-dark); font-weight: 700; font-size: 13.5px; cursor: pointer; }
+  .serve input { accent-color: var(--sakura-dark); width: 16px; height: 16px; }
+  #menuShelves .chip { font-size: 12.5px; padding: 6px 11px; }
 
   .mix { display: grid; gap: 12px; margin-top: 12px; }
   .mix label { display: grid; grid-template-columns: 92px 1fr 34px; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; color: var(--text-mid); }
@@ -314,10 +317,11 @@
       <p class="eyebrow">Your avatar</p>
       <h2>Who's <em>coming in?</em></h2>
       <label class="field"><span>Name above your head</span><input type="text" id="cName" maxlength="24"></label>
-      <div class="opt-group"><span>You are…</span><div class="chips" id="optBody"></div></div>
+      <div class="opt-group"><span>You are…</span><div class="chips" id="optBody"></div><div class="chips" id="optGender" style="margin-top:8px"></div></div>
       <div class="opt-group"><span id="skinLabel">Skin</span><div class="chips" id="optSkin"></div></div>
       <div class="opt-group" id="hairGroup"><span>Hair</span><div class="chips" id="optHairStyle"></div><div class="chips" id="optHair" style="margin-top:8px"></div></div>
       <div class="opt-group"><span>Outfit</span><div class="chips" id="optOutfit"></div></div>
+      <div class="opt-group" id="bottomGroup"><span>Wearing</span><div class="chips" id="optBottom"></div></div>
       <div class="opt-group"><span>Accent</span><div class="chips" id="optAccent"></div></div>
       <div class="opt-group"><span>Something extra</span><div class="chips" id="optAccessory"></div></div>
       <div class="error" id="creatorErr"></div>
@@ -366,6 +370,7 @@
   <button id="floorAct" title="Go upstairs"><span>🪜</span> <span class="t">Upstairs</span></button>
   <button id="sitAct" title="Sit down"><span>🪑</span> <span class="t">Sit</span></button>
   <button id="drinkAct" class="hidden" title="Put your drink down"><span>🍵</span> <span class="t">Put drink down</span></button>
+  <button id="sipAct" class="hidden" title="Take a sip (C)"><span>☕</span> <span class="t">Take a sip</span></button>
   <button id="biteAct" class="hidden" title="Take a bite (B)"><span>🍡</span> <span class="t">Take a bite</span></button>
   <button id="waveAct" title="Wave"><span>👋</span> <span class="t">Wave</span></button>
   <button id="emoteAct" title="Send a little something"><span>🌸</span></button>
@@ -419,6 +424,8 @@
     <button type="button" data-tab="drinks" class="on">☕ Drinks</button>
     <button type="button" data-tab="desserts">🍡 Desserts</button>
   </div>
+  <div class="chips hidden" id="menuShelves" style="margin-top:10px"></div>
+  <label class="serve hidden" id="serveRow"><input type="checkbox" id="serveToggle" checked> 🛎️ Bring it to my table</label>
   <p class="lede" id="menuNote" style="font-size:13.5px">Hana will bring it over. Nothing costs anything here.</p>
   <div class="menu-list" id="menuList"></div>
 </div>
@@ -534,13 +541,15 @@
     <li>Press <b>🪑 Sit</b> (or click a chair or table) to sit at the closest free seat. Walk, or press <b>Stand up</b>, to get up.</li>
     <li>Holding a drink? Press <b>🍵 Put drink down</b> near a table — or click the table. Click your cup to pick it back up.</li>
     <li>Click <b>Hana or the counter</b> (or ☕ <b>Order</b>) for a drink — or a dessert from the <b>🍡 Desserts</b> tab. A plate goes in your other hand: <b>🍡 Take a bite</b>, or set it down next to your cup.</li>
+    <li>Sitting at a table? Tick <b>🛎️ Bring it to my table</b> on the menu and Hana or Yuki will carry it over. <b>☕ Take a sip</b> (<kbd>C</kbd>) and <b>🍡 Take a bite</b> (<kbd>B</kbd>) work on what's in your hands — or on your table.</li>
+    <li>The tables are numbered — <b>Table 4</b> is the one by the window. The <b>kitchen</b> is through the back door: walk up and the doors swing open.</li>
     <li>Any menu closes with its <b>✕</b>, with <kbd>Esc</kbd>, or by tapping the café behind it. The chat has its own <b>✕</b> (💬 brings it back).</li>
     <li>The clock and the weather are top left (tap them for more) — and on the street clock and chalkboards outside.</li>
     <li>📌 <b>Leave a note</b> on the board, a table, or a wall — everyone will see it</li>
     <li>Click any note to read it and leave a ♥</li>
     <li>🗣️ <b>Talk</b> — or click Yuto, Hana, Yuki or Me3temed — to have a real conversation. Ask Hana what to drink, or ask anyone how to make it: the recipe comes as a card you can copy.</li>
     <li>🪜 <b>Upstairs</b> — or click the spiral stairs — for rooms just for your group.</li>
-    <li><kbd>E</kbd> sit / stand · <kbd>Q</kbd> put down / pick up · <kbd>B</kbd> take a bite</li>
+    <li><kbd>E</kbd> sit / stand · <kbd>Q</kbd> put down / pick up · <kbd>C</kbd> take a sip · <kbd>B</kbd> take a bite</li>
     <li><kbd>Enter</kbd> to chat · <kbd>Esc</kbd> to close things</li>
   </ul>
 </div>
