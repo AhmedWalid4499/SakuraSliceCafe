@@ -86,7 +86,7 @@ Local: `cp .env.example .env`, point `DATABASE_URL` at any Postgres, then `npm i
 | `chat_messages` | The café's quiet chat |
 | `guestbook_notes` | Table Four notes from the website (can be hidden from /admin) |
 | `subscribers` | Morning & evening letter signups (CSV export in /admin) |
-| `site_content` | **Everything editable**: today's story, letters, moods, hero text, café menu, welcome card, default sound mix, board sign |
+| `site_content` | **Everything editable**: today's story, letters, moods, hero text, the pastry counter, the drinks menu, the letters archive, this week's pairing, the book, café menu, welcome card, default sound mix, board sign |
 | `site_content_history` | Every earlier version of each content row — nothing is ever lost |
 | `npc_sessions` / `npc_messages` | Conversations with the team, stored exactly as sent so each one can continue |
 | `guest_memories` | What the team remembers about each guest's tastes |
@@ -189,13 +189,46 @@ A guestbook, seeded with five notes already "on the table" (the `guestbook.seed`
 - Held in memory as well as `localStorage`, so notes still appear in private windows and other storage-blocked contexts
 - All note text is rendered with `textContent`, so pasted markup can never execute
 
-### 🍵 The Menu
+### 🍞 This Week's Pairing
+A bento card under the window seat: one pastry from the counter and the drink it belongs with ("Honey Dorayaki with an Iced Honey Vanilla Latte. Friday's order, available all week."). It moves to the next pastry every Sunday, Cairo time. Set it in `/admin` → `counter.pairing`:
+- `{"mode":"rotate","from":"2026-10-11","start":"honey-dorayaki"}` — rotate, starting with that pastry in that week
+- `{"mode":"set","pastry":"matcha-basbousa","note":"optional line"}` — pin one
+
+### 💌 The Letters archive
+"Every morning since March. *Twelve editions, eighty-four mornings.*" One card per edition with its theme. Open one for the week: morning story, night story and drink, Sunday to Saturday (drinks link to their recipe). A second signup form sits under it. Edit `letters.archive`; a `null` day shows as a dash until its title is filled in.
+
+### 🍵 The House Menu
 Its own full section, not a card. **No prices** — the café doesn't exist, so nothing costs anything.
 
 - 16 items across Matcha & Tea, Coffee, Sweet, Savory — each with a description in the café's voice and who makes it
 - **Every item has a real method.** A `How it's made` toggle opens step-by-step instructions — actual technique, written in the café's voice. Native `<details>`, no JavaScript.
 - Two items answer in prose instead of steps: the **Sakura Slice** (Yuki won't say) and **Seasonal Something** (the recipe is written after the shopping)
 - **"What do you need today?"** — six moods (tired, heartbroken, can't sleep, celebrating, overwhelmed, just arrived), each answered with a drink and a note from Hana. Edit the `MOODS` object.
+
+### 🥮 The Counter (pastries)
+Between The People and the bookshelf. "Small things, made by hand, *lined up like tiny moons.*" Twelve pastries, six from Hana's kitchen and six from Yuki's counter, with tabs **All · Hana's kitchen · Yuki's counter · Seasonal** (the current season is marked *now*).
+
+- Each card: picture, name, maker, Yuto's menu line, and the drink it belongs with
+- **Me3temed's line** appears on hover (first tap on a phone); clicking opens the pastry with its pairing
+- Until the pixel-art pictures exist, each pastry is drawn on a little plate (SVG, the `shape` field). To use a picture, put its Google Drive file id in the pastry's `image` field in `/admin` → `counter.pastries`
+- Seasonal and occasion pastries: `counter.seasonal`
+- Hana and Yuki know the counter too: in the 3D café they can talk about any pastry and this week's pairing
+
+### 🍹 The Menu (drinks from the letters)
+"Sixty-three drinks and counting." Every drink from the morning letters, sorted into **Spring · Summer · Autumn · Winter** tabs (it opens on Cairo's current season). Click a drink for its recipe in the same frame as Today's Café Story: ingredients, four steps, Me3temed's line, and the pastry it pairs with. Seven drinks have their full recipe on record so far; the rest point to their letter (and to Hana in the 3D café). To add a recipe, give the drink a `recipe` in `/admin` → `menu.drinks`:
+
+```json
+"recipe": { "ingredients": ["…"], "steps": ["…", "…", "…", "…"], "me3temed": "…", "pair": "…" }
+```
+
+### 📖 Our book on the shelf
+*Thirteen Quiet Stories from a Café* is first on the bookshelf, on every tab, with the dedication, all thirteen stories, and a **Read on Kindle** button ([B0H1499X4M](https://www.amazon.com/dp/B0H1499X4M)). Edit `site.book`; add a Drive id as `cover` to replace the drawn cover.
+
+### 🚪 Walk In
+The hero button reads **Walk into the café →**, with "Make an avatar. Find Me3temed's shelf. Mariam's table is reserved." underneath on hover. The always-visible *Enter the 3D café* button stays at the top.
+
+### 🌙 Dark mode
+The whole site follows the visitor's system setting (`prefers-color-scheme`), with the same evening palette as the letters.
 
 ### 👥 Team Section (Bento Grid)
 Four equal square cards for the café's imagined characters:

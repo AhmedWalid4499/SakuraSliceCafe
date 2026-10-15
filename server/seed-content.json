@@ -231,5 +231,1326 @@
       "subtitle": "pin something kind for a stranger"
     },
     "description": "Sign above the cork board in the 3D café."
+  },
+  "counter.pastries": {
+    "value": [
+      {
+        "id": "sakura-slice",
+        "name": "Sakura Slice",
+        "by": "yuki",
+        "what": "A thin slab of white chocolate and strawberry mochi cake, cut in slices, one pressed sakura on top",
+        "line": "The one the café is named after. One slice, no hurry.",
+        "me3temed": "It tastes like the first week of spring, every time.",
+        "drink": "Cherry Blossom Milk Tea",
+        "day": "Friday",
+        "shape": "slice",
+        "image": ""
+      },
+      {
+        "id": "maamoul-mochi",
+        "name": "Maamoul Mochi",
+        "by": "yuki",
+        "what": "Date-filled mochi shaped in a maamoul mould and dusted with powdered sugar",
+        "line": "Eid in a bite, any day of the year.",
+        "me3temed": "Little moons, lined up on the counter.",
+        "drink": "Warm Honey Cardamom Milk",
+        "day": "Sunday",
+        "shape": "domes",
+        "image": ""
+      },
+      {
+        "id": "matcha-basbousa",
+        "name": "Matcha Basbousa",
+        "by": "hana",
+        "what": "Semolina cake soaked in a light matcha syrup instead of the usual sugar syrup",
+        "line": "Grandmother's basbousa, Yuki's matcha. They get along.",
+        "me3temed": "Two kitchens in one square.",
+        "drink": "Warm Oat Milk Matcha",
+        "day": "Wednesday",
+        "shape": "square",
+        "image": ""
+      },
+      {
+        "id": "sesame-cookies",
+        "name": "Hana's Sesame Cookies",
+        "by": "hana",
+        "what": "Her grandmother's tahini-sesame cookies, thin and crisp, baked two trays at a time",
+        "line": "Not for the menu, she says. They are on the menu.",
+        "me3temed": "She eats two while they are warm. Always.",
+        "drink": "Warm Hojicha with Oat Milk and Honey",
+        "day": "Thursday",
+        "shape": "cookies",
+        "image": ""
+      },
+      {
+        "id": "hojicha-konafa",
+        "name": "Hojicha Konafa Nest",
+        "by": "hana",
+        "what": "A small konafa nest filled with hojicha cream and a drizzle of honey",
+        "line": "Crisp outside, roasted-tea cream inside. Eat with a spoon.",
+        "me3temed": "The sound of it is half the pleasure.",
+        "drink": "Cold Brew with Brown Sugar and Cream",
+        "day": "Friday",
+        "shape": "nest",
+        "image": ""
+      },
+      {
+        "id": "melon-pan",
+        "name": "Cardamom Melon Pan",
+        "by": "hana",
+        "what": "Japanese melon pan with a cardamom-sugar crackle crust",
+        "line": "A soft bun wearing a sweater.",
+        "me3temed": "For mornings that start slowly.",
+        "drink": "Warm Lemon Ginger Honey Tea",
+        "day": "Monday",
+        "shape": "melonpan",
+        "image": ""
+      },
+      {
+        "id": "rosewater-daifuku",
+        "name": "Rosewater Daifuku",
+        "by": "yuki",
+        "what": "Mochi wrapped around rosewater-scented white bean paste",
+        "line": "Pink, round, slightly surprising.",
+        "me3temed": "Rose on the outside, Cairo on the inside.",
+        "drink": "Rose Lychee Sparkling Water",
+        "day": "Sunday",
+        "shape": "daifuku",
+        "image": ""
+      },
+      {
+        "id": "honey-dorayaki",
+        "name": "Honey Dorayaki",
+        "by": "yuki",
+        "what": "Two small pancakes with Egyptian wildflower honey and a thin layer of red bean",
+        "line": "Yuto's breakfast when nobody is looking.",
+        "me3temed": "He thinks nobody is looking.",
+        "drink": "Iced Honey Vanilla Latte",
+        "day": "Friday",
+        "shape": "dorayaki",
+        "image": ""
+      },
+      {
+        "id": "fig-anpan",
+        "name": "Fig and Walnut Anpan",
+        "by": "hana",
+        "what": "A soft bun filled with dried fig and walnut paste instead of red bean",
+        "line": "The autumn one. Warm it for ten seconds.",
+        "me3temed": "It is best on a Wednesday. Do not ask why.",
+        "drink": "Spiced Fig Warm Milk",
+        "day": "Wednesday",
+        "shape": "anpan",
+        "image": ""
+      },
+      {
+        "id": "yuzu-madeleines",
+        "name": "Yuzu Lemon Madeleines",
+        "by": "hana",
+        "what": "Classic madeleines with yuzu zest and a lemon glaze",
+        "line": "Small, shell-shaped, gone before the tea is ready.",
+        "me3temed": "Pairs with every Wednesday drink we have ever made.",
+        "drink": "Mint Iced Green Tea",
+        "day": "Wednesday",
+        "shape": "shells",
+        "image": ""
+      },
+      {
+        "id": "mini-waffle",
+        "name": "Me3temed's Mini Waffle",
+        "by": "yuki",
+        "what": "A palm-sized waffle with matcha cream and a leaf-shaped chocolate",
+        "line": "Two kids once shared one. Neither admitted the other got the bigger half.",
+        "me3temed": "My name is on it. I did not ask for this.",
+        "drink": "Matcha Brown Sugar Latte",
+        "day": "Saturday",
+        "shape": "waffle",
+        "image": ""
+      },
+      {
+        "id": "date-tahini-bites",
+        "name": "Date and Tahini Mochi Bites",
+        "by": "yuki",
+        "what": "Bite-size mochi filled with date-tahini paste, rolled in toasted sesame",
+        "line": "The one regulars take home in a paper bag.",
+        "me3temed": "The paper bag is part of the recipe.",
+        "drink": "Cardamom Oat Milk Cold Brew",
+        "day": "Tuesday",
+        "shape": "bites",
+        "image": ""
+      }
+    ],
+    "description": "The Counter on the website: twelve pastries. by = hana or yuki. image = a Google Drive file id (or full URL) for the pixel-art picture; leave empty to show the drawn plate. shape picks the drawing (slice, domes, square, cookies, nest, melonpan, daifuku, dorayaki, anpan, shells, waffle, bites)."
+  },
+  "counter.seasonal": {
+    "value": [
+      {
+        "when": "Sakura season",
+        "months": "March–April",
+        "pastries": [
+          "Sakura Slice (double batch)",
+          "Sakura Milk Bread"
+        ],
+        "note": "Milk bread swirled with a thin strawberry layer; sliced to show the pink spiral.",
+        "shape": "slice"
+      },
+      {
+        "when": "Ramadan",
+        "months": "",
+        "pastries": [
+          "Qatayef Dorayaki"
+        ],
+        "note": "Qatayef batter folded like dorayaki, filled with cream and pistachio; served after iftar.",
+        "shape": "dorayaki"
+      },
+      {
+        "when": "Eid",
+        "months": "",
+        "pastries": [
+          "Maamoul Mochi gift box"
+        ],
+        "note": "Six pieces, paper box with a sakura stamp; the Eid story already mentions them.",
+        "shape": "domes"
+      },
+      {
+        "when": "Summer",
+        "months": "June–August",
+        "pastries": [
+          "Watermelon Mint Mochi",
+          "Karkade Jelly Cups"
+        ],
+        "note": "The signature drink's flavours as a pastry; hibiscus jelly with a yoghurt layer.",
+        "shape": "daifuku"
+      },
+      {
+        "when": "Autumn",
+        "months": "October–November",
+        "pastries": [
+          "Fig and Walnut Anpan",
+          "Roasted Sweet Potato Taiyaki"
+        ],
+        "note": "Taiyaki with batata-flavoured custard, a Cairo street-corner smell.",
+        "shape": "anpan"
+      },
+      {
+        "when": "Winter",
+        "months": "December–February",
+        "pastries": [
+          "Sahlab Cream Puffs",
+          "Cinnamon Hojicha Snowballs"
+        ],
+        "note": "Choux puffs with sahlab custard; powdered-sugar cookies rolled in hojicha.",
+        "shape": "bites"
+      },
+      {
+        "when": "Someone's birthday",
+        "months": "Any day",
+        "pastries": [
+          "The Regular's Cake"
+        ],
+        "note": "One slice of Sakura Slice with a candle and the person's name written in matcha; free, no questions.",
+        "shape": "slice"
+      }
+    ],
+    "description": "Seasonal and occasion pastries (The Counter → Seasonal tab). months is shown under the season; the current season is highlighted on its own."
+  },
+  "counter.pairing": {
+    "value": {
+      "mode": "rotate",
+      "from": "2026-10-11",
+      "start": "honey-dorayaki"
+    },
+    "description": "This Week's Pairing card. mode \"rotate\" moves to the next pastry on the counter every Sunday (Cairo time), starting with `start` in the week of `from`. mode \"set\" pins one: {\"mode\":\"set\",\"pastry\":\"matcha-basbousa\",\"note\":\"optional line\"}. The drink and the day come from the pastry."
+  },
+  "menu.drinks": {
+    "value": [
+      {
+        "name": "Iced Matcha Honey Latte",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "Early spring",
+        "day": "Sunday",
+        "mood": "Green blooming down through cold milk. A slow start you can watch.",
+        "recipe": {
+          "ingredients": [
+            "1 tsp matcha",
+            "2 tbsp hot water, just off the boil",
+            "¾ cup cold oat or regular milk",
+            "1 tsp honey",
+            "A generous handful of ice"
+          ],
+          "steps": [
+            "Whisk the matcha with the hot water until smooth and frothy.",
+            "Stir in the honey while it's warm.",
+            "Fill a glass with ice and pour the cold milk over slowly.",
+            "Pour the matcha over the milk, watch the green bloom down, stir once."
+          ],
+          "me3temed": "Warmth and coolness together. That is spring.",
+          "pair": "A plain mochi, a butter cookie, or toast with matcha honey."
+        }
+      },
+      {
+        "name": "Mint Iced Green Tea",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "Early spring",
+        "day": "Wednesday",
+        "mood": "For the middle of the week, when you need a breath more than a boost.",
+        "recipe": {
+          "ingredients": [
+            "1–2 green tea bags",
+            "1 cup cold water (cold-brewed overnight), or hot-brewed and cooled",
+            "A few fresh mint leaves",
+            "1 tsp honey or a squeeze of agave",
+            "Ice and a mint sprig"
+          ],
+          "steps": [
+            "Brew the tea, cold overnight if you can.",
+            "Steep the mint leaves for 5 minutes, then take them out.",
+            "Stir in the honey.",
+            "Pour over ice, add the sprig, and breathe it in before the first sip."
+          ],
+          "me3temed": "Quiet moments are strong moments.",
+          "pair": "Yuzu Lemon Madeleines."
+        }
+      },
+      {
+        "name": "Warm Miso Honey Latte",
+        "season": "spring",
+        "temp": "warm",
+        "edition": "Early spring",
+        "day": "Wednesday",
+        "mood": "Sweet, earthy, warm, in that order. Stranger than it sounds and kinder too.",
+        "recipe": {
+          "ingredients": [
+            "1 tsp white miso paste",
+            "1 tsp honey",
+            "¾ cup warm oat milk",
+            "1 shot espresso or ½ cup strong coffee",
+            "A pinch of sea salt"
+          ],
+          "steps": [
+            "Whisk the miso and honey in the bottom of the cup until smooth.",
+            "Pull the espresso into it and stir.",
+            "Warm the oat milk until hot but not scalded, and pour it over slowly.",
+            "Stir once. It arrives in three layers: sweet, earthy, warm."
+          ],
+          "me3temed": "The strangest combinations make the most honest warmth.",
+          "pair": "A soft madeleine, or anything plain and warm."
+        }
+      },
+      {
+        "name": "Warm Honey Cardamom Milk",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v1–v4",
+        "day": "Sunday",
+        "mood": "A Sunday in a cup. Cardamom does the hugging."
+      },
+      {
+        "name": "Warm Lemon Ginger Honey Tea",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v1–v4",
+        "day": "Monday",
+        "mood": "For Mondays and sore throats, which are often the same thing."
+      },
+      {
+        "name": "Blueberry Oat Smoothie",
+        "season": "summer",
+        "temp": "cold",
+        "edition": "v1–v4",
+        "day": "Tuesday",
+        "mood": "Breakfast you can drink on the way out the door, if you must go."
+      },
+      {
+        "name": "Warm Oat Milk Matcha",
+        "season": "autumn",
+        "temp": "warm",
+        "edition": "v1–v4",
+        "day": "Wednesday",
+        "mood": "Hana's everyday cup. Green, soft and steady."
+      },
+      {
+        "name": "Warm Hojicha with Oat Milk and Honey",
+        "season": "autumn",
+        "temp": "warm",
+        "edition": "v1–v4",
+        "day": "Thursday",
+        "mood": "Roasted tea the colour of an old photograph. The 4pm drink."
+      },
+      {
+        "name": "Iced Honey Vanilla Latte",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v1–v4",
+        "day": "Friday",
+        "mood": "Friday's order. Take it somewhere beautiful.",
+        "recipe": {
+          "ingredients": [
+            "1 shot espresso or ½ cup strong coffee, cooled to room temperature",
+            "¾ cup cold oat or regular milk",
+            "1 tbsp honey",
+            "¼ tsp vanilla extract",
+            "Ice"
+          ],
+          "steps": [
+            "Stir the honey and vanilla into the cooled coffee until they dissolve.",
+            "Fill a tall glass with ice and pour the milk over.",
+            "Pour the honey vanilla coffee over the milk.",
+            "Stir once and take it somewhere beautiful."
+          ],
+          "me3temed": "A drink made with honey tastes like the kindness you saved for yourself.",
+          "pair": "Honey Dorayaki."
+        }
+      },
+      {
+        "name": "Strawberry Banana Smoothie",
+        "season": "summer",
+        "temp": "cold",
+        "edition": "v1–v4",
+        "day": "Saturday",
+        "mood": "Pink, thick and unbothered. A Saturday that hasn't made plans yet."
+      },
+      {
+        "name": "Rose Lychee Sparkling Water",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v5",
+        "day": "Sunday",
+        "mood": "Rest, with bubbles. Nobody earns Sunday.",
+        "recipe": {
+          "ingredients": [
+            "1 cup cold sparkling water",
+            "3–4 lychees, lightly crushed",
+            "1 tsp rose water",
+            "A squeeze of lime",
+            "Ice, and a rose petal or a lychee to garnish"
+          ],
+          "steps": [
+            "Crush the lychees gently with a fork in the glass.",
+            "Add the rose water and lime, and stir slowly.",
+            "Fill with ice and pour in the sparkling water.",
+            "Garnish with whatever feels like Sunday."
+          ],
+          "me3temed": "Rest is not earned. It simply is.",
+          "pair": "Rosewater Daifuku."
+        }
+      },
+      {
+        "name": "Spring Matcha Lemonade",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v5",
+        "day": "Monday",
+        "mood": "A clean start with a warm middle. The whole Monday recipe.",
+        "recipe": {
+          "ingredients": [
+            "1 tsp matcha",
+            "2 tbsp warm water, about 70°C",
+            "Juice of half a lemon",
+            "1 tsp honey or simple syrup",
+            "1 cup cold still or sparkling water",
+            "Ice"
+          ],
+          "steps": [
+            "Sift the matcha, add the warm water and whisk in a W until frothy. Stir in the honey while it's warm.",
+            "Pour it into a tall glass over ice.",
+            "Add the lemon juice.",
+            "Top with the cold water and stir once."
+          ],
+          "me3temed": "A clean start and a warm core. That is the whole Monday recipe.",
+          "pair": "Cardamom Melon Pan."
+        }
+      },
+      {
+        "name": "Lavender Honey Oat Milk Latte",
+        "season": "spring",
+        "temp": "warm",
+        "edition": "v5",
+        "day": "Tuesday",
+        "mood": "Deep flavours for a quiet Tuesday.",
+        "recipe": {
+          "ingredients": [
+            "¾ cup oat milk (barista blend)",
+            "1 shot espresso or ½ cup strong coffee",
+            "1 tsp lavender syrup",
+            "1 tsp honey",
+            "A pinch of dried lavender"
+          ],
+          "steps": [
+            "Brew the espresso and set it aside.",
+            "Warm and froth the oat milk.",
+            "Stir the lavender syrup and honey into the coffee.",
+            "Pour the oat milk over slowly and dust with lavender."
+          ],
+          "me3temed": "Deep flavours on quiet days.",
+          "pair": "Date and Tahini Mochi Bites."
+        }
+      },
+      {
+        "name": "Peach Ginger Iced Tea",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v5",
+        "day": "Wednesday",
+        "mood": "Soft fruit, a little bite. Like a friend who tells you the truth gently."
+      },
+      {
+        "name": "Mint Cucumber Sparkling Cooler",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v5",
+        "day": "Thursday",
+        "mood": "Garden-cold. For the hottest hour of the day."
+      },
+      {
+        "name": "Cherry Blossom Milk Tea",
+        "season": "spring",
+        "temp": "warm",
+        "edition": "v5",
+        "day": "Friday",
+        "mood": "Pale pink and barely sweet. The Sakura Slice's other half."
+      },
+      {
+        "name": "Mango Coconut Iced Latte",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v5",
+        "day": "Saturday",
+        "mood": "A holiday you can make in your own kitchen."
+      },
+      {
+        "name": "Jasmine Green Tea Lemonade",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v6",
+        "day": "Sunday",
+        "mood": "Flowers and lemons, for remembering something good."
+      },
+      {
+        "name": "Warm Honey Citrus Oat Milk",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v6",
+        "day": "Monday",
+        "mood": "Orange peel and honey on a grey morning."
+      },
+      {
+        "name": "Elderflower Sparkling Lemonade",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v6",
+        "day": "Tuesday",
+        "mood": "Bright and a little old-fashioned, like a letter on real paper."
+      },
+      {
+        "name": "Saffron Vanilla Warm Milk",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v6",
+        "day": "Wednesday",
+        "mood": "Golden and slow. Tastes like somebody's grandmother's kitchen."
+      },
+      {
+        "name": "Basil Lemon Iced Soda",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v6",
+        "day": "Thursday",
+        "mood": "Green, sharp and surprising. The drink that makes people ask what's in it."
+      },
+      {
+        "name": "Hibiscus Rose Iced Tea",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v6",
+        "day": "Friday",
+        "mood": "Karkade with a rose in its pocket. Very Cairo, very cold."
+      },
+      {
+        "name": "Coconut Pandan Iced Latte",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v6",
+        "day": "Saturday",
+        "mood": "Green-sweet and creamy. A long Saturday afternoon."
+      },
+      {
+        "name": "Yuzu Honey Sparkling Soda",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v7",
+        "day": "",
+        "mood": "Fizzy, golden and a bit tart. Friendship in a glass."
+      },
+      {
+        "name": "Cardamom Oat Milk Cold Brew",
+        "season": "autumn",
+        "temp": "iced",
+        "edition": "v7",
+        "day": "",
+        "mood": "Strong coffee that smells like home."
+      },
+      {
+        "name": "Apricot Ginger Iced Green Tea",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v7",
+        "day": "",
+        "mood": "Mishmish season, held a little longer."
+      },
+      {
+        "name": "Cinnamon Brown Sugar Warm Milk",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v7",
+        "day": "",
+        "mood": "Cinnamon, sugar and warm milk, like being eight years old."
+      },
+      {
+        "name": "Lemon Thyme Sparkling Water",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v7",
+        "day": "",
+        "mood": "Herbal and clean. For a long talk with an old friend."
+      },
+      {
+        "name": "Passion Fruit Mint Iced Tea",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v7",
+        "day": "",
+        "mood": "Sweet-sour and loud. A good laugh in a glass."
+      },
+      {
+        "name": "White Grape Rose Water Spritzer",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v7",
+        "day": "",
+        "mood": "Light enough to sip for an entire conversation."
+      },
+      {
+        "name": "Chamomile Honey Oat Milk",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v8",
+        "day": "Sunday",
+        "mood": "The one you make for someone who can't sleep."
+      },
+      {
+        "name": "Taro Oat Milk Latte",
+        "season": "autumn",
+        "temp": "warm",
+        "edition": "v8",
+        "day": "Monday",
+        "mood": "Lilac, nutty and soft. Quietly kind."
+      },
+      {
+        "name": "Pink Lemonade with Dried Rose",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v8",
+        "day": "Tuesday",
+        "mood": "Pink on purpose. Small kindness, big colour."
+      },
+      {
+        "name": "Warm Turmeric Golden Milk",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v8",
+        "day": "Wednesday",
+        "mood": "Golden, peppery and warm all the way down."
+      },
+      {
+        "name": "Cucumber Lime Mint Cooler",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v8",
+        "day": "Thursday",
+        "mood": "The coldest thing on the menu. Handed over without a word."
+      },
+      {
+        "name": "Watermelon Basil Fizz",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v8",
+        "day": "Friday",
+        "mood": "Summer fruit with a grown-up herb."
+      },
+      {
+        "name": "Vanilla Almond Iced Latte",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v8",
+        "day": "Saturday",
+        "mood": "Smooth and gentle. The latte equivalent of a held door."
+      },
+      {
+        "name": "Warm Rosewater Honey Milk",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v9",
+        "day": "Sunday",
+        "mood": "Rose and honey for the people we carry."
+      },
+      {
+        "name": "Ginger Maple Oat Milk Latte",
+        "season": "autumn",
+        "temp": "warm",
+        "edition": "v9",
+        "day": "Monday",
+        "mood": "Spice and syrup for a heavy morning."
+      },
+      {
+        "name": "Dried Hibiscus Warm Tea with Honey",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v9",
+        "day": "Tuesday",
+        "mood": "Karkade, served hot the way grandmothers made it."
+      },
+      {
+        "name": "Warm Cinnamon Apple Cider",
+        "season": "autumn",
+        "temp": "warm",
+        "edition": "v9",
+        "day": "Wednesday",
+        "mood": "Apple and cinnamon steam. The whole room smells better."
+      },
+      {
+        "name": "Orange Blossom Warm Milk",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v9",
+        "day": "Thursday",
+        "mood": "Mazaher in warm milk. A goodnight in the middle of the day."
+      },
+      {
+        "name": "Cold Brew with Brown Sugar and Cream",
+        "season": "autumn",
+        "temp": "iced",
+        "edition": "v9",
+        "day": "Friday",
+        "mood": "Dark, sweet and patient. It took twelve hours to get here."
+      },
+      {
+        "name": "Pomegranate Sparkling Soda with Rose",
+        "season": "autumn",
+        "temp": "iced",
+        "edition": "v9",
+        "day": "Saturday",
+        "mood": "Ruby red and fizzing. Something to look forward to."
+      },
+      {
+        "name": "Honey Pear Sparkling Soda",
+        "season": "autumn",
+        "temp": "iced",
+        "edition": "v10",
+        "day": "Sunday",
+        "mood": "Soft pear and honey bubbles. A small joy on purpose."
+      },
+      {
+        "name": "Matcha Brown Sugar Latte",
+        "season": "autumn",
+        "temp": "warm",
+        "edition": "v10",
+        "day": "Monday",
+        "mood": "Matcha with a caramel edge. Me3temed's Saturday treat."
+      },
+      {
+        "name": "Strawberry Rosewater Iced Drink",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v10",
+        "day": "Tuesday",
+        "mood": "Strawberries and rose, pretty enough to photograph, too good to wait."
+      },
+      {
+        "name": "Spiced Fig Warm Milk",
+        "season": "autumn",
+        "temp": "warm",
+        "edition": "v10",
+        "day": "Wednesday",
+        "mood": "Figs and spice. Autumn's favourite cup."
+      },
+      {
+        "name": "Lychee Lime Sparkling Soda",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v10",
+        "day": "Thursday",
+        "mood": "Sweet, sharp, sparkling. A Thursday that turned out well."
+      },
+      {
+        "name": "Coconut Cold Brew Float",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v10",
+        "day": "Friday",
+        "mood": "Coffee wearing a scoop of coconut ice cream. Yes, really."
+      },
+      {
+        "name": "Saffron Iced Latte",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v10",
+        "day": "Saturday",
+        "mood": "Golden and cold. Fancy without trying."
+      },
+      {
+        "name": "Warm Vanilla Oat Milk",
+        "season": "winter",
+        "temp": "warm",
+        "edition": "v11",
+        "day": "Sunday",
+        "mood": "Nothing clever. Just warm, sweet and safe."
+      },
+      {
+        "name": "Iced Brown Sugar Cinnamon Latte",
+        "season": "autumn",
+        "temp": "iced",
+        "edition": "v11",
+        "day": "Monday",
+        "mood": "Cold coffee that tastes like warm bread."
+      },
+      {
+        "name": "Pineapple Mint Sparkling Soda",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v11",
+        "day": "Tuesday",
+        "mood": "Bright and sunny, for trusting the day."
+      },
+      {
+        "name": "Salted Caramel Oat Milk",
+        "season": "autumn",
+        "temp": "warm",
+        "edition": "v11",
+        "day": "Wednesday",
+        "mood": "Salt and sweet together, the way the best days are."
+      },
+      {
+        "name": "Green Apple Ginger Sparkling Soda",
+        "season": "autumn",
+        "temp": "iced",
+        "edition": "v11",
+        "day": "Thursday",
+        "mood": "Crisp and gingery. Wakes you up gently."
+      },
+      {
+        "name": "Iced Lavender Lemonade",
+        "season": "spring",
+        "temp": "iced",
+        "edition": "v11",
+        "day": "Friday",
+        "mood": "Purple, cold and calm. Friday with the windows open."
+      },
+      {
+        "name": "Mango Turmeric Golden Latte",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v11",
+        "day": "Saturday",
+        "mood": "Sunshine with a spoon of turmeric. For what comes next."
+      },
+      {
+        "name": "Watermelon Mint Refresher",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v12",
+        "day": "Sunday",
+        "mood": "The café's signature. If you only try one, try this one."
+      },
+      {
+        "name": "Iced Peach Green Tea",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v12",
+        "day": "Monday",
+        "mood": "Peach and green tea, the easiest summer yes."
+      },
+      {
+        "name": "Coconut Lime Cooler",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v12",
+        "day": "Tuesday",
+        "mood": "Creamy and zesty, like a beach in your hand."
+      },
+      {
+        "name": "Iced Hibiscus Lemonade (karkade)",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v12",
+        "day": "Wednesday",
+        "mood": "Karkade and lemon. Cairo's own summer drink."
+      },
+      {
+        "name": "Cantaloupe Vanilla Cooler",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v12",
+        "day": "Thursday",
+        "mood": "Shammam and vanilla, sweet as an August evening."
+      },
+      {
+        "name": "Grapefruit Rosemary Sparkler",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v12",
+        "day": "Friday",
+        "mood": "Bitter-bright and herbal. A compliment you accept."
+      },
+      {
+        "name": "Frozen Lemon Mint Slush (limon bel na3na3)",
+        "season": "summer",
+        "temp": "iced",
+        "edition": "v12",
+        "day": "Saturday",
+        "mood": "Limon bel na3na3, frozen. The answer to every July."
+      }
+    ],
+    "description": "The Menu on the website: every drink from the morning letters, by season (spring, summer, autumn, winter). temp = warm, iced or cold. To add a full recipe to a drink, give it a recipe: {\"ingredients\":[...], \"steps\":[four steps], \"me3temed\":\"...\", \"pair\":\"...\"}. Drinks without one point to their letter."
+  },
+  "letters.archive": {
+    "value": [
+      {
+        "edition": "Early spring",
+        "theme": "The first spring letters",
+        "blurb": "Before the numbering started. Stories from Yuki-chan, Kenji and the café team.",
+        "morning": [
+          "Midori (the named cup)",
+          null,
+          null,
+          "The notebook at table seven",
+          null,
+          "What Hana and Yuki-chan made for themselves",
+          null
+        ],
+        "nightTheme": "",
+        "night": [],
+        "drinks": [
+          "Iced Matcha Honey Latte",
+          null,
+          null,
+          "Mint Iced Green Tea · Warm Miso Honey Latte",
+          null,
+          "Iced Honey Vanilla Latte",
+          null
+        ],
+        "note": ""
+      },
+      {
+        "edition": "v1",
+        "theme": "Self-love, one angle per day",
+        "blurb": "Seven small ways of being on your own side.",
+        "morning": [
+          "The Crane That Was Never Claimed",
+          "The Monday Drawer",
+          "The Recipe Yuki-chan Left Behind",
+          "What Kenji Found on Rainy Wednesdays",
+          "The Person Who Always Left a Light On",
+          "Five Minutes Before the Café Remembers It's a Café",
+          "The Table That Always Had Room"
+        ],
+        "nightTheme": "Original fables",
+        "night": [
+          "The Star That Counted Sundays",
+          "The Snail Who Mapped Monday",
+          "The Wren Who Sang on Tuesdays",
+          "The Two Trees on Wednesday Hill",
+          "The Lighthouse Keeper Thursday",
+          "The Cartographer Who Mapped Fridays",
+          "The Peony That Took Its Time"
+        ],
+        "drinks": [
+          "Warm Honey Cardamom Milk",
+          "Warm Lemon Ginger Honey Tea",
+          "Blueberry Oat Smoothie",
+          "Warm Oat Milk Matcha",
+          "Warm Hojicha with Oat Milk and Honey",
+          "Iced Honey Vanilla Latte",
+          "Strawberry Banana Smoothie"
+        ],
+        "note": ""
+      },
+      {
+        "edition": "v2",
+        "theme": "Self-love, the second week",
+        "blurb": "The same theme, looked at from the other side of the counter.",
+        "morning": [
+          "What Hana Made on the Slow Morning",
+          "The Regular Who Stopped Apologising for Being Here",
+          "The Note Yuto Left on the Mirror",
+          "What Hana Keeps in Her Apron Pocket",
+          "The Order She Made for Herself",
+          "The Day They Made the Café a Gift",
+          "The Saturday the Café Closed Early"
+        ],
+        "nightTheme": "A first refresh of the fables",
+        "night": [
+          "The Owl Who Only Counted Rests",
+          "The Seed That Did Not Know It Was Growing",
+          "The Wren Who Worked on Tuesdays",
+          "The Two Trees on Wednesday Hill",
+          "The Lighthouse Keeper's Thursday",
+          "The Cartographer Who Mapped Fridays",
+          "The Peony That Took Its Time"
+        ],
+        "drinks": [],
+        "note": "v1 to v4 share the same seven drinks."
+      },
+      {
+        "edition": "v3",
+        "theme": "Self-love, with people in it",
+        "blurb": "The night stories stopped being fables and started being people.",
+        "morning": [],
+        "nightTheme": "Self-love, human characters",
+        "night": [
+          "The Grandmother Who Kept the Bread Warm",
+          "The Boy Who Collected Mondays",
+          "The Fisherman Who Fished on the Wrong Day",
+          "The Woman Who Wrote Letters to Wednesday",
+          "The Musician Who Only Played the Last Note",
+          "The Girl Who Left the Door Open",
+          "The Man Who Learned to Receive"
+        ],
+        "drinks": [],
+        "note": "The v3 mornings returned to the self-love stories of v1 and v2."
+      },
+      {
+        "edition": "v4",
+        "theme": "Love and letting go",
+        "blurb": "Holding on, and the gentler skill of putting down.",
+        "morning": [
+          "The Customer Who Came Back to Say Goodbye",
+          "The Cup Left Behind",
+          "The Name in the Order Book",
+          "The Two Chairs",
+          "What Midori Left at the Café",
+          "The Recipe She Finally Finished",
+          "The Person Who Stayed for the Closing"
+        ],
+        "nightTheme": "Love and letting go",
+        "night": [
+          "The Letters She Never Stopped Writing",
+          "The Photograph He Kept in the Wrong Place",
+          "The Garden She Gave Away",
+          "The Letter That Took Eight Years to Send",
+          "The Inheritance She Did Not Expect",
+          "The Night She Came Back",
+          "The Photograph of a Room"
+        ],
+        "drinks": [],
+        "note": ""
+      },
+      {
+        "edition": "v5",
+        "theme": "Love languages",
+        "blurb": "Nobody at the café says it out loud. They do it instead.",
+        "morning": [
+          "The Window That Was Always Saved",
+          "The Thing Yuki-chan Does Every Opening",
+          "What Ren Does Instead of Saying He Cares",
+          "The Way Hana Makes Coffee for Tired People",
+          "The Small Thing Yuto Leaves at Every Table",
+          "What Me3temed Noticed About the Friday Regulars",
+          "The Afternoon Mariam Came Back"
+        ],
+        "nightTheme": "Love languages",
+        "night": [
+          "The Man Who Showed Up Twenty Minutes Early",
+          "The Woman Who Kept a List of Beautiful Things",
+          "The Brother Who Fixed Things Without Being Asked",
+          "The Grandmother Who Held Hands Without Words",
+          "The Girl Who Always Brought the Small Thing",
+          "The Man Who Made Time on Tuesdays",
+          "The Friend Who Listened Without Trying to Fix"
+        ],
+        "drinks": [
+          "Rose Lychee Sparkling Water",
+          "Spring Matcha Lemonade",
+          "Lavender Honey Oat Milk Latte",
+          "Peach Ginger Iced Tea",
+          "Mint Cucumber Sparkling Cooler",
+          "Cherry Blossom Milk Tea",
+          "Mango Coconut Iced Latte"
+        ],
+        "note": ""
+      },
+      {
+        "edition": "v6",
+        "theme": "Memories and reconnecting",
+        "blurb": "Old boxes, old photographs, old friends who come back.",
+        "morning": [
+          "The Box of Things Hana Found in the Kitchen",
+          "The Monday Regular Who Started Coming Again",
+          "What Yuki-chan Keeps Behind the Counter",
+          "The Photograph on the Shelf",
+          "What Me3temed Remembers About the First Year",
+          "The Song Hana Keeps Playing",
+          "Ahmed Ashraf Visits After Hours"
+        ],
+        "nightTheme": "Memories and reconnecting",
+        "night": [
+          "The Woman Who Called Her Old Teacher",
+          "The Man Who Found the Box of Letters",
+          "The Girl Who Went Back to the Old Street",
+          "The Two Friends Who Met at the Same Bookshop",
+          "The Man Who Called Everyone in His Old Phone",
+          "The Mother Who Saved Every Drawing",
+          "The Reunion at the Table That Was Always Theirs"
+        ],
+        "drinks": [
+          "Jasmine Green Tea Lemonade",
+          "Warm Honey Citrus Oat Milk",
+          "Elderflower Sparkling Lemonade",
+          "Saffron Vanilla Warm Milk",
+          "Basil Lemon Iced Soda",
+          "Hibiscus Rose Iced Tea",
+          "Coconut Pandan Iced Latte"
+        ],
+        "note": ""
+      },
+      {
+        "edition": "v7",
+        "theme": "Friendship across time and distance",
+        "blurb": "The people who stay, even from far away.",
+        "morning": [],
+        "nightTheme": "Friendship",
+        "night": [
+          "The Two Women Who Wrote Letters for Forty Years",
+          "The Man Who Flew Back for a Tuesday",
+          "The Friends Who Spoke Every Morning",
+          "The Group Chat Nobody Left",
+          "The Friend Who Showed Up Without Being Called",
+          "The Two Old Men on the Same Bench",
+          "The Friendship That Survived Everything"
+        ],
+        "drinks": [],
+        "note": "Drinks this week: Yuzu Honey Sparkling Soda, Cardamom Oat Milk Cold Brew, Apricot Ginger Iced Green Tea, Cinnamon Brown Sugar Warm Milk, Lemon Thyme Sparkling Water, Passion Fruit Mint Iced Tea and White Grape Rose Water Spritzer."
+      },
+      {
+        "edition": "v8",
+        "theme": "Silent kindness that returns",
+        "blurb": "The things done quietly, and how they find their way back.",
+        "morning": [
+          "The Drink Yuto Made for the Stranger",
+          "What Hana Wrote on the Napkins",
+          "The Chair Me3temed Saved",
+          null,
+          null,
+          null,
+          null
+        ],
+        "nightTheme": "Silent kindness",
+        "night": [],
+        "drinks": [
+          "Chamomile Honey Oat Milk",
+          "Taro Oat Milk Latte",
+          "Pink Lemonade with Dried Rose",
+          "Warm Turmeric Golden Milk",
+          "Cucumber Lime Mint Cooler",
+          "Watermelon Basil Fizz",
+          "Vanilla Almond Iced Latte"
+        ],
+        "note": ""
+      },
+      {
+        "edition": "v9",
+        "theme": "Grief and the people we carry",
+        "blurb": "For the ones who aren't at the table any more, and the ones still sitting at it.",
+        "morning": [],
+        "nightTheme": "Grief",
+        "night": [
+          null,
+          "Her grandmother's recipe book, fingerprints in the flour",
+          null,
+          "The Man Who Walked the Same Route",
+          "The Things She Kept",
+          "The Birthday That Still Came",
+          "The Letter She Finally Read"
+        ],
+        "drinks": [
+          "Warm Rosewater Honey Milk",
+          "Ginger Maple Oat Milk Latte",
+          "Dried Hibiscus Warm Tea with Honey",
+          "Warm Cinnamon Apple Cider",
+          "Orange Blossom Warm Milk",
+          "Cold Brew with Brown Sugar and Cream",
+          "Pomegranate Sparkling Soda with Rose"
+        ],
+        "note": ""
+      },
+      {
+        "edition": "v10",
+        "theme": "Small joys beside the career",
+        "blurb": "The sketchbooks and songs people keep next to the day job.",
+        "morning": [
+          "The Sketchbook Yuto Keeps Under the Counter",
+          "What Hana Sings While She Bakes",
+          "The Novel Yuki-chan Is Writing",
+          "The Hour Me3temed Claims Every Day",
+          "What Ren Does on Thursday Evenings",
+          "The Playlist Mariam Made for the Café",
+          "The Thing Ahmed Ashraf Paints"
+        ],
+        "nightTheme": "Small joys",
+        "night": [
+          "The Woman Who Kept Her Paints",
+          "The Man Who Ran Every Morning",
+          "The Girl Who Taught Herself Piano",
+          "The Architect Who Made Bread",
+          null,
+          null,
+          null
+        ],
+        "drinks": [
+          "Honey Pear Sparkling Soda",
+          "Matcha Brown Sugar Latte",
+          "Strawberry Rosewater Iced Drink",
+          "Spiced Fig Warm Milk",
+          "Lychee Lime Sparkling Soda",
+          "Coconut Cold Brew Float",
+          "Saffron Iced Latte"
+        ],
+        "note": ""
+      },
+      {
+        "edition": "v11",
+        "theme": "Tomorrow: trust in what you cannot see",
+        "blurb": "For not knowing what comes next, and opening the door anyway.",
+        "morning": [
+          "The Door Yuto Opens Every Morning",
+          "What Hana Does When a Recipe Fails",
+          "The Table Yuki-chan Sets on Quiet Mornings",
+          "Me3temed and the Rainy Window",
+          "What Yuto Writes in the Notebook Before Opening",
+          "The New Drink Hana Tried",
+          "What Me3temed Knows About Tomorrow"
+        ],
+        "nightTheme": "Tomorrow, short form",
+        "night": [
+          "The Man Who Didn't Know What Came Next",
+          "The Woman Who Moved to a New City Alone",
+          "The Girl Who Sent the Email",
+          "The Couple Who Didn't Know",
+          "The Man Who Planted the Tree",
+          "The Letter She Hadn't Written Yet",
+          "The First Morning After"
+        ],
+        "drinks": [
+          "Warm Vanilla Oat Milk",
+          "Iced Brown Sugar Cinnamon Latte",
+          "Pineapple Mint Sparkling Soda",
+          "Salted Caramel Oat Milk",
+          "Green Apple Ginger Sparkling Soda",
+          "Iced Lavender Lemonade",
+          "Mango Turmeric Golden Latte"
+        ],
+        "note": ""
+      },
+      {
+        "edition": "v12",
+        "theme": "The love we forget to give ourselves",
+        "blurb": "A summer edition, about being as kind to yourself as you are to the regulars.",
+        "morning": [
+          "The Cup Yuto Makes for Himself",
+          "How Hana Talks to Herself Now",
+          "The Day Yuki-chan Sat Down",
+          "What Me3temed Never Does",
+          "The Compliment Yuto Almost Didn't Accept",
+          "The No Hana Said",
+          "The Mirror by the Café Door"
+        ],
+        "nightTheme": "Self-love, short form",
+        "night": [
+          "The Woman Who Made Herself Tea",
+          "The Man Who Changed His Inner Voice",
+          "The Nurse Who Finally Slept",
+          null,
+          null,
+          null,
+          null
+        ],
+        "drinks": [
+          "Watermelon Mint Refresher",
+          "Iced Peach Green Tea",
+          "Coconut Lime Cooler",
+          "Iced Hibiscus Lemonade (karkade)",
+          "Cantaloupe Vanilla Cooler",
+          "Grapefruit Rosemary Sparkler",
+          "Frozen Lemon Mint Slush (limon bel na3na3)"
+        ],
+        "note": ""
+      }
+    ],
+    "description": "The Letters archive on the website. morning, night and drinks are Sunday → Saturday (null = not filled in yet). An empty list hides that part."
+  },
+  "site.book": {
+    "value": {
+      "title": "Thirteen Quiet Stories from a Café",
+      "line": "Thirteen Quiet Stories from a Café is on Kindle. Yuto wrote them. Hana cried at number four.",
+      "url": "https://www.amazon.com/dp/B0H1499X4M",
+      "dedication": "For everyone who thought they were alone, you're not alone. We are waiting for you.",
+      "cover": "",
+      "stories": [
+        [
+          "The Beginning",
+          "How the café came to exist, and who it was built for"
+        ],
+        [
+          "The Boy Who Knew What to Do",
+          "A regular who acts before anyone asks"
+        ],
+        [
+          "The Girl Who Did Not Know How to Cry",
+          "Grief that finally finds a safe table"
+        ],
+        [
+          "The Regular's Empty Chair",
+          "A chair kept for someone who stopped coming"
+        ],
+        [
+          "Two Strangers One Charger",
+          "A small favour that becomes a friendship"
+        ],
+        [
+          "The Letter That Never Got Sent",
+          "Words written and kept, and what they still do"
+        ],
+        [
+          "Ten Years Later We Meet",
+          "A reunion at the café after a decade"
+        ],
+        [
+          "The Egyptian Who Forgot Arabic",
+          "Home, language and what returns"
+        ],
+        [
+          "The Unexpected Date",
+          "A date that did not go as planned, and went better"
+        ],
+        [
+          "The Mum Who Knew",
+          "A mother who understood before being told"
+        ],
+        [
+          "The Memory Catcher",
+          "Someone who keeps the café's small moments"
+        ],
+        [
+          "The Boy Who Gave Quietly",
+          "Generosity nobody was meant to notice"
+        ],
+        [
+          "An Ending",
+          "The closing story and the open door"
+        ]
+      ]
+    },
+    "description": "The book on the bookshelf (Read the Book card). cover = a Google Drive file id or URL for the cover image; empty shows the drawn cover."
   }
 }
