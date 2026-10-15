@@ -186,7 +186,7 @@ api.post('/notes', auth.requireUser, writeLimit, wrap(async (req, res) => {
   const room = groups.roomFromQuery(req);
   if (!(await groups.canEnter(req.user.id, room))) return res.status(403).json({ error: 'That room is for its group only.' });
   // y covers both floors: the ground floor (0–4.2) and upstairs (4.4–8.6)
-  const pos = [clamp(b.x, -11, 11), clamp(b.y, 0, 8.6), clamp(b.z, -8, 8)];
+  const pos = [clamp(b.x, -15, 15), clamp(b.y, 0, 8.6), clamp(b.z, -11, 11)];
   if (pos.some(Number.isNaN)) return res.status(400).json({ error: 'Where should it go?' });
 
   const daily = await query(

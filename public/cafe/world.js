@@ -8,11 +8,12 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { buildAvatar, makeLabel } from './avatar.js';
+import { mapX, mapZ, deltaAt, OLD } from './layout.mjs';
 
-export const ROOM = { minX: -11, maxX: 11, minZ: -8, maxZ: 8, h: 4.2 };
+export const ROOM = { minX: -15, maxX: 15, minZ: -11, maxZ: 11, h: 4.2 };
 export const FLOOR2_Y = 4.4;      // the upstairs floor
 export const FLOOR2_H = 3.6;      // upstairs ceiling height
-export const STAIRS = { x: 1.1, z: -6.7, r: 1.15 };
+export const STAIRS = { x: mapX(1.1), z: mapZ(-6.7), r: 1.15 };
 
 const COLORS = {
   plaster: '#f6ece2', sage: '#9fbf98', sageDark: '#6f9a6c', wood: '#a8754f', woodDark: '#7a5236',
@@ -22,6 +23,18 @@ const COLORS = {
 
 const SEG = 48;
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...o });
+
+// Keep something clear of the outdoor haze (mist, dust, rain).
+export function noFog(obj) {
+  obj.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.fog = false; }); });
+  return obj;
+}
+
+// Built at the café's real size already — not spread out by layout.mjs.
+function fixed(obj) {
+  obj.userData.fixed = true;
+  return obj;
+}
 
 function shadowy(mesh, cast = true, receive = true) {
   mesh.castShadow = cast;
@@ -254,10 +267,13 @@ export function buildWorld(renderer) {
     pot: std('#d9a07a', { roughness: 0.8 }),
   };
 
-  // ── floor
+  // ── floor (the room is built at its full size; furniture is laid out on
+  // the original plan and spread out to fit at the end — see layout.mjs)
+  const W = ROOM.maxX - ROOM.minX, D = ROOM.maxZ - ROOM.minZ;
   const floorTex = woodFloorTexture();
   floorTex.anisotropy = maxAniso;
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(22, 16), std('#ffffff', { map: floorTex, roughness: 0.55 }));
+  floorTex.repeat.set(5 * W / 22, 4 * D / 16);
+  const floor = fixed(new THREE.Mesh(new THREE.PlaneGeometry(W, D), std('#ffffff', { map: floorTex, roughness: 0.55 })));
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   floor.userData.floor = true;
@@ -266,29 +282,30 @@ export function buildWorld(renderer) {
 
   // ── walls (built as one piece each, with real openings)
   const H = ROOM.h;
-  const back = wallWithHoles(22.4, H, [[-9, 0, -7, 2.7]], M.plaster);
-  back.position.set(0, 0, -8.1);
-  const front = wallWithHoles(22.4, H, [[-8, 1.0, -4, 3.0], [-1.1, 0, 1.1, 2.8], [4, 1.0, 8, 3.0]], M.plaster);
-  front.position.set(0, 0, 8.1);
+  const hole = (cx, w, y0, y1) => [cx - w / 2, y0, cx + w / 2, y1];
+  const back = wallWithHoles(W + 0.4, H, [hole(mapX(-8), 2, 0, 2.7)], M.plaster);
+  back.position.set(0, 0, ROOM.minZ - 0.1);
+  const front = wallWithHoles(W + 0.4, H, [hole(mapX(-6), 4, 1.0, 3.0), hole(0, 2.2, 0, 2.8), hole(mapX(6), 4, 1.0, 3.0)], M.plaster);
+  front.position.set(0, 0, ROOM.maxZ + 0.1);
   // the left wall is turned a quarter, so its local x runs along −z
-  const left = wallWithHoles(16.4, H, [[2, 1.0, 5, 3.0], [-4, 1.0, -1, 3.0]], M.plaster);
+  const left = wallWithHoles(D + 0.4, H, [hole(-mapZ(-3.5), 3, 1.0, 3.0), hole(-mapZ(2.5), 3, 1.0, 3.0)], M.plaster);
   left.rotation.y = Math.PI / 2;
-  left.position.set(-11.1, 0, 0);
-  const right = wallWithHoles(16.4, H, [], M.plaster);
+  left.position.set(ROOM.minX - 0.1, 0, 0);
+  const right = wallWithHoles(D + 0.4, H, [], M.plaster);
   right.rotation.y = -Math.PI / 2;
-  right.position.set(11.1, 0, 0);
+  right.position.set(ROOM.maxX + 0.1, 0, 0);
   for (const w of [back, front, left, right]) {
     w.userData.surface = 'wall';
     surfaces.push(w);
-    root.add(w);
+    root.add(fixed(w));
   }
 
   // sage wainscoting all round (below 1 m), with a wooden rail
   const wains = [
-    { x: 0, z: -7.99, w: 22, ry: 0, skip: [-9, -7] },
-    { x: 0, z: 7.99, w: 22, ry: Math.PI, skip: [-1.1, 1.1] },
-    { x: -10.99, z: 0, w: 16, ry: Math.PI / 2 },
-    { x: 10.99, z: 0, w: 16, ry: -Math.PI / 2 },
+    { x: 0, z: ROOM.minZ + 0.01, w: W, ry: 0, skip: [mapX(-8) - 1, mapX(-8) + 1] },
+    { x: 0, z: ROOM.maxZ - 0.01, w: W, ry: Math.PI, skip: [-1.1, 1.1] },
+    { x: ROOM.minX + 0.01, z: 0, w: D, ry: Math.PI / 2 },
+    { x: ROOM.maxX - 0.01, z: 0, w: D, ry: -Math.PI / 2 },
   ];
   for (const wn of wains) {
     const segs = wn.skip ? [[-wn.w / 2, wn.skip[0]], [wn.skip[1], wn.w / 2]] : [[-wn.w / 2, wn.w / 2]];
@@ -305,17 +322,17 @@ export function buildWorld(renderer) {
       g.position.set(wn.x, 0, wn.z);
       // flip local x so the "skip" opening lines up when the wall is rotated
       if (wn.ry === Math.PI) g.scale.x = -1;
-      root.add(g);
+      root.add(fixed(g));
     }
   }
 
   // ceiling + beams
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(22.4, 16.4), std('#fbf3ea', { roughness: 1 }));
+  const ceiling = fixed(new THREE.Mesh(new THREE.PlaneGeometry(W + 0.4, D + 0.4), std('#fbf3ea', { roughness: 1 })));
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.y = H;
   root.add(ceiling);
-  for (let x = -9; x <= 9; x += 3) {
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.25, 16), M.woodDark);
+  for (let x = -13.5; x <= 13.5; x += 3) {
+    const beam = fixed(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.25, D), M.woodDark));
     beam.position.set(x, H - 0.12, 0);
     root.add(beam);
   }
@@ -510,6 +527,7 @@ export function buildWorld(renderer) {
   addTable('t3', 'the sunny table', 1.6, 1.0, [0, Math.PI, Math.PI / 2]);
   addTable('t5', 'the table by the tree', 4.6, 4.8, [Math.PI / 2, -Math.PI / 2]);
   addTable('t6', 'the quiet table', -5.6, -3.6, [Math.PI / 2, -Math.PI / 2]);
+  addTable('t7', 'the table in the middle of everything', -1.8, -1.2, [0, Math.PI * 2 / 3, -Math.PI * 2 / 3]);
 
   // Table Four, at the window
   addTable('four', 'Table Four', -9.6, -3.5, [Math.PI / 2 + 0.5, Math.PI / 2 - 0.5 + Math.PI]);
@@ -721,7 +739,7 @@ export function buildWorld(renderer) {
     animated.push((dt, t) => {
       puffs.forEach(p => {
         const k = (t * 0.18 + p.userData.phase) % 1;
-        p.position.set(8.6 + Math.sin(t + p.userData.phase * 6) * 0.05, 1.65 + k * 0.7, -5.05);
+        p.position.set(machine.position.x + Math.sin(t + p.userData.phase * 6) * 0.05, 1.65 + k * 0.7, machine.position.z - 0.1);
         const s = 0.12 + k * 0.35;
         p.scale.set(s, s, 1);
         p.material.opacity = Math.sin(k * Math.PI) * 0.35;
@@ -828,13 +846,14 @@ export function buildWorld(renderer) {
   }
   const boardSign = { mesh: null };
   function setBoardSign(title, subtitle) {
-    if (boardSign.mesh) { scene.remove(boardSign.mesh); boardSign.mesh.material.map.dispose(); }
+    if (boardSign.mesh) { boardSign.mesh.parent.remove(boardSign.mesh); boardSign.mesh.material.map.dispose(); }
     const s = makeSign([
       { text: title, size: 120, weight: '700' },
       { text: subtitle, font: 'Dancing Script, cursive', size: 92, color: COLORS.sakuraDark },
     ], 3.2, 0.62, { bg: null });
-    s.position.set(board.x, board.y + board.h / 2 + 0.42, -7.98);
-    root.add(s);
+    s.position.set(board.x, board.y + board.h / 2 + 0.42, board.z - 0.02);
+    s.userData.fixed = board.placed; // after the spread-out, it's already in place
+    floors.main.group.add(noFog(s));
     boardSign.mesh = s;
   }
   setBoardSign('The Community Board', 'pin something kind for a stranger');
@@ -1009,14 +1028,15 @@ export function buildWorld(renderer) {
   {
     const bulbM = new THREE.MeshBasicMaterial({ color: '#ffe2b0' });
     const geo = new THREE.SphereGeometry(0.035, 16, 16);
-    const runs = [[[-10.8, -7.85], [10.8, -7.85]], [[-10.85, -7.8], [-10.85, 7.8]], [[10.85, -3.8], [10.85, 7.8]], [[-10.8, 7.85], [10.8, 7.85]]];
+    const ex = ROOM.maxX - 0.2, ez = ROOM.maxZ - 0.15;
+    const runs = [[[-ex, -ez], [ex, -ez]], [[-ex - 0.05, -ez + 0.05], [-ex - 0.05, ez - 0.05]], [[ex + 0.05, mapZ(-3.8)], [ex + 0.05, ez - 0.05]], [[-ex, ez], [ex, ez]]];
     for (const [[x0, z0], [x1, z1]] of runs) {
       const n = Math.round(Math.hypot(x1 - x0, z1 - z0) / 0.5);
       for (let i = 0; i <= n; i++) {
         const k = i / n;
         const b = new THREE.Mesh(geo, bulbM);
         b.position.set(x0 + (x1 - x0) * k, 3.75 - Math.sin(k * Math.PI * (n / 6)) ** 2 * 0.12, z0 + (z1 - z0) * k);
-        root.add(b);
+        root.add(fixed(b));
         bulbs.push(b);
       }
     }
@@ -1085,7 +1105,7 @@ export function buildWorld(renderer) {
     }));
     g.add(shadowy(new THREE.Mesh(new THREE.TubeGeometry(helix, 160, 0.025, 10), M.woodDark)));
     g.position.set(STAIRS.x, 0, STAIRS.z);
-    root.add(g);
+    root.add(fixed(g));
     // the opening in the ceiling the stairs disappear into
     const hole = new THREE.Mesh(new THREE.CircleGeometry(STAIRS.r + 0.1, 64), new THREE.MeshBasicMaterial({ color: '#3a2a22' }));
     hole.rotation.x = Math.PI / 2;
@@ -1093,19 +1113,19 @@ export function buildWorld(renderer) {
     const rim = new THREE.Mesh(new THREE.TorusGeometry(STAIRS.r + 0.1, 0.05, 12, 64), M.woodDark);
     rim.rotation.x = Math.PI / 2;
     rim.position.copy(hole.position);
-    root.add(hole, rim);
-    colliders.push({ type: 'circle', x: STAIRS.x, z: STAIRS.z, r: STAIRS.r - 0.1 });
+    root.add(fixed(hole), fixed(rim));
+    colliders.push({ type: 'circle', x: STAIRS.x, z: STAIRS.z, r: STAIRS.r - 0.1, fixed: true });
     const sign = makeSign([
       { text: 'upstairs ↑', font: 'Dancing Script, cursive', size: 150, color: COLORS.sakuraDark, weight: '700' },
       { text: 'rooms for groups', size: 70 },
     ], 0.7, 0.32);
     sign.position.set(STAIRS.x - 0.02, 1.2, STAIRS.z + 1.3);
-    root.add(sign);
+    root.add(fixed(sign));
     const hover = new THREE.Mesh(new THREE.CylinderGeometry(STAIRS.r + 0.2, STAIRS.r + 0.2, ROOM.h, 24), new THREE.MeshBasicMaterial({ visible: false }));
     hover.position.set(STAIRS.x, ROOM.h / 2, STAIRS.z);
     hover.userData = { kind: 'stairs-up', label: 'Go upstairs — rooms for groups' };
     interactables.push(hover);
-    root.add(hover);
+    root.add(fixed(hover));
   }
 
   // ════════════════════════════════════════ UPSTAIRS
@@ -1119,11 +1139,11 @@ export function buildWorld(renderer) {
   {
     const H2 = FLOOR2_H;
     colliders.push({ type: 'room', minX: ROOM.minX + 0.35, maxX: ROOM.maxX - 0.35, minZ: ROOM.minZ + 0.35, maxZ: ROOM.maxZ - 0.35 });
-    colliders.push({ type: 'circle', x: STAIRS.x, z: STAIRS.z, r: STAIRS.r + 0.05 });
+    colliders.push({ type: 'circle', x: STAIRS.x, z: STAIRS.z, r: STAIRS.r + 0.05, fixed: true });
 
     // floor, with the stair opening cut out of it
     const fs = new THREE.Shape();
-    fs.moveTo(-11, -8); fs.lineTo(11, -8); fs.lineTo(11, 8); fs.lineTo(-11, 8); fs.closePath();
+    fs.moveTo(ROOM.minX, ROOM.minZ); fs.lineTo(ROOM.maxX, ROOM.minZ); fs.lineTo(ROOM.maxX, ROOM.maxZ); fs.lineTo(ROOM.minX, ROOM.maxZ); fs.closePath();
     const fh = new THREE.Path();
     fh.absarc(STAIRS.x, -STAIRS.z, STAIRS.r, 0, Math.PI * 2, true);
     fs.holes.push(fh);
@@ -1134,21 +1154,21 @@ export function buildWorld(renderer) {
     floor2.rotation.x = -Math.PI / 2;
     floor2.receiveShadow = true;
     floor2.userData.floor = true;
-    root.add(floor2);
+    root.add(fixed(floor2));
     floors.up.floorMesh = floor2;
 
     // walls with big windows — the view is the point up here
-    const back2 = wallWithHoles(22.4, H2, [[-9.5, 0.5, -1.5, 3.1], [3.5, 0.8, 7.5, 3.0]], M.plaster);
-    back2.position.set(0, 0, -8.1);
-    const front2 = wallWithHoles(22.4, H2, [[-8, 0.8, -3, 3.0], [3, 0.8, 8, 3.0]], M.plaster);
-    front2.position.set(0, 0, 8.1);
-    const left2 = wallWithHoles(16.4, H2, [[2, 0.8, 5, 3.0], [-4, 0.8, -1, 3.0]], M.plaster);
+    const back2 = wallWithHoles(W + 0.4, H2, [hole(mapX(-5.5), 8, 0.5, 3.1), hole(mapX(5.5), 4, 0.8, 3.0)], M.plaster);
+    back2.position.set(0, 0, ROOM.minZ - 0.1);
+    const front2 = wallWithHoles(W + 0.4, H2, [hole(mapX(-5.5), 5, 0.8, 3.0), hole(mapX(5.5), 5, 0.8, 3.0)], M.plaster);
+    front2.position.set(0, 0, ROOM.maxZ + 0.1);
+    const left2 = wallWithHoles(D + 0.4, H2, [hole(-mapZ(-3.5), 3, 0.8, 3.0), hole(-mapZ(2.5), 3, 0.8, 3.0)], M.plaster);
     left2.rotation.y = Math.PI / 2;
-    left2.position.set(-11.1, 0, 0);
-    const right2 = wallWithHoles(16.4, H2, [], M.plaster);
+    left2.position.set(ROOM.minX - 0.1, 0, 0);
+    const right2 = wallWithHoles(D + 0.4, H2, [], M.plaster);
     right2.rotation.y = -Math.PI / 2;
-    right2.position.set(11.1, 0, 0);
-    for (const w of [back2, front2, left2, right2]) { w.userData.surface = 'wall'; surfaces.push(w); root.add(w); }
+    right2.position.set(ROOM.maxX + 0.1, 0, 0);
+    for (const w of [back2, front2, left2, right2]) { w.userData.surface = 'wall'; surfaces.push(w); root.add(fixed(w)); }
     for (const wd of [
       { x: -5.5, y: 1.8, z: -8.1, ry: 0, w: 8, h: 2.6, m: 3 }, { x: 5.5, y: 1.9, z: -8.1, ry: 0, w: 4, h: 2.2, m: 1 },
       { x: -5.5, y: 1.9, z: 8.1, ry: Math.PI, w: 5, h: 2.2, m: 2 }, { x: 5.5, y: 1.9, z: 8.1, ry: Math.PI, w: 5, h: 2.2, m: 2 },
@@ -1160,38 +1180,39 @@ export function buildWorld(renderer) {
       root.add(f);
     }
     // a low sage band round the room
-    for (const [x, z, w, ry] of [[0, -7.99, 22, 0], [0, 7.99, 22, Math.PI], [-10.99, 0, 16, Math.PI / 2], [10.99, 0, 16, -Math.PI / 2]]) {
+    for (const [x, z, w, ry] of [[0, ROOM.minZ + 0.01, W, 0], [0, ROOM.maxZ - 0.01, W, Math.PI], [ROOM.minX + 0.01, 0, D, Math.PI / 2], [ROOM.maxX - 0.01, 0, D, -Math.PI / 2]]) {
       const band = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, 0.04), M.sage);
       band.position.set(x, 0.25, z);
       band.rotation.y = ry;
-      root.add(band);
+      root.add(fixed(band));
     }
 
     // ceiling with two skylights
     const cs = new THREE.Shape();
-    cs.moveTo(-11.2, -8.2); cs.lineTo(11.2, -8.2); cs.lineTo(11.2, 8.2); cs.lineTo(-11.2, 8.2); cs.closePath();
-    for (const [x0, z0, x1, z1] of [[-7, -1.5, -3, 2], [3, -1.5, 7, 2]]) {
+    cs.moveTo(ROOM.minX - 0.2, ROOM.minZ - 0.2); cs.lineTo(ROOM.maxX + 0.2, ROOM.minZ - 0.2); cs.lineTo(ROOM.maxX + 0.2, ROOM.maxZ + 0.2); cs.lineTo(ROOM.minX - 0.2, ROOM.maxZ + 0.2); cs.closePath();
+    const skyZ = mapZ(0.25);
+    for (const [x0, z0, x1, z1] of [[mapX(-5) - 2, skyZ - 1.75, mapX(-5) + 2, skyZ + 1.75], [mapX(5) - 2, skyZ - 1.75, mapX(5) + 2, skyZ + 1.75]]) {
       const p = new THREE.Path();
       p.moveTo(x0, z0); p.lineTo(x0, z1); p.lineTo(x1, z1); p.lineTo(x1, z0); p.closePath();
       cs.holes.push(p);
       const glass = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), M.glass);
       glass.rotation.x = Math.PI / 2;
       glass.position.set((x0 + x1) / 2, H2 + 0.05, (z0 + z1) / 2);
-      root.add(glass);
+      root.add(fixed(glass));
       for (const [w, d, x, z] of [[x1 - x0 + 0.2, 0.1, (x0 + x1) / 2, z0], [x1 - x0 + 0.2, 0.1, (x0 + x1) / 2, z1], [0.1, z1 - z0, x0, (z0 + z1) / 2], [0.1, z1 - z0, x1, (z0 + z1) / 2]]) {
         const fr = new THREE.Mesh(new THREE.BoxGeometry(w, 0.16, d), M.woodDark);
         fr.position.set(x, H2 - 0.05, z);
-        root.add(fr);
+        root.add(fixed(fr));
       }
     }
     const ceil2 = new THREE.Mesh(new THREE.ShapeGeometry(cs, 8), std('#fbf3ea', { roughness: 1, side: THREE.DoubleSide }));
     ceil2.rotation.x = Math.PI / 2;
     ceil2.position.y = H2;
-    root.add(ceil2);
-    for (const x of [-9, -1, 1.2, 9]) {
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 16), M.woodDark);
+    root.add(fixed(ceil2));
+    for (const x of [-9, -1, 1.2, 9].map(mapX)) {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, D), M.woodDark);
       beam.position.set(x, H2 - 0.11, 0);
-      root.add(beam);
+      root.add(fixed(beam));
     }
 
     // the stair opening: a railing round it, the stairs going down inside
@@ -1200,31 +1221,31 @@ export function buildWorld(renderer) {
       rail.rotation.x = Math.PI / 2;
       rail.rotation.z = Math.PI * 0.72; // leave a gap facing into the room
       rail.position.set(STAIRS.x, 0.95, STAIRS.z);
-      root.add(rail);
+      root.add(fixed(rail));
       for (let i = 0; i <= 12; i++) {
         const a = Math.PI * 0.72 + (i / 12) * Math.PI * 1.55;
         const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.95, 10), M.woodDark);
         post.position.set(STAIRS.x + Math.cos(a) * (STAIRS.r + 0.05), 0.475, STAIRS.z - Math.sin(a) * (STAIRS.r + 0.05));
-        root.add(post);
+        root.add(fixed(post));
       }
       const well = new THREE.Mesh(new THREE.CylinderGeometry(STAIRS.r, STAIRS.r, 1.2, 48, 1, true), std('#4a362c', { side: THREE.BackSide }));
       well.position.set(STAIRS.x, -0.6, STAIRS.z);
       const bottom = new THREE.Mesh(new THREE.CircleGeometry(STAIRS.r, 48), std('#2a1d18'));
       bottom.rotation.x = -Math.PI / 2;
       bottom.position.set(STAIRS.x, -1.2, STAIRS.z);
-      root.add(well, bottom);
+      root.add(fixed(well), fixed(bottom));
       for (let i = 0; i < 4; i++) {
         const a = (16 + i) * 0.32;
         const step = rbox(0.95, 0.06, 0.36, 0.02, M.woodLight);
         step.position.set(STAIRS.x + Math.sin(a) * 0.58, -0.9 + i * 0.22, STAIRS.z + Math.cos(a) * 0.58);
         step.rotation.y = a + Math.PI / 2;
-        root.add(step);
+        root.add(fixed(step));
       }
       const hover = new THREE.Mesh(new THREE.CylinderGeometry(STAIRS.r + 0.2, STAIRS.r + 0.2, 1.2, 24), new THREE.MeshBasicMaterial({ visible: false }));
       hover.position.set(STAIRS.x, 0.5, STAIRS.z);
       hover.userData = { kind: 'stairs-down', label: 'Go back downstairs' };
       interactables.push(hover);
-      root.add(hover);
+      root.add(fixed(hover));
     }
 
     // the big shared table, for the whole group
@@ -1386,9 +1407,10 @@ export function buildWorld(renderer) {
       { text: title, size: 120, weight: '700' },
       { text: subtitle, font: 'Dancing Script, cursive', size: 88, color },
     ], 3.6, 0.62, { bg: null });
-    s.position.set(10.98, 2.95, 0.5);
+    s.position.set(mapX(10.98), 2.95, mapZ(0.5));
     s.rotation.y = -Math.PI / 2;
-    floors.up.group.add(s);
+    s.userData.fixed = true;
+    floors.up.group.add(noFog(s));
     upBanner.mesh = s;
   }
   setUpstairsSign('Upstairs', 'a room of your own');
@@ -1398,6 +1420,52 @@ export function buildWorld(renderer) {
   root = floors.main.group;
   FY = 0;
 
+  // ── spread everything out onto the café's full size (see layout.mjs)
+  const box = new THREE.Box3();
+  const centre = new THREE.Vector3();
+  for (const [name, f] of Object.entries(floors)) {
+    for (const o of [...f.group.children]) {
+      if (o.userData.fixed) continue;
+      let rx = o.position.x, rz = o.position.z;
+      // groups built with their parts at absolute positions (the counter,
+      // the shelves) sit at the origin: use where their parts actually are
+      if (Math.abs(rx) < 1e-6 && Math.abs(rz) < 1e-6 && o.children.length) {
+        box.setFromObject(o);
+        if (!box.isEmpty()) { box.getCenter(centre); rx = centre.x; rz = centre.z; }
+      }
+      const [dx, dz] = deltaAt(name, rx, rz);
+      o.position.x += dx;
+      o.position.z += dz;
+    }
+    for (const seat of f.seats) {
+      const [dx, dz] = deltaAt(name, seat.x, seat.z);
+      seat.x += dx; seat.z += dz;
+    }
+    for (const c of f.colliders) {
+      if (c.fixed) continue;
+      if (c.type === 'room') {
+        Object.assign(c, { minX: ROOM.minX + 0.35, maxX: ROOM.maxX - 0.35, minZ: ROOM.minZ + 0.35, maxZ: ROOM.maxZ - 0.35 });
+      } else if (c.type === 'circle') {
+        const [dx, dz] = deltaAt(name, c.x, c.z);
+        c.x += dx; c.z += dz;
+      } else if (c.type === 'box') {
+        const [dx, dz] = deltaAt(name, (c.minX + c.maxX) / 2, (c.minZ + c.maxZ) / 2);
+        const wall = { minX: c.minX <= -OLD.hx + 0.05, maxX: c.maxX >= OLD.hx - 0.05, minZ: c.minZ <= -OLD.hz + 0.05, maxZ: c.maxZ >= OLD.hz - 0.05 };
+        c.minX += dx; c.maxX += dx; c.minZ += dz; c.maxZ += dz;
+        if (wall.minX) c.minX = ROOM.minX; if (wall.maxX) c.maxX = ROOM.maxX;
+        if (wall.minZ) c.minZ = ROOM.minZ; if (wall.maxZ) c.maxZ = ROOM.maxZ;
+      }
+    }
+  }
+  for (const obj of [board, fire, tree]) {
+    const [dx, dz] = deltaAt('main', obj.x, obj.z);
+    obj.x += dx; obj.z += dz;
+  }
+  board.placed = true;
+
+  // Weather haze is for outside: nothing inside the café fogs up.
+  for (const f of Object.values(floors)) noFog(f.group);
+
   // ── outside: Cairo
   const outside = buildCairo(scene);
 
@@ -1406,9 +1474,9 @@ export function buildWorld(renderer) {
   scene.add(hemi);
   const sun = new THREE.DirectionalLight('#ffe2b8', 2.5);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -14; sun.shadow.camera.right = 14;
-  sun.shadow.camera.top = 14; sun.shadow.camera.bottom = -14;
+  sun.shadow.mapSize.set(3072, 3072);
+  sun.shadow.camera.left = -19; sun.shadow.camera.right = 19;
+  sun.shadow.camera.top = 19; sun.shadow.camera.bottom = -19;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 80;
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.03;
@@ -1417,7 +1485,21 @@ export function buildWorld(renderer) {
   const fill = new THREE.AmbientLight('#ffe9d6', 0.35);
   scene.add(fill);
 
+  // The weather (see weather.js LOOK): how much sun gets through, rain,
+  // fog, lightning. Set by the app; the light below takes it into account.
+  let wx = { sun: 1, clouds: 0.25, cloudGrey: 0, rain: 0, fog: 0, fogColor: null, sky: null, wet: 0, birds: 1, flashes: 0 };
+  let lastHour = 12;
+  let flash = 0;
+  let nextFlash = 4;
+  const api_ = { onThunder: null };
+  function setWeather(look) {
+    wx = { ...wx, ...look };
+    outside.setWeather(wx);
+    setTimeOfDay(lastHour);
+  }
+
   function setTimeOfDay(hour) {
+    lastHour = hour;
     // 0 = deep night, 1 = full day
     const day = hour >= 6 && hour < 18.5 ? Math.min(1, (hour - 6) / 1.5, (18.5 - hour) / 1.5) : 0;
     const dusk = Math.max(0, 1 - Math.abs(hour - 18) / 1.3) + Math.max(0, 1 - Math.abs(hour - 6.3) / 1.0) * 0.7;
@@ -1427,32 +1509,56 @@ export function buildWorld(renderer) {
     // light comes in through the back door and the left windows
     const a = ((hour - 6) / 12.5) * Math.PI;
     sun.position.set(Math.cos(a) * -30 - 10, Math.max(3, Math.sin(a) * 34), -26);
-    sun.intensity = 3.2 * day;
-    sun.color.set(dusk > 0.3 ? '#ffb27a' : '#ffe8c4');
-    hemi.intensity = 0.12 + day * 0.78;
-    hemi.color.set(night > 0.5 ? '#9fa9d6' : '#fff3e0');
-    fill.intensity = 0.1 + day * 0.3;
-    scene.environmentIntensity = 0.08 + day * 0.27;
+    // clouds, rain and dust soften the daylight; the sun itself can vanish
+    const daylight = day * (0.45 + 0.55 * wx.sun);
+    sun.intensity = 3.2 * day * wx.sun;
+    sun.color.set(dusk > 0.3 ? '#ffb27a' : wx.fogColor && wx.fog > 0.6 ? wx.fogColor : '#ffe8c4');
+    hemi.intensity = 0.12 + daylight * 0.78;
+    hemi.color.set(night > 0.5 ? '#9fa9d6' : wx.sun < 0.4 ? '#dfe4ea' : '#fff3e0');
+    fill.intensity = 0.1 + daylight * 0.3;
+    scene.environmentIntensity = 0.08 + daylight * 0.27;
+    baseHemi = hemi.intensity;
 
     // lamps glow more after dark — at night the room is lit by them alone
     const lampK = 0.55 + night * 0.85;
     [...lamps, ...upLamps].forEach(l => { l.light.intensity = 3.5 * lampK; l.shade.material.emissiveIntensity = 0.2 + night * 0.5; });
     bulbs.forEach(b => b.material.color.set(night > 0.5 ? '#ffd49a' : '#ffe9c9'));
 
+    // after dark, cloud and rain make the night darker and the lamps matter more
+    const lampK2 = lampK * (1 + (1 - wx.sun) * 0.2 * day);
+    [...lamps, ...upLamps].forEach(l => { l.light.intensity = 3.5 * lampK2; });
     outside.setSky(hour, day, dusk, night);
     return { day, night };
   }
+  let baseHemi = 0.9;
 
   function update(dt, t) {
     animated.forEach(f => f(dt, t));
     npcs.forEach(n => n.av.update(dt, {}));
     outside.update(dt, t);
+    // lightning: a sudden white flash, then thunder a moment later
+    if (wx.flashes) {
+      nextFlash -= dt;
+      if (nextFlash <= 0) {
+        flash = 1;
+        nextFlash = 7 + Math.random() * 12;
+        const delay = 600 + Math.random() * 2200;
+        if (api_.onThunder) setTimeout(() => api_.onThunder(), delay);
+      }
+    }
+    if (flash > 0) {
+      flash = Math.max(0, flash - dt * (flash > 0.6 ? 5 : 2.2));
+      const flicker = flash > 0.3 && Math.random() < 0.3 ? 0.4 : 1;
+      hemi.intensity = baseHemi + flash * 3.2 * flicker;
+      outside.setFlash(flash * flicker);
+      if (flash === 0) { hemi.intensity = baseHemi; outside.setFlash(0); }
+    }
   }
 
-  const api = {
-    scene, npcs, update, setTimeOfDay, setBoardSign, setUpstairsSign, setFloor, floors,
+  const api = Object.assign(api_, {
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors,
     fire: { x: fire.x - 0.4, y: 0.5, z: fire.z }, board, tree,
-  };
+  });
   // Show one floor and point colliders/seats/surfaces/interactables at it.
   function setFloor(name) {
     for (const [k, f] of Object.entries(floors)) f.group.visible = k === name;
@@ -1478,9 +1584,9 @@ export function buildWorld(renderer) {
 // drift, and the street lamps come on at dusk.
 
 const STREET = {
-  pave: { x: 14.5, z: 11.5 },   // the café's pavement reaches this far
-  road: { x: 21, z: 18 },       // the road's outer edge
-  far: { x: 24, z: 21 },        // the far pavement's outer edge (buildings start here)
+  pave: { x: 18.5, z: 14.5 },   // the café's pavement reaches this far
+  road: { x: 25, z: 21 },       // the road's outer edge
+  far: { x: 28, z: 24 },        // the far pavement's outer edge (buildings start here)
 };
 
 function softTexture(size, draw) {
@@ -1589,12 +1695,15 @@ function buildCairo(scene) {
     return m;
   }
   const paveM = new THREE.MeshStandardMaterial({ color: '#ffffff', map: paveTex, roughness: 0.95 });
+  const wetMats = [];
   slab(STREET.pave.x * 2, STREET.pave.z * 2, 0, 0, -0.012, paveM);
   const roadTex = canvasTex(512, (ctx, s) => {
     ctx.fillStyle = '#5c5753'; ctx.fillRect(0, 0, s, s);
     for (let i = 0; i < 5000; i++) { ctx.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(r() * s, r() * s, 2, 2); }
   }, { repeat: [10, 8] });
-  slab(STREET.road.x * 2, STREET.road.z * 2, 0, 0, -0.03, new THREE.MeshStandardMaterial({ color: '#ffffff', map: roadTex, roughness: 0.9 }));
+  const roadM = new THREE.MeshStandardMaterial({ color: '#ffffff', map: roadTex, roughness: 0.9 });
+  slab(STREET.road.x * 2, STREET.road.z * 2, 0, 0, -0.03, roadM);
+  wetMats.push({ mat: paveM, rough: 0.95 }, { mat: roadM, rough: 0.9 });
   // the far pavement (in four strips, around the road)
   const farPave = new THREE.MeshStandardMaterial({ color: '#ffffff', map: paveTex.clone(), roughness: 0.95 });
   farPave.map.repeat.set(12, 1);
@@ -1708,10 +1817,10 @@ function buildCairo(scene) {
 
   // lamps and palms alternate along each side of the café
   const lx = STREET.pave.x - 0.8, lz = STREET.pave.z - 0.8;
-  for (let x = -12; x <= 12; x += 8) { streetLamp(x, lz, 0, 1); streetLamp(x + 0.01, -lz, 0, -1); }
-  for (let z = -6; z <= 6; z += 12) { streetLamp(lx, z, 1, 0); streetLamp(-lx, z, -1, 0); }
-  for (let x = -8; x <= 8; x += 8) { if (Math.abs(x) > 2) palm(x, lz - 0.2, 7 + r() * 2); palm(x, -lz + 0.2, 7 + r() * 2); }
-  for (const z of [-9, 0, 9]) { palm(lx - 0.2, z, 7 + r() * 2); palm(-lx + 0.2, z, 7 + r() * 2); }
+  for (let x = -16; x <= 16; x += 8) { streetLamp(x, lz, 0, 1); streetLamp(x + 0.01, -lz, 0, -1); }
+  for (const z of [-8, 0, 8]) { streetLamp(lx, z, 1, 0); streetLamp(-lx, z, -1, 0); }
+  for (let x = -12; x <= 12; x += 8) { palm(x, lz - 0.2, 7 + r() * 2); palm(x, -lz + 0.2, 7 + r() * 2); }
+  for (const z of [-12, -4, 4, 12]) { palm(lx - 0.2, z, 7 + r() * 2); palm(-lx + 0.2, z, 7 + r() * 2); }
 
   // a little terrace outside the front door
   function terraceTable(x, z, color) {
@@ -1736,8 +1845,8 @@ function buildCairo(scene) {
     g.position.set(x, 0, z);
     scene.add(g);
   }
-  terraceTable(-4, 9.9, '#f2a7bb');
-  terraceTable(4, 9.9, '#9fbf98');
+  terraceTable(-4.5, 12.9, '#f2a7bb');
+  terraceTable(4.5, 12.9, '#9fbf98');
 
   // ── across the road: a row of Cairo buildings, facing the café
   const sand = ['#e6cfa6', '#dcbf92', '#efdcbc', '#d4b58a', '#e9d4b4', '#cfae86', '#e3c7a0', '#d9b99a'];
@@ -2004,16 +2113,69 @@ function buildCairo(scene) {
     birds.push(g);
   }
 
+  // rain: streaks falling everywhere outside the building
+  const RAIN_N = 2400;
+  const rainPos = new Float32Array(RAIN_N * 6);
+  const rainSeed = new Float32Array(RAIN_N * 3);
+  function dropAt(i, y) {
+    let x, z;
+    do { x = (Math.random() - 0.5) * 100; z = (Math.random() - 0.5) * 90; }
+    while (Math.abs(x) < 15.6 && Math.abs(z) < 11.6); // the café has a roof
+    rainSeed[i * 3] = x; rainSeed[i * 3 + 1] = y; rainSeed[i * 3 + 2] = z;
+  }
+  for (let i = 0; i < RAIN_N; i++) dropAt(i, Math.random() * 30);
+  const rainGeo = new THREE.BufferGeometry();
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+  const rainM = new THREE.LineBasicMaterial({ color: '#e2e9f0', transparent: true, opacity: 0.6, depthWrite: false });
+  const rain = new THREE.LineSegments(rainGeo, rainM);
+  rain.frustumCulled = false;
+  rain.visible = false;
+  scene.add(rain);
+
+  let wx = { sun: 1, clouds: 0.25, cloudGrey: 0, rain: 0, fog: 0, fogColor: null, sky: null, wet: 0, birds: 1, flashes: 0 };
+  let flashK = 0;
+  let skyState = [12, 1, 0, 0];
+  function setWeather(look) {
+    wx = look;
+    rain.visible = wx.rain > 0;
+    rainM.opacity = Math.min(0.85, 0.5 + wx.rain * 0.22);
+    for (const { mat, rough } of wetMats) {
+      mat.roughness = rough - wx.wet * 0.6;
+      mat.color.setScalar(1 - wx.wet * 0.28);
+    }
+    setSky(...skyState);
+  }
+  function setFlash(k) {
+    flashK = k;
+    if (k > 0) {
+      skyU.top.value.lerp(new THREE.Color('#e8ecff'), k * 0.6);
+      skyU.horizon.value.lerp(new THREE.Color('#f4f6ff'), k * 0.6);
+    } else setSky(...skyState);
+  }
+
   function setSky(hour, day, dusk, night) {
+    skyState = [hour, day, dusk, night];
     const dayTop = new THREE.Color('#7fb8f0'), dayHor = new THREE.Color('#fbe8cc');
     const duskTop = new THREE.Color('#6d6aa8'), duskHor = new THREE.Color('#ffb48a');
     const nightTop = new THREE.Color('#0d1530'), nightHor = new THREE.Color('#2b3159');
     const top = nightTop.clone().lerp(dayTop, day).lerp(duskTop, Math.min(1, dusk) * 0.7);
     const hor = nightHor.clone().lerp(dayHor, day).lerp(duskHor, Math.min(1, dusk) * 0.8);
+    // the weather greys, dims or tints the sky
+    if (wx.sky) {
+      const tint = new THREE.Color(wx.sky);
+      const k = Math.min(1, wx.clouds * 0.6 + wx.fog * 0.5);
+      top.lerp(tint.clone().multiplyScalar(0.25 + 0.75 * day), k);
+      hor.lerp(tint.clone().multiplyScalar(0.3 + 0.7 * day), k);
+    }
     skyU.top.value.copy(top);
     skyU.horizon.value.copy(hor);
     skyU.bottom.value.copy(hor.clone().multiplyScalar(0.85));
-    scene.fog.color.copy(hor);
+    // haze, mist or dust close in the distance
+    const fogC = wx.fogColor ? hor.clone().lerp(new THREE.Color(wx.fogColor).multiplyScalar(0.3 + 0.7 * day), wx.fog) : hor;
+    scene.fog.color.copy(fogC);
+    // (the inside of the café doesn't fog up — see noFog)
+    scene.fog.near = 80 * (1 - wx.fog) ** 2 + 1;
+    scene.fog.far = 260 * (1 - wx.fog) ** 1.5 + 35 * wx.fog;
     stars.material.opacity = Math.max(0, night - 0.3);
     const a = ((hour - 6) / 12.5) * Math.PI;
     sunDisc.position.set(Math.cos(a) * -170 - 40, Math.max(-20, Math.sin(a) * 190), -160);
@@ -2025,15 +2187,35 @@ function buildCairo(scene) {
     moon.position.set(80, 140, -200);
     moon.lookAt(0, 0, 0);
     moon.material.opacity = night;
-    clouds.forEach(c => { c.material.color.set(night > 0.5 ? '#3a4266' : dusk > 0.3 ? '#ffd2b8' : '#ffffff'); c.material.opacity = 0.5 + day * 0.35; });
+    const showClouds = Math.round(clouds.length * wx.clouds);
+    clouds.forEach((c, i) => {
+      c.visible = i < showClouds;
+      const base = new THREE.Color(night > 0.5 ? '#3a4266' : dusk > 0.3 ? '#ffd2b8' : '#ffffff');
+      c.material.color.copy(base.lerp(new THREE.Color(night > 0.5 ? '#2a2f40' : '#8d939c'), wx.cloudGrey));
+      c.material.opacity = (0.5 + day * 0.35) * (0.7 + wx.clouds * 0.3);
+    });
+    stars.material.opacity *= 1 - Math.min(1, wx.clouds * 0.8 + wx.fog * 0.6);
+    moon.material.opacity *= 1 - Math.min(0.9, wx.clouds * 0.7 + wx.fog * 0.5);
     for (const { mat, max } of nightMats) mat.emissiveIntensity = night * max + (dusk > 0.4 ? 0.2 * max : 0);
     lampGlows.forEach(g => { g.material.opacity = night * 0.9; });
-    birds.forEach(b => { b.visible = day > 0.2; });
+    birds.forEach(b => { b.visible = day > 0.2 && wx.birds > 0.5; });
     ground.material.color.set(night > 0.5 ? '#5e5a66' : '#cdb58f');
   }
 
   function update(dt, t) {
     animated.forEach(f => f(dt, t));
+    if (rain.visible) {
+      const fall = (18 + wx.rain * 10) * dt;
+      const slant = 0.12 + wx.rain * 0.12;
+      for (let i = 0; i < RAIN_N; i++) {
+        let y = rainSeed[i * 3 + 1] - fall;
+        if (y < 0) { dropAt(i, 30); y = 30; }
+        rainSeed[i * 3 + 1] = y;
+        const x = rainSeed[i * 3], z = rainSeed[i * 3 + 2];
+        rainPos.set([x, y, z, x + slant, y + 1.0, z], i * 6);
+      }
+      rainGeo.attributes.position.needsUpdate = true;
+    }
     clouds.forEach(c => {
       c.position.x += c.userData.speed * dt;
       if (c.position.x > 260) c.position.x = -260;
@@ -2061,7 +2243,7 @@ function buildCairo(scene) {
     });
   }
 
-  return { setSky, update };
+  return { setSky, setWeather, setFlash, update };
 }
 
 function lerpAngleW(a, b, t) {

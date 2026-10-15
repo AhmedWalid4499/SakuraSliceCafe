@@ -2322,6 +2322,25 @@
     }
   };
 
+  // Two more the café owner can choose by hand (never picked on their own)
+  WX.storm = {
+    icon: '⛈️', nightIcon: '⛈️', label: 'Thunderstorm', shift: -5,
+    tint: 'linear-gradient(to bottom, rgba(60,70,90,0.62), rgba(60,70,90,0.4))',
+    note: 'Thunder over the rooftops. Hana has lit the candles, just in case.',
+    nightNote: 'A real storm. Every flash shows the whole street for a second. Stay as long as you like.'
+  };
+  WX.fog = {
+    icon: '🌫️', nightIcon: '🌫️', label: 'Mist', shift: -3,
+    tint: 'linear-gradient(to bottom, rgba(225,228,232,0.6), rgba(225,228,232,0.38))',
+    note: "A soft white morning. You can't see the end of the street, and that's fine.",
+    nightNote: 'Mist under the streetlights. The minarets have disappeared for the night.'
+  };
+  // Set from the database ('cafe.weather') when the owner picks the weather.
+  let WX_OVERRIDE = null;
+  function overrideActive(o) {
+    return !!(o && o.mode === 'set' && WX[o.condition] && (!o.until || Date.parse(o.until) > Date.now()));
+  }
+
   // Which conditions are plausible in which season
   const WX_SEASONS = {
     winter: ['clear', 'clear', 'cloudy', 'cloudy', 'rain', 'hazy'],
@@ -2348,7 +2367,8 @@
   function cairoWeather(t) {
     const seed = t.year * 10000 + (t.monthIndex + 1) * 100 + t.dayNum;
     const pool = WX_SEASONS[seasonOf(t.monthIndex)];
-    const key = pool[hashInt(seed) % pool.length];
+    const manual = overrideActive(WX_OVERRIDE);
+    const key = manual ? WX_OVERRIDE.condition : pool[hashInt(seed) % pool.length];
     const w = WX[key];
 
     const [hi, lo] = CAIRO_CLIMATE[t.monthIndex];
@@ -2363,7 +2383,7 @@
       label: w.label,
       tint: w.tint,
       note: night ? w.nightNote : w.note,
-      temp: Math.round(curve + drift + w.shift)
+      temp: manual && Number.isFinite(WX_OVERRIDE.temp) ? Math.round(WX_OVERRIDE.temp) : Math.round(curve + drift + w.shift)
     };
   }
 
@@ -2942,6 +2962,7 @@
       showLetters(mode, null);
     }
     if (c.moods && typeof c.moods === 'object') MOODS = c.moods;
+    if (c['cafe.weather']) { WX_OVERRIDE = c['cafe.weather']; renderWeather(cairoNow()); }
     if (Array.isArray(c['guestbook.seed'])) { SEED_NOTES = c['guestbook.seed']; renderNotes(); }
   }
   loadContent();
