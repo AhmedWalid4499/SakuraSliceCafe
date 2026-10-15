@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildWorld, ROOM } from './world.js';
-import { buildAvatar, makeLabel, disposeTree } from './avatar.js';
+import { buildAvatar, makeLabel, makeCup, disposeTree } from './avatar.js';
 import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
 
@@ -125,6 +125,9 @@ const player = {
   drink: null,
   target: null,       // click-to-walk destination
   goingToSeat: null,
+  seatDeadline: 0,
+  placed: null,       // { drink, x, y, z } — the drink this person set down
+  placedMesh: null,
   waving: 0,
 };
 
@@ -180,6 +183,7 @@ function standUp() {
   player.pos.set(s.x + Math.cos(s.ry) * 0.62, 0, s.z - Math.sin(s.ry) * 0.62);
   collide(player.pos);
   sendMove(true);
+  refreshActions();
 }
 
 function sitAt(seat) {
@@ -190,11 +194,131 @@ function sitAt(seat) {
   player.ry = seat.ry;
   sound.cue('sit');
   sendMove(true);
-  toast(`You sit down at ${seat.label}.`);
+  refreshActions();
+  toast(`You sit down at ${seat.label}. Walk, or press Stand up, to get up.`);
+}
+
+// ── sitting ────────────────────────────────────────────────
+
+function seatTaken(seat) {
+  return [...state.people.values()].some(p => p.state.seat === seat.id);
+}
+
+function nearestFreeSeat(from, near = null, maxDist = Infinity) {
+  let best = null, bestD = maxDist;
+  for (const seat of world.seats) {
+    if (seatTaken(seat)) continue;
+    if (near && Math.hypot(seat.x - near.x, seat.z - near.z) > near.r) continue;
+    const d = Math.hypot(seat.x - from.x, seat.z - from.z);
+    if (d < bestD) { best = seat; bestD = d; }
+  }
+  return best;
+}
+
+function goSit(seat) {
+  if (!seat) return toast('Every seat nearby is taken — try another table.');
+  if (seatTaken(seat)) return toast('Someone is already sitting there.');
+  if (player.seat) standUp();
+  player.goingToSeat = seat;
+  player.target = new THREE.Vector3(seat.x, 0, seat.z);
+  // If the way is blocked, don't leave anyone hovering by a chair forever.
+  player.seatDeadline = performance.now() + 7000;
+  // Already right next to it? Sit straight away.
+  if (Math.hypot(seat.x - player.pos.x, seat.z - player.pos.z) < 1.0) sitAt(seat);
+}
+
+function toggleSit() {
+  if (player.seat) { standUp(); refreshActions(); return; }
+  goSit(nearestFreeSeat(player.pos));
+}
+
+// ── putting a drink down ──────────────────────────────────
+
+function tableTops() {
+  return world.surfaces.filter(m => m.userData.surface === 'table');
+}
+
+// The nearest table top within reach, and a spot on it close to `from`.
+function spotOnTable(from, reach = 2.2) {
+  let best = null, bestD = reach;
+  const c = new THREE.Vector3();
+  for (const top of tableTops()) {
+    top.getWorldPosition(c);
+    const y = top.userData.top ?? c.y;
+    const geo = top.geometry.parameters || {};
+    let x, z;
+    if (geo.radiusTop) {
+      // round table: a spot on the near side, inside the rim
+      const dx = from.x - c.x, dz = from.z - c.z;
+      const d = Math.hypot(dx, dz) || 1;
+      const r = geo.radiusTop * 0.55;
+      x = c.x + (dx / d) * r; z = c.z + (dz / d) * r;
+    } else {
+      // the counter: the nearest point along it, kept off the edges
+      top.geometry.computeBoundingBox();
+      const bb = top.geometry.boundingBox.clone().applyMatrix4(top.matrixWorld);
+      x = Math.min(bb.max.x - 0.2, Math.max(bb.min.x + 0.2, from.x));
+      z = Math.min(bb.max.z - 0.25, Math.max(bb.min.z + 0.25, from.z));
+    }
+    const d = Math.hypot(from.x - x, from.z - z);
+    if (d < bestD) { bestD = d; best = { x, y, z }; }
+  }
+  return best;
+}
+
+function drinkMesh(placed, mine, who) {
+  const g = makeCup(drinkColor(placed.drink));
+  g.position.set(placed.x, placed.y + 0.056, placed.z);
+  g.rotation.y = Math.random() * Math.PI;
+  const label = mine ? 'Your drink — click to pick it up' : `${who}'s drink`;
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData = { kind: 'cup', mine, label }; } });
+  scene.add(g);
+  return g;
+}
+
+function setPlaced(placed) {
+  if (player.placedMesh) { scene.remove(player.placedMesh); disposeTree(player.placedMesh); player.placedMesh = null; }
+  player.placed = placed;
+  if (placed) player.placedMesh = drinkMesh(placed, true);
+}
+
+function putDrinkDown(at = null) {
+  if (!player.drink) return toast('You aren\'t holding a drink — order one at the counter ☕');
+  const spot = at || spotOnTable(player.pos);
+  if (!spot) return toast('Walk up to a table (or sit down) to put your drink down.');
+  setPlaced({ drink: player.drink, ...spot });
+  player.drink = null;
+  player.av.setDrink(null);
+  sound.cue('drink');
+  sendMove(true);
+  refreshActions();
+}
+
+function pickUpDrink() {
+  if (!player.placed) return;
+  const far = Math.hypot(player.placed.x - player.pos.x, player.placed.z - player.pos.z) > 2.6;
+  if (far) return toast('Walk back to your table to pick up your drink.');
+  player.drink = player.placed.drink;
+  player.av.setDrink(drinkColor(player.drink));
+  setPlaced(null);
+  sound.cue('sit');
+  sendMove(true);
+  refreshActions();
+}
+
+function refreshActions() {
+  const sitBtn = $('sitAct');
+  sitBtn.querySelector('.t').textContent = player.seat ? 'Stand up' : 'Sit';
+  sitBtn.classList.toggle('on', !!player.seat);
+  const drinkBtn = $('drinkAct');
+  const show = !!player.drink || !!player.placed;
+  drinkBtn.classList.toggle('hidden', !show);
+  if (show) drinkBtn.querySelector('.t').textContent = player.drink ? 'Put drink down' : 'Pick up drink';
 }
 
 function updatePlayer(dt) {
   if (!player.av) return;
+  if (player.goingToSeat && performance.now() > player.seatDeadline) sitAt(player.goingToSeat);
   let mx = 0, mz = 0;
   if (keys.has('w') || keys.has('arrowup')) mz -= 1;
   if (keys.has('s') || keys.has('arrowdown')) mz += 1;
@@ -304,14 +428,23 @@ function removePerson(id) {
   if (!p) return;
   scene.remove(p.av.group);
   disposeTree(p.av.group);
+  if (p.placedMesh) { scene.remove(p.placedMesh); disposeTree(p.placedMesh); }
   state.people.delete(id);
   updateOnline();
 }
 
 function setPersonDrink(p) {
-  if (p.drinkShown === (p.state.drink || null)) return;
-  p.drinkShown = p.state.drink || null;
-  p.av.setDrink(p.drinkShown ? drinkColor(p.drinkShown) : null);
+  if (p.drinkShown !== (p.state.drink || null)) {
+    p.drinkShown = p.state.drink || null;
+    p.av.setDrink(p.drinkShown ? drinkColor(p.drinkShown) : null);
+  }
+  // the cup they set down on a table
+  const pl = p.state.placed || null;
+  const key = pl ? `${pl.drink}@${pl.x},${pl.y},${pl.z}` : null;
+  if (p.placedKey === key) return;
+  p.placedKey = key;
+  if (p.placedMesh) { scene.remove(p.placedMesh); disposeTree(p.placedMesh); p.placedMesh = null; }
+  if (pl) p.placedMesh = drinkMesh(pl, false, p.displayName);
 }
 
 function updatePeople(dt) {
@@ -438,6 +571,9 @@ function sendMove(force = false) {
   const msg = {
     t: 'move', x: +player.pos.x.toFixed(2), z: +player.pos.z.toFixed(2), ry: +player.ry.toFixed(2),
     seat: player.seat ? player.seat.id : null, drink: player.drink, moving: player.moving,
+    placed: player.placed ? {
+      drink: player.placed.drink, x: +player.placed.x.toFixed(2), y: +player.placed.y.toFixed(3), z: +player.placed.z.toFixed(2),
+    } : null,
   };
   const key = JSON.stringify(msg);
   if (!force && (now - lastSent < 110 || key === lastSentState)) return;
@@ -658,6 +794,7 @@ function order(d) {
     player.av.setDrink(d.color);
     sound.cue('drink');
     sendMove(true);
+    refreshActions();
     toast(`☕ Your ${d.name} is here. ${d.by} made it.`);
   }, 1800);
 }
@@ -803,7 +940,10 @@ function updateHover() {
     return;
   }
   const h = pickInteractive(hoverPt.x, hoverPt.y);
-  const label = h && h.object.userData.label;
+  const ud = h ? h.object.userData : {};
+  const label = ud.label || (ud.surface === 'table' && !ud.label
+    ? (player.drink ? 'Put your drink here' : 'Sit at this table')
+    : null);
   canvas.style.cursor = label ? 'pointer' : 'default';
   if (label) {
     tip.textContent = label;
@@ -826,12 +966,21 @@ function click(x, y) {
   if (!h) return;
   const d = h.object.userData;
   if (d.kind === 'note') return openNote(d.note.id);
-  if (d.kind === 'seat') {
-    const taken = [...state.people.values()].some(p => p.state.seat === d.seat.id);
-    if (taken) return toast('Someone is already sitting there.');
-    if (player.seat) standUp();
-    player.goingToSeat = d.seat;
-    player.target = new THREE.Vector3(d.seat.x, 0, d.seat.z);
+  if (d.kind === 'seat') return goSit(d.seat);
+  if (d.kind === 'cup') {
+    if (d.mine) return pickUpDrink();
+    return toast(d.label + ' — best leave it be 🌸');
+  }
+  if (d.surface === 'table') {
+    // Holding a drink and close enough? Set it down right where you clicked.
+    const near = Math.hypot(h.point.x - player.pos.x, h.point.z - player.pos.z) < 2.4;
+    if (player.drink && near) return putDrinkDown({ x: h.point.x, y: d.top ?? h.point.y, z: h.point.z });
+    // Otherwise, sit at the closest free chair around that table.
+    const c = new THREE.Vector3();
+    h.object.getWorldPosition(c);
+    const seat = nearestFreeSeat(player.pos, { x: c.x, z: c.z, r: 1.3 });
+    if (seat) return goSit(seat);
+    if (player.drink) return toast('Walk a little closer to put your drink down.');
     return;
   }
   if (d.kind === 'order') return openMenu();
@@ -874,6 +1023,8 @@ window.addEventListener('keydown', e => {
   }
   if (typing || !state.started) return;
   if (e.key === 'Enter') { e.preventDefault(); $('chat').classList.remove('hidden'); $('chatInput').focus(); return; }
+  if (e.key === 'e' || e.key === 'E') { toggleSit(); return; }
+  if (e.key === 'q' || e.key === 'Q') { if (player.drink) putDrinkDown(); else pickUpDrink(); return; }
   const k = e.key.toLowerCase();
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
     keys.add(k);
@@ -963,6 +1114,8 @@ $('helpBtn').onclick = () => openPanel('helpPanel');
 
 $('noteAct').onclick = () => (state.placing ? stopPlacing() : startPlacing());
 $('orderAct').onclick = openMenu;
+$('sitAct').onclick = toggleSit;
+$('drinkAct').onclick = () => (player.drink ? putDrinkDown() : pickUpDrink());
 $('waveAct').onclick = () => {
   player.waving = 2;
   bubble(player.av.group, '👋', 'emote');
