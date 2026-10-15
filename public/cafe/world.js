@@ -1045,18 +1045,18 @@ export function buildWorld(renderer) {
   // ── the café team
   const team = [
     {
-      id: 'hana', name: 'Hana', role: 'Head Barista', x: 8.6, z: -5.9, ry: 0,
-      avatar: { body: 'fox', skin: '#b5562b', accent: '#fdf3e6', outfit: '#fef9f5' }, extra: { apron: '#efe0c4' },
+      id: 'hana', name: 'Hana', role: 'Head Barista', x: 7.3, z: -5.9, ry: 0.15,
+      avatar: { body: 'fox', skin: '#b5562b', accent: '#fdf3e6', outfit: '#fef9f5' }, extra: { apron: '#efe0c4', neckerchief: '#7aab7a' },
       lines: ["What can I make you?", "Sit anywhere — I'll bring it over.", "The hojicha is very good today. I'm not biased. I'm a little biased."],
     },
     {
       id: 'yuki', name: 'Yuki', role: 'Pastry Chef', x: 4.6, z: -5.9, ry: 0.1,
-      avatar: { body: 'rabbit', skin: '#f6f2ee', accent: '#fde8ef', outfit: '#f2a7bb' }, extra: { apron: '#efe0c4' },
+      avatar: { body: 'rabbit', skin: '#f6f2ee', accent: '#fde8ef', outfit: '#f2a7bb' }, extra: { apron: '#fffaf4', bow: '#d4678a' },
       lines: ["The Sakura Slice? I won't say how. Sorry.", "I've been here since five. It's the best part of the day.", "If you sit at table four, you'll come back. Everyone does."],
     },
     {
       id: 'yuto', name: 'Yuto', role: 'Owner · Co-founder', x: 2.2, z: -3.4, ry: 0.5,
-      avatar: { body: 'person', skin: '#c99a74', hair: '#2a1d1a', hairStyle: 'short', outfit: '#6f9a6c' }, extra: { apron: '#efe0c4', glasses: 'tortoise' },
+      avatar: { body: 'person', skin: '#c99a74', hair: '#2a1d1a', hairStyle: 'short', outfit: '#6f9a6c' }, extra: { apron: '#efe0c4', glasses: 'tortoise', pocket: 'pencil' },
       lines: ["Welcome in. Take your time.", "You don't have to be ready yet.", "Leave a note on the board if you like — someone will need it."],
     },
     {
@@ -1557,6 +1557,7 @@ export function buildWorld(renderer) {
 
   const api = Object.assign(api_, {
     scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors,
+    setClock: (hour, label, w) => outside.setClock(hour, label, w),
     fire: { x: fire.x - 0.4, y: 0.5, z: fire.z }, board, tree,
   });
   // Show one floor and point colliders/seats/surfaces/interactables at it.
@@ -1821,6 +1822,141 @@ function buildCairo(scene) {
   for (const z of [-8, 0, 8]) { streetLamp(lx, z, 1, 0); streetLamp(-lx, z, -1, 0); }
   for (let x = -12; x <= 12; x += 8) { palm(x, lz - 0.2, 7 + r() * 2); palm(x, -lz + 0.2, 7 + r() * 2); }
   for (const z of [-12, -4, 4, 12]) { palm(lx - 0.2, z, 7 + r() * 2); palm(-lx + 0.2, z, 7 + r() * 2); }
+
+
+  // ── Cairo's time and weather, out on the pavement: a street clock you can
+  // see through the front window, and a chalkboard by each door.
+  const brassM = new THREE.MeshStandardMaterial({ color: '#b8925a', roughness: 0.35, metalness: 0.6 });
+  const faceCanvas = document.createElement('canvas');
+  faceCanvas.width = faceCanvas.height = 256;
+  const faceTex = new THREE.CanvasTexture(faceCanvas);
+  faceTex.colorSpace = THREE.SRGBColorSpace;
+  faceTex.anisotropy = 4;
+  const faceM = new THREE.MeshStandardMaterial({ map: faceTex, emissive: '#fff1d6', emissiveMap: faceTex, emissiveIntensity: 0.15, roughness: 0.5 });
+  nightMats.push({ mat: faceM, max: 0.9 });
+  function drawFace(hour) {
+    const c = faceCanvas.getContext('2d'), S = 256, R = 120;
+    c.clearRect(0, 0, S, S);
+    c.fillStyle = '#fbf3e6';
+    c.beginPath(); c.arc(S / 2, S / 2, R, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#d4678a'; c.lineWidth = 5;
+    c.beginPath(); c.arc(S / 2, S / 2, R - 8, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = '#4a3a3a';
+    for (let i = 0; i < 60; i++) {
+      const a = (i / 60) * Math.PI * 2, big = i % 5 === 0;
+      const r0 = R - (big ? 26 : 18), r1 = R - 14;
+      c.lineWidth = big ? 5 : 2;
+      c.strokeStyle = big ? '#4a3a3a' : '#a08a7a';
+      c.beginPath();
+      c.moveTo(S / 2 + Math.sin(a) * r0, S / 2 - Math.cos(a) * r0);
+      c.lineTo(S / 2 + Math.sin(a) * r1, S / 2 - Math.cos(a) * r1);
+      c.stroke();
+    }
+    c.font = 'italic 600 22px Georgia, serif';
+    c.textAlign = 'center';
+    c.fillStyle = '#7aab7a';
+    c.fillText('Cairo', S / 2, S / 2 + 48);
+    const h = ((hour % 12) + 12) % 12, m = (hour % 1) * 60;
+    const hand = (ang, len, w, col) => {
+      c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(S / 2, S / 2); c.lineTo(S / 2 + Math.sin(ang) * len, S / 2 - Math.cos(ang) * len); c.stroke();
+    };
+    hand((h / 12) * Math.PI * 2 + (m / 60) * (Math.PI / 6), 58, 9, '#3a2a2a');
+    hand((m / 60) * Math.PI * 2, 86, 6, '#3a2a2a');
+    c.fillStyle = '#d4678a';
+    c.beginPath(); c.arc(S / 2, S / 2, 8, 0, Math.PI * 2); c.fill();
+    faceTex.needsUpdate = true;
+  }
+  function streetClock(x, z) {
+    const g = new THREE.Group();
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 2.2, 16), poleM);
+    post.position.y = 1.1;
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.3, 20), poleM);
+    foot.position.y = 0.15;
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.16, 40), poleM);
+    drum.rotation.x = Math.PI / 2;
+    drum.position.y = 2.6;
+    g.add(post, foot, drum);
+    for (const side of [1, -1]) {
+      const face = new THREE.Mesh(new THREE.CircleGeometry(0.42, 48), faceM);
+      face.position.set(0, 2.6, 0.081 * side);
+      if (side < 0) face.rotation.y = Math.PI;
+      const bezel = new THREE.Mesh(new THREE.TorusGeometry(0.43, 0.03, 10, 48), brassM);
+      bezel.position.copy(face.position);
+      g.add(face, bezel);
+    }
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), brassM);
+    cap.position.y = 3.1;
+    g.add(cap);
+    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    g.position.set(x, 0, z);
+    scene.add(g);
+  }
+
+  const chalkCanvas = document.createElement('canvas');
+  chalkCanvas.width = 360; chalkCanvas.height = 480;
+  const chalkTex = new THREE.CanvasTexture(chalkCanvas);
+  chalkTex.colorSpace = THREE.SRGBColorSpace;
+  chalkTex.anisotropy = 4;
+  const chalkM = new THREE.MeshStandardMaterial({ map: chalkTex, roughness: 0.95, emissive: '#ffffff', emissiveMap: chalkTex, emissiveIntensity: 0.05 });
+  nightMats.push({ mat: chalkM, max: 0.35 });
+  function drawChalk(label, w) {
+    const c = chalkCanvas.getContext('2d'), W = 360, H = 480;
+    c.fillStyle = '#2f3a33'; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(255,255,255,0.05)';
+    for (let i = 0; i < 40; i++) c.fillRect((i * 97) % W, (i * 61) % H, 40, 2);
+    c.textAlign = 'center';
+    c.fillStyle = '#f6c6d2';
+    c.font = 'italic 600 34px Georgia, serif';
+    c.fillText('Cairo, right now', W / 2, 70);
+    c.fillStyle = '#fdf6ee';
+    c.font = '700 74px Georgia, serif';
+    c.fillText(label || '', W / 2, 170);
+    if (w) {
+      c.font = '64px sans-serif';
+      c.fillText(w.icon, W / 2, 268);
+      c.font = '600 40px Georgia, serif';
+      c.fillText(`${w.temp}° · ${w.label}`, W / 2, 330);
+    }
+    c.fillStyle = '#b9d7b9';
+    c.font = 'italic 30px Georgia, serif';
+    c.fillText('come in, stay a while', W / 2, 410);
+    c.fillStyle = '#f2a7bb';
+    c.fillText('✿', W / 2, 452);
+    chalkTex.needsUpdate = true;
+  }
+  const woodM = new THREE.MeshStandardMaterial({ color: '#8a5a3a', roughness: 0.8 });
+  function chalkBoard(x, z, ry) {
+    const g = new THREE.Group();
+    for (const side of [1, -1]) {
+      const leaf = new THREE.Group();
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.92, 0.04), woodM);
+      frame.position.y = 0.5;
+      const board = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.75), chalkM);
+      board.position.set(0, 0.52, 0.022);
+      leaf.add(frame, board);
+      // two boards leaning together, one facing each way
+      leaf.position.z = 0.16 * side;
+      leaf.rotation.set(-0.2, side < 0 ? Math.PI : 0, 0, 'YXZ');
+      g.add(leaf);
+    }
+    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    g.position.set(x, 0, z);
+    g.rotation.y = ry;
+    scene.add(g);
+  }
+  streetClock(mapX(-6), 12.4);                      // framed by the left front window
+  chalkBoard(1.9, 11.75, 0);                         // by the front door
+  chalkBoard(mapX(-8) + 0.5, -12.7, Math.PI + 0.35); // seen through the open back door
+  let clockShown = '';
+  function setClock(hour, label, w) {
+    const key = `${label}|${w ? w.icon + w.temp + w.label : ''}`;
+    if (key === clockShown) return;
+    clockShown = key;
+    drawFace(hour);
+    drawChalk(label, w);
+  }
+  setClock(12, '', null);
 
   // a little terrace outside the front door
   function terraceTable(x, z, color) {
@@ -2243,7 +2379,7 @@ function buildCairo(scene) {
     });
   }
 
-  return { setSky, setWeather, setFlash, update };
+  return { setSky, setWeather, setFlash, update, setClock };
 }
 
 function lerpAngleW(a, b, t) {

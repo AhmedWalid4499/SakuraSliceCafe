@@ -20,7 +20,7 @@ const SESSION_IDLE_MIN = 120;     // a new conversation after two quiet hours
 const SESSION_MAX_MESSAGES = 60;  // ...or once one gets long
 // Bump when the system prompt or tools change: a conversation always keeps
 // the prompt and tools it started with, so changes apply to new ones.
-const PROMPT_VERSION = 3; // 3: the pastry counter
+const PROMPT_VERSION = 4; // 3: the pastry counter; 4: pastries can be ordered
 const DAILY_LIMIT = Number(process.env.NPC_DAILY_LIMIT || 120); // messages per guest per day
 const BETAS = ['server-side-fallback-2026-07-01', 'thinking-binding-controls-2026-08-01'];
 
@@ -53,6 +53,7 @@ const HOW_TO_TALK = `How to talk:
 - The voice of the café is intimate, never promotional. Warm, specific, unhurried. Small concrete details beat big words.
 - Be kind without being saccharine. Don't lecture. Ask at most one question at a time.
 - When a guest wants a drink, or tells you how they feel, or what they like, you may suggest one drink from the menu in the guest's notes, using the recommend_drink tool, and say a line about why in your reply. Only recommend drinks that are on that menu, by their exact id. Don't recommend a drink every turn.
+- When a guest would like something to eat, or asks what goes with their drink, you may suggest one pastry from the counter in the guest's notes with the recommend_pastry tool (exact id), and say why in a line. They can order it right there. Don't push food every turn.
 - When a guest asks how to make a drink or a treat — at home, step by step, "what's the recipe" — give it with the share_recipe tool, so it appears as a tidy recipe card: real home-kitchen measures (cups, tablespoons, grams, ml), ingredients in the order they're used, short numbered steps, and one small tip in your own voice. Keep your chat line to a sentence or two around it; don't repeat the recipe in your text. Recipes should be safe and sensible for a home kitchen. (Yuki will never give the Sakura Slice recipe — she can share any other one.)
 - When a guest tells you something lasting about their tastes or needs (favourite flavours, no caffeine at night, dairy-free, loves cardamom, hates cinnamon), save it with remember_about_guest, in a few plain words. Don't save passing moods or anything private beyond what a good barista would remember.
 - The guest's notes list what the team already remembers about them. Use it naturally; don't recite it.
@@ -95,6 +96,20 @@ const TOOLS = [
         why: { type: 'string', description: 'A short, warm reason this drink suits the guest right now (one sentence).' },
       },
       required: ['drink_id', 'why'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'recommend_pastry',
+    description: "Suggest one pastry from the café's counter to the guest. The guest will see it as a card with a button to have it. Use the pastry's exact id from the counter in the guest's notes.",
+    strict: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        pastry_id: { type: 'string', description: 'The exact id of a pastry on the counter.' },
+        why: { type: 'string', description: 'A short, warm reason this pastry suits the guest right now (one sentence).' },
+      },
+      required: ['pastry_id', 'why'],
       additionalProperties: false,
     },
   },
@@ -198,8 +213,8 @@ async function openingNotes(user, context) {
     context.where ? `They are: ${context.where}.` : '',
     'The menu (id — name — made by):',
     ...m.map(d => `- ${d.id} — ${d.name} — ${d.by || 'Hana'}`),
-    c.pastries.length ? 'The pastry counter (name — who makes it — the menu line — the drink it belongs with). These are to talk about; guests can\'t order them in the 3D café yet:' : '',
-    ...c.pastries.map(p => `- ${p.name} — ${p.by === 'yuki' ? 'Yuki' : 'Hana'} — ${p.line || ''} — ${p.drink || ''}${p.day ? ' (' + p.day + ')' : ''}`),
+    c.pastries.length ? 'The pastry counter (id — name — who makes it — the menu line — the drink it belongs with). Guests can order these at the counter, on a plate:' : '',
+    ...c.pastries.map(p => `- ${p.id} — ${p.name} — ${p.by === 'yuki' ? 'Yuki' : 'Hana'} — ${p.line || ''} — ${p.drink || ''}${p.day ? ' (' + p.day + ')' : ''}`),
     c.thisWeek ? `This week's pairing at the counter: ${c.thisWeek.name} with ${c.thisWeek.drink}.` : '',
     mem.length ? 'What the team remembers about this guest:' : 'The team doesn\'t know this guest\'s tastes yet.',
     ...mem.map(n => `- ${n}`),
@@ -325,6 +340,7 @@ router.post('/npc/:npc', auth.requireUser, talkLimit, wrap(async (req, res) => {
   let recommendation = null;
   let recipe = null;
   const menuNow = await menu();
+  const pastriesNow = (await counter()).pastries;
 
   try {
     for (let round = 0; round < 4; round++) {
@@ -349,6 +365,15 @@ router.post('/npc/:npc', auth.requireUser, talkLimit, wrap(async (req, res) => {
             results.push({ type: 'tool_result', tool_use_id: t.id, content: 'Shown to the guest with an order button.' });
           } else {
             results.push({ type: 'tool_result', tool_use_id: t.id, is_error: true, content: 'That id is not on the menu. Use an id from the menu in the guest notes.' });
+          }
+        } else if (t.name === 'recommend_pastry') {
+          const p = pastriesNow.find(x => x.id === t.input.pastry_id);
+          if (p) {
+            recommendation = { kind: 'pastry', id: p.id, name: p.name, by: p.by, shape: p.shape, why: cleanText(t.input.why, 200) };
+            meta.recommendation = recommendation;
+            results.push({ type: 'tool_result', tool_use_id: t.id, content: 'Shown to the guest with a button to have it.' });
+          } else {
+            results.push({ type: 'tool_result', tool_use_id: t.id, is_error: true, content: 'That id is not on the counter. Use an id from the pastry counter in the guest notes.' });
           }
         } else if (t.name === 'share_recipe') {
           const r = t.input || {};
