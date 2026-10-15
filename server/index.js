@@ -24,7 +24,15 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/healthz', (_req, res) => res.json({ ok: true }));
+// Which version is running (Railway sets RAILWAY_GIT_COMMIT_SHA) — handy for
+// "is my update live yet?": open /version in the browser.
+const VERSION = {
+  release: 'the kitchen, table service and a moving team',
+  commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
+  started: new Date().toISOString(),
+};
+app.get('/healthz', (_req, res) => res.json({ ok: true, ...VERSION }));
+app.get('/version', (_req, res) => res.set('Cache-Control', 'no-cache').json(VERSION));
 app.use('/api', api);
 
 // Three.js comes from npm (version pinned in package.json), not a CDN.

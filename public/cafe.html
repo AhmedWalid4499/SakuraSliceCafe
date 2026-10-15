@@ -550,11 +550,48 @@
     <li>🗣️ <b>Talk</b> — or click Yuto, Hana, Yuki or Me3temed — to have a real conversation. Ask Hana what to drink, or ask anyone how to make it: the recipe comes as a card you can copy.</li>
     <li>🪜 <b>Upstairs</b> — or click the spiral stairs — for rooms just for your group.</li>
     <li><kbd>E</kbd> sit / stand · <kbd>Q</kbd> put down / pick up · <kbd>C</kbd> take a sip · <kbd>B</kbd> take a bite</li>
+    <li class="fine" id="cafeVersion" style="list-style:none;margin-top:6px"></li>
     <li><kbd>Enter</kbd> to chat · <kbd>Esc</kbd> to close things</li>
   </ul>
 </div>
 
+<!-- If the café can't start, say so on screen (with the reason) instead of a blank room. -->
+<div id="snag" class="card" style="display:none;position:fixed;z-index:99;left:50%;top:50%;transform:translate(-50%,-50%);max-width:min(440px,calc(100vw - 32px));padding:22px 24px;text-align:left">
+  <p class="eyebrow">The café hit a snag</p>
+  <h3 style="margin:4px 0 8px">Something didn't load.</h3>
+  <p class="lede" style="font-size:13.5px">Try reloading the page. If it keeps happening, send a screenshot of this card.</p>
+  <pre id="snagText" style="white-space:pre-wrap;font-size:12px;background:var(--field);border-radius:12px;padding:10px;margin-top:10px;max-height:30vh;overflow:auto"></pre>
+  <button class="btn" type="button" onclick="location.reload()" style="margin-top:12px">Reload</button>
+</div>
+<script>
+  (function () {
+    function snag(msg) {
+      var card = document.getElementById('snag');
+      var t = document.getElementById('snagText');
+      t.textContent += (t.textContent ? '\n' : '') + msg;
+      card.style.display = 'block';
+    }
+    window.__cafeSnag = snag;
+    window.addEventListener('error', function (e) {
+      if (e.filename && e.filename.indexOf(location.origin) !== 0) return; // not ours (an extension)
+      snag((e.message || 'error') + (e.filename ? '\n' + e.filename.replace(location.origin, '') + ':' + e.lineno : ''));
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e.reason;
+      if (r && /fetch|network|Load failed/i.test(String(r.message || r))) return;
+      snag('(promise) ' + (r && (r.stack || r.message) || r));
+    });
+    setTimeout(function () {
+      if (!window.__cafeReady) snag('The café didn\'t finish starting after 25 seconds.');
+    }, 25000);
+    fetch('/version', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (v) {
+      window.__cafeVersion = v;
+      var el = document.getElementById('cafeVersion');
+      if (el) el.textContent = 'Café version: ' + v.release + (v.commit ? ' (' + v.commit + ')' : '');
+    }).catch(function () {});
+  })();
+</script>
 <script src="/art.js"></script>
-<script type="module" src="/cafe/app.js"></script>
+<script type="module" src="/cafe/app.js" onerror="window.__cafeSnag && window.__cafeSnag('Could not load /cafe/app.js')"></script>
 </body>
 </html>
