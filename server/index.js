@@ -36,7 +36,9 @@ const pub = path.join(__dirname, '..', 'public');
 // /cafe is the page; /cafe/*.js are its modules (the folder would otherwise win).
 app.get('/cafe', (_req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(pub, 'cafe.html')));
 app.use(express.static(pub, { extensions: ['html'], maxAge: '1h', setHeaders(res, file) {
-  if (file.endsWith('.html')) res.set('Cache-Control', 'no-cache');
+  // pages and the café's code are always checked for a newer version (a quick
+  // 304 when nothing changed), so a deploy shows up on the next reload
+  if (/\.(html|js|mjs|css)$/.test(file)) res.set('Cache-Control', 'no-cache');
 } }));
 
 // The old GitHub Pages filename still works.
