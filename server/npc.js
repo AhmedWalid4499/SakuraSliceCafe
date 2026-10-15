@@ -162,20 +162,40 @@ async function append(sessionId, role, content, display = null, meta = null) {
   await query('UPDATE npc_sessions SET updated_at = now() WHERE id = $1', [sessionId]);
 }
 
-async function ask(npc, messages) {
-  const response = await claude().beta.messages.create({
+// Two ways to ask. "full" uses the refusal-fallback and thinking-binding
+// betas; "plain" is the standard request every account accepts. If an
+// account turns down the full request, we switch to plain for good (until
+// the next restart) and answer the guest anyway.
+let mode = process.env.NPC_PLAIN === '1' ? 'plain' : 'full';
+
+function baseRequest(npc, messages) {
+  return {
     model: MODEL,
     max_tokens: 16000,
-    betas: BETAS,
-    // If the model declines on safety grounds, the API retries on a fallback model.
-    fallbacks: 'default',
-    thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } },
     output_config: { effort: 'low' }, // café small talk: quick and light
     system: [{ type: 'text', text: systemFor(npc), cache_control: { type: 'ephemeral' } }],
     tools: TOOLS,
     messages,
-  });
-  return response;
+  };
+}
+
+async function ask(npc, messages) {
+  if (mode === 'full') {
+    try {
+      return await claude().beta.messages.create({
+        ...baseRequest(npc, messages),
+        betas: BETAS,
+        // If the model declines on safety grounds, the API retries on a fallback model.
+        fallbacks: 'default',
+        thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } },
+      });
+    } catch (err) {
+      if (!(err instanceof Anthropic.BadRequestError)) throw err;
+      console.warn('npc: the full request was turned down, switching to the standard one:', err.message);
+      mode = 'plain';
+    }
+  }
+  return claude().messages.create(baseRequest(npc, messages));
 }
 
 // ─────────────────────────────────────────── routes
@@ -291,11 +311,18 @@ router.post('/npc/:npc', auth.requireUser, talkLimit, wrap(async (req, res) => {
       // Something about this conversation can't continue: start fresh next time.
       console.error('npc bad request:', err.message);
       await query('UPDATE npc_sessions SET updated_at = now() - interval \'1 day\' WHERE id = $1', [session.id]);
-      return res.status(502).json({ error: 'Sorry — I lost my train of thought. Say that again?' });
+      return res.status(502).json({
+        error: 'Sorry — I lost my train of thought. Say that again?',
+        // the café owner sees why, to fix it; guests don't
+        detail: req.user.is_admin ? `Claude API said: ${err.message}` : undefined,
+      });
     }
     if (err instanceof Anthropic.APIError || err instanceof Anthropic.APIConnectionError) {
       console.error('npc api error:', err.message);
-      return res.status(502).json({ error: 'Sorry — the kettle was loud. Say that again?' });
+      return res.status(502).json({
+        error: 'Sorry — the kettle was loud. Say that again?',
+        detail: req.user.is_admin ? `Claude API said: ${err.message}` : undefined,
+      });
     }
     throw err;
   }
