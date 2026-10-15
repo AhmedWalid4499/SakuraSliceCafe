@@ -114,6 +114,17 @@ function attach(server, opts = {}) {
         return;
       }
 
+      // The owner plays (or pauses) the café playlist for everyone, on every
+      // floor — never throttled, and only the owner can.
+      if (m.t === 'music') {
+        if (!entry.user.is_admin) return;
+        const now = Date.now();
+        if (now - (entry.lastMusic || 0) < 1000) return;
+        entry.lastMusic = now;
+        broadcast({ t: 'music', action: m.action === 'pause' ? 'pause' : 'play', by: entry.profile.displayName }, ws);
+        return;
+      }
+
       const now = Date.now();
       // State changes (sitting, drinks) always go through; plain walking is
       // limited to ~15 updates a second.

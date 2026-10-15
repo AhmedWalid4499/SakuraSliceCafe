@@ -830,6 +830,11 @@ function handle(m) {
       }
       break;
     }
+    case 'music':
+      showMusic(true);
+      musicAction(m.action);
+      toast(m.action === 'pause' ? `⏸ ${m.by} paused the café playlist.` : `🎧 ${m.by} is playing the café playlist for everyone — if it's quiet, tap ▶ in the player.`);
+      break;
     case 'content':
       state.content[m.key] = m.value;
       applyContent(m.key);
@@ -1499,7 +1504,16 @@ function buildMixer() {
     q.appendChild(b);
   }
 }
-$('soundBtn').onclick = () => { buildMixer(); openPanel('soundPanel'); openSpotify(); };
+$('soundBtn').onclick = () => { buildMixer(); openPanel('soundPanel'); };
+$('openMusic').onclick = () => { closePanels(); showMusic(true); };
+$('musicBtn').onclick = () => showMusic($('musicDock').classList.contains('hidden'));
+$('musicClose').onclick = () => showMusic(false);
+// The player stays in the page when hidden, so the music keeps going.
+function showMusic(on) {
+  $('musicDock').classList.toggle('hidden', !on);
+  $('musicBtn').classList.toggle('on', on);
+  if (on) openSpotify();
+}
 
 // ── Lofi from Spotify: the café's playlist (site_content 'cafe.spotify'),
 // played in Spotify's own player. Everyone gets the same playlist; while it
@@ -1527,7 +1541,8 @@ function openSpotify() {
     api.createController(holder, { uri, width: '100%', height: 152 }, controller => {
       spotify.controller = controller;
       spotify.uri = uri;
-      controller.addListener('playback_update', e => sound.duckMusic(e.data && !e.data.isPaused));
+      controller.addListener('playback_update', e => { spotify.playing = !!(e.data && !e.data.isPaused); sound.duckMusic(spotify.playing); });
+      controller.addListener('ready', () => { if (spotify.pending) { const a = spotify.pending; spotify.pending = null; musicAction(a); } });
     });
   };
   if (window.SpotifyIframeApi) return make(window.SpotifyIframeApi);
@@ -1538,6 +1553,27 @@ function openSpotify() {
   s.onerror = () => { spotify.loading = false; $('spotEmbed').textContent = "Spotify didn't load — check your connection and open this panel again."; };
   document.head.appendChild(s);
 }
+// Play or pause the café playlist here (when the owner does it for everyone,
+// or presses the buttons). Browsers may still want one tap on ▶ the first time.
+function musicAction(action) {
+  if (!spotify.controller) { spotify.pending = action; openSpotify(); return; }
+  try {
+    if (action === 'pause') spotify.controller.pause();
+    else spotify.controller.resume ? spotify.controller.resume() : spotify.controller.play();
+  } catch (e) { /* the player says no until someone taps it */ }
+}
+$('playAll').onclick = () => {
+  send({ t: 'music', action: 'play' });
+  showMusic(true);
+  musicAction('play');
+  toast('🎧 The café playlist is playing — for everyone in the café.');
+};
+$('pauseAll').onclick = () => {
+  send({ t: 'music', action: 'pause' });
+  musicAction('pause');
+  toast('⏸ Paused for everyone.');
+};
+
 $('spotSave').onclick = async () => {
   $('spotErr').textContent = '';
   const link = $('spotLink').value.trim();
@@ -1832,6 +1868,8 @@ $('enterBtn').onclick = async () => {
   $('chatAct').classList.toggle('on', !small);
   $('adminLink').classList.toggle('hidden', !state.me.isAdmin);
   $('wxOwnerBtn').classList.toggle('hidden', !state.me.isAdmin);
+  showMusic(!small);
+  if (small) setTimeout(() => toast('🎧 Tap 🎧 at the top for the café playlist.'), 4000);
   state.started = true;
   canvas.focus();
 
