@@ -85,6 +85,139 @@ export class Soundscape {
 
   setNight(n) { this.night = n; }
 
+  // 0 = the middle of the room, 1 = right by a window (the rain gets louder)
+  setNearWindow(k) {
+    k = Math.max(0, Math.min(1, k));
+    if (Math.abs(k - (this.nearWindow ?? -1)) < 0.04) return;
+    this.nearWindow = k;
+    this.apply(0.8);
+  }
+  // how busy it is: 0 = empty, 1 = full (the hum of the room follows)
+  setCrowd(k) {
+    k = Math.max(0, Math.min(1, k));
+    if (Math.abs(k - (this.crowd ?? -1)) < 0.05) return;
+    this.crowd = k;
+    this.apply(2);
+  }
+
+  // ───────────────────────────────────────── sounds of the café, where they happen
+
+  // A sound placed in the room: it comes from where it happens and fades with distance.
+  at(pos, bus = 'murmur', ref = 2) {
+    const ctx = this.ctx;
+    const p = ctx.createPanner();
+    Object.assign(p, { panningModel: 'HRTF', distanceModel: 'inverse', refDistance: ref, rolloffFactor: 1.4, maxDistance: 40 });
+    if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y ?? 1; p.positionZ.value = pos.z; }
+    else p.setPosition(pos.x, pos.y ?? 1, pos.z);
+    p.connect(this.bus[bus]);
+    p.connect(this.reverb);
+    return p;
+  }
+  ok() { return this.ctx && this.ctx.state === 'running'; }
+
+  // The espresso machine: the grinder, the pump's low hum while it pours,
+  // and the steam wand hissing as the milk spins.
+  espresso(pos, milk = true, quick = false) {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime, out = this.at(pos, 'murmur', 2.5);
+    const white = this.whiteBuffer(2);
+    // a quick one (your own order, ready in a moment) is just the grind and a burst of steam
+    const grindFor = quick ? 0.7 : 1.8, p0 = t + grindFor + 0.6, pumpFor = quick ? 0 : 4.5;
+    const s0 = quick ? t + grindFor + 0.15 : p0 + pumpFor + 0.9, steamFor = quick ? 1.1 : 4.2;
+    // grinder: a gritty burr
+    const g1 = ctx.createBufferSource(); g1.buffer = white; g1.loop = true;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.9;
+    const grind = ctx.createGain();
+    grind.gain.setValueAtTime(0, t); grind.gain.linearRampToValueAtTime(0.16, t + 0.08);
+    grind.gain.setValueAtTime(0.16, t + grindFor); grind.gain.linearRampToValueAtTime(0, t + grindFor + 0.2);
+    const wob = ctx.createOscillator(); wob.frequency.value = 38; const wg = ctx.createGain(); wg.gain.value = 0.05;
+    wob.connect(wg).connect(grind.gain);
+    g1.connect(bp).connect(grind).connect(out);
+    g1.start(t); g1.stop(t + grindFor + 0.3); wob.start(t); wob.stop(t + grindFor + 0.3);
+    // pump: a low buzz while the shot pours
+    if (pumpFor) {
+      const pump = ctx.createOscillator(); pump.type = 'sawtooth'; pump.frequency.value = 50;
+      const plp = ctx.createBiquadFilter(); plp.type = 'lowpass'; plp.frequency.value = 220;
+      const pg = ctx.createGain();
+      pg.gain.setValueAtTime(0, p0); pg.gain.linearRampToValueAtTime(0.07, p0 + 0.2);
+      pg.gain.setValueAtTime(0.07, p0 + pumpFor); pg.gain.linearRampToValueAtTime(0, p0 + pumpFor + 0.3);
+      pump.connect(plp).connect(pg).connect(out);
+      pump.start(p0); pump.stop(p0 + pumpFor + 0.5);
+    }
+    // steam wand: a bright hiss that deepens as the milk warms
+    if (milk) {
+      const st = ctx.createBufferSource(); st.buffer = white; st.loop = true;
+      const hp = ctx.createBiquadFilter(); hp.type = 'bandpass'; hp.Q.value = 0.6;
+      hp.frequency.setValueAtTime(5200, s0); hp.frequency.linearRampToValueAtTime(2600, s0 + steamFor + 0.3);
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(0, s0); sg.gain.linearRampToValueAtTime(0.09, s0 + 0.25);
+      sg.gain.setValueAtTime(0.09, s0 + steamFor); sg.gain.linearRampToValueAtTime(0, s0 + steamFor + 0.4);
+      st.connect(hp).connect(sg).connect(out);
+      st.start(s0); st.stop(s0 + steamFor + 0.6);
+    }
+    // the knock of the portafilter being emptied
+    if (!quick) this.knock(pos, (milk ? s0 + steamFor : p0 + pumpFor) + 0.9);
+  }
+  knock(pos, when) {
+    const ctx = this.ctx, out = this.at(pos, 'murmur', 2);
+    for (const [dt, f] of [[0, 140], [0.16, 120]]) {
+      const o = ctx.createOscillator(); o.frequency.setValueAtTime(f, when + dt); o.frequency.exponentialRampToValueAtTime(60, when + dt + 0.12);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.12, when + dt); g.gain.exponentialRampToValueAtTime(0.0001, when + dt + 0.15);
+      o.connect(g).connect(out); o.start(when + dt); o.stop(when + dt + 0.2);
+    }
+  }
+  // A cup set down on its saucer or a table: a soft ceramic knock and a ring.
+  cupDown(pos) {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime, out = this.at(pos, 'murmur', 1.5);
+    const o = ctx.createOscillator(); o.frequency.setValueAtTime(320, t); o.frequency.exponentialRampToValueAtTime(180, t + 0.05);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.09, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+    o.connect(g).connect(out); o.start(t); o.stop(t + 0.1);
+    const base = 1900 + Math.random() * 500;
+    [1, 2.31, 3.9].forEach((m, i) => {
+      const r = ctx.createOscillator(); r.frequency.value = base * m;
+      const rg = ctx.createGain(); rg.gain.setValueAtTime(0, t); rg.gain.linearRampToValueAtTime(0.022 / (i + 1), t + 0.003);
+      rg.gain.exponentialRampToValueAtTime(0.0001, t + 0.35 / (i + 1));
+      r.connect(rg).connect(out); r.start(t); r.stop(t + 0.4);
+    });
+  }
+  // A chair pulled out or pushed in: wood dragging on the floor.
+  chair(pos) {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime, out = this.at(pos, 'murmur', 1.5);
+    const src = ctx.createBufferSource(); src.buffer = this.whiteBuffer(0.6);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4;
+    const f0 = 260 + Math.random() * 120, dur = 0.25 + Math.random() * 0.2;
+    bp.frequency.setValueAtTime(f0, t); bp.frequency.linearRampToValueAtTime(f0 * 1.6, t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.35, t + 0.03);
+    // the judder of legs catching on the boards
+    for (let k = 0.04; k < dur; k += 0.035) g.gain.setValueAtTime(0.18 + Math.random() * 0.2, t + k);
+    g.gain.linearRampToValueAtTime(0, t + dur + 0.04);
+    src.connect(bp).connect(g).connect(out);
+    src.start(t); src.stop(t + dur + 0.1);
+  }
+  // The little bell on the counter: an order is ready.
+  counterBell(pos) {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime, out = this.at(pos, 'chimes', 3);
+    [[2637, 0.07, 2.2], [3520 * 1.003, 0.03, 1.4], [5274, 0.012, 0.8]].forEach(([f, gain, d]) => {
+      const o = ctx.createOscillator(); o.frequency.value = f;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(out); o.start(t); o.stop(t + d + 0.1);
+    });
+  }
+  // A page turning, close by.
+  page(pos) {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime, out = this.at(pos, 'murmur', 1);
+    const src = ctx.createBufferSource(); src.buffer = this.whiteBuffer(0.4);
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 0.1); g.gain.linearRampToValueAtTime(0, t + 0.32);
+    src.connect(hp).connect(g).connect(out); src.start(t); src.stop(t + 0.4);
+  }
+
   // look: see weather.js LOOK. Rain is softer on dry days, fuller when it
   // actually rains; the birds go quiet in rain, storms and sandstorms.
   setWeather(look) {
@@ -128,7 +261,9 @@ export class Soundscape {
     // perceptual curve: sliders feel even all the way along
     for (const [k, g] of Object.entries(this.bus)) {
       // while Spotify is playing, the café's own piano steps aside
-      const v = (this.levels[k] ?? 0) * (this.weather[k] ?? 1) * (k === 'music' && this.ducked ? 0 : 1);
+      const v = (this.levels[k] ?? 0) * (this.weather[k] ?? 1) * (k === 'music' && this.ducked ? 0 : 1)
+        * (k === 'rain' ? 0.7 + (this.nearWindow ?? 0.3) * 0.75 : 1)   // louder by the glass
+        * (k === 'murmur' ? 0.55 + (this.crowd ?? 0.4) * 0.9 : 1);      // fuller when the café is busy
       g.gain.setTargetAtTime(v * v * 1.4, now, ramp);
     }
   }
@@ -172,9 +307,12 @@ export class Soundscape {
 
   whiteBuffer(seconds) {
     const ctx = this.ctx;
+    this.whites = this.whites || {};
+    if (this.whites[seconds]) return this.whites[seconds];
     const buf = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate);
     const d = buf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    this.whites[seconds] = buf;
     return buf;
   }
 

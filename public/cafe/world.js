@@ -100,6 +100,38 @@ function woodFloorTexture() {
   }, { repeat: [5, 4] });
 }
 
+// A soft print for an empty photo frame: a sakura branch on warm paper.
+function sakuraPrint(seed, aspect) {
+  const w = 512, h = Math.round(512 / aspect);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  const r = rand(31 + seed * 7);
+  const bg = x.createLinearGradient(0, 0, 0, h);
+  bg.addColorStop(0, ['#f6efe6', '#eef1ea', '#f7ece9'][seed % 3]); bg.addColorStop(1, '#efe4d6');
+  x.fillStyle = bg; x.fillRect(0, 0, w, h);
+  x.strokeStyle = '#5a3c2c'; x.lineCap = 'round';
+  const branch = (x0, y0, a, len, wd, depth) => {
+    if (depth > 4 || len < 14) return;
+    const x1 = x0 + Math.cos(a) * len, y1 = y0 + Math.sin(a) * len;
+    x.lineWidth = wd; x.beginPath(); x.moveTo(x0, y0);
+    x.quadraticCurveTo((x0 + x1) / 2 + (r() - 0.5) * 20, (y0 + y1) / 2 + (r() - 0.5) * 20, x1, y1); x.stroke();
+    for (let i = 0; i < 4; i++) {
+      x.fillStyle = `rgba(${226 + r() * 20},${150 + r() * 40},${168 + r() * 30},${0.55 + r() * 0.35})`;
+      x.beginPath(); x.arc(x1 + (r() - 0.5) * 34, y1 + (r() - 0.5) * 34, 5 + r() * 9, 0, Math.PI * 2); x.fill();
+    }
+    branch(x1, y1, a - 0.5 - r() * 0.3, len * 0.7, wd * 0.65, depth + 1);
+    branch(x1, y1, a + 0.35 + r() * 0.3, len * 0.62, wd * 0.6, depth + 1);
+  };
+  branch(seed % 2 ? w * 0.95 : w * 0.05, h * (0.75 + r() * 0.2), seed % 2 ? Math.PI + 0.45 : -0.45, w * 0.32, 11, 0);
+  x.fillStyle = 'rgba(90,60,44,.55)'; x.font = 'italic 22px Georgia, serif'; x.textAlign = 'right';
+  x.fillText('Sakura Slice', w - 24, h - 22);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
 // Surfaces that read as real things up close: near-white maps (the
 // material's colour still decides the hue) with a matching bump, so light
 // rakes across plaster, wood grain and woven fabric instead of flat paint.
@@ -1659,6 +1691,98 @@ export function buildWorld(renderer) {
   windowBar('bar-left', 'the window bar', mapX(-6) - 1.8, mapX(-6) + 1.8, 4);
   windowBar('bar-right', 'the street bar', mapX(6) - 2.8, mapX(6) + 0.6, 4); // kept clear of the sakura tree
 
+  // ── sunlight on the floor: each window throws its shape (panes and all)
+  // across the boards, following the sun — long and golden in the morning
+  // through the front, amber through the left windows late in the day.
+  const paneTex = (() => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+    const x = c.getContext('2d');
+    x.fillStyle = '#000'; x.fillRect(0, 0, 256, 128);
+    const g = x.createRadialGradient(128, 64, 10, 128, 64, 150);
+    g.addColorStop(0, '#fff'); g.addColorStop(1, '#bbb');
+    x.fillStyle = g; x.fillRect(8, 6, 240, 116);
+    x.fillStyle = '#000';
+    for (const bx of [84, 170]) x.fillRect(bx - 4, 0, 8, 128); // mullions
+    x.fillRect(0, 60, 256, 7);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const windowsLit = [
+    { wall: 'front', a: mapX(-6) - 2, b: mapX(-6) + 2 }, { wall: 'front', a: mapX(6) - 2, b: mapX(6) + 2 },
+    { wall: 'left', a: mapZ(-3.5) - 1.5, b: mapZ(-3.5) + 1.5 }, { wall: 'left', a: mapZ(2.5) - 1.5, b: mapZ(2.5) + 1.5 },
+  ].map(w => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
+    geo.setIndex([0, 1, 2, 0, 2, 3]);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      map: paneTex, color: '#ffd9a0', transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+      depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2,
+    }));
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 1;
+    root.add(fixed(mesh));
+    return { ...w, mesh };
+  });
+  function lightWindows(sunDir, strength, color) {
+    // sunDir: from the room towards the sun
+    const L = sunDir.clone().negate(); // the way the light travels
+    for (const w of windowsLit) {
+      const into = w.wall === 'front' ? -L.z : L.x; // how squarely it comes in through this wall
+      const ok = L.y < -0.05 && into > 0.08;
+      const k = ok ? strength * Math.min(1, into * 1.6) * Math.min(1, -L.y * 4) : 0;
+      w.mesh.visible = k > 0.01;
+      if (!w.mesh.visible) continue;
+      w.mesh.material.opacity = 0.42 * k;
+      w.mesh.material.color.copy(color);
+      const pos = w.mesh.geometry.attributes.position;
+      // the window's corners: [along the wall, height]
+      const corners = [[w.a, 1.0], [w.b, 1.0], [w.b, 3.0], [w.a, 3.0]];
+      corners.forEach(([u, y], i) => {
+        const t = Math.min(14, y / -L.y);
+        const px = w.wall === 'front' ? u : ROOM.minX, pz = w.wall === 'front' ? ROOM.maxZ : u;
+        pos.setXYZ(i, px + L.x * t, 0.012, pz + L.z * t);
+      });
+      pos.needsUpdate = true;
+    }
+  }
+
+  // ── the photo wall: frames on the left wall for real photos of the café
+  // (the owner hangs them from inside the café — see setPhotos). Until a
+  // photo goes in, each one holds a soft sakura print.
+  const PHOTO_FRAMES = [
+    // either side of the café's name sign, and a row past the second window
+    { id: 'p1', z: -2.75, y: 2.05, w: 0.62, h: 0.8 },
+    { id: 'p2', z: 1.25, y: 2.15, w: 0.9, h: 0.66 },
+    { id: 'p3', z: 8.4, y: 1.95, w: 0.56, h: 0.72 },
+    { id: 'p4', z: 5.9, y: 2.0, w: 0.86, h: 0.64 },
+    { id: 'p5', z: 7.15, y: 2.05, w: 0.6, h: 0.78 },
+  ];
+  const photoMeshes = {};
+  for (const [n, f] of PHOTO_FRAMES.entries()) {
+    const g = new THREE.Group();
+    const outer = rbox(f.w + 0.1, f.h + 0.1, 0.04, 0.012, n % 2 ? M.woodDark : M.wood);
+    const mount = new THREE.Mesh(new THREE.PlaneGeometry(f.w, f.h), M.cream);
+    mount.position.z = 0.021;
+    const pic = new THREE.Mesh(new THREE.PlaneGeometry(f.w - 0.1, f.h - 0.1), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.6 }));
+    pic.position.z = 0.023;
+    pic.material.map = sakuraPrint(n, f.w / f.h);
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(f.w, f.h), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.05, transparent: true, opacity: 0.06, depthWrite: false }));
+    glass.position.z = 0.026;
+    g.add(outer, mount, pic, glass);
+    g.position.set(ROOM.minX + 0.04, f.y, f.z);
+    g.rotation.y = Math.PI / 2;
+    root.add(g);
+    photoMeshes[f.id] = pic;
+    const hover = new THREE.Mesh(new THREE.BoxGeometry(f.w + 0.1, f.h + 0.1, 0.1), new THREE.MeshBasicMaterial({ visible: false }));
+    hover.position.copy(g.position);
+    hover.rotation.y = Math.PI / 2;
+    hover.userData = { kind: 'photo', id: f.id, label: 'A photo from the café' };
+    interactables.push(hover);
+    root.add(hover);
+  }
+
   // Weather haze is for outside: nothing inside the café fogs up.
   for (const f of Object.values(floors)) noFog(f.group);
 
@@ -1716,6 +1840,7 @@ export function buildWorld(renderer) {
   }
 
   // ── the front door: two glazed leaves that fill the opening exactly
+  const doorSigns = [];
   {
     const wz = ROOM.maxZ + 0.1, W2 = 2.2, H2 = 2.8;
     add(doorCasing(0, wz, W2, H2));
@@ -1728,10 +1853,20 @@ export function buildWorld(renderer) {
       bar.position.set(s < 0 ? -0.14 : 0.14, 1.05, wz - 0.07);
       add(bar);
     }
-    const sign = makeSign([{ text: 'open', font: 'Dancing Script, cursive', size: 210, color: COLORS.sakuraDark, weight: '700' }], 0.5, 0.24, { bg: COLORS.cream });
-    sign.position.set(-0.5, 1.62, wz - 0.06);
-    sign.rotation.y = Math.PI;
-    add(sign);
+    // a little hanging sign that turns over at opening and closing time
+    for (const [state, text, color] of [['open', 'open', COLORS.sakuraDark], ['closed', 'closed', COLORS.woodDark]]) {
+      for (const [dz, ry] of [[-0.06, Math.PI], [0.06, 0]]) {
+        const sign = makeSign([{ text, font: 'Dancing Script, cursive', size: 210, color, weight: '700' }], 0.5, 0.24, { bg: COLORS.cream });
+        sign.position.set(-0.5, 1.62, wz + dz);
+        sign.rotation.y = ry;
+        sign.visible = state === 'open';
+        doorSigns.push({ state, sign });
+        add(sign);
+      }
+    }
+    const hours = makeSign([{ text: 'every day', size: 70, color: COLORS.woodDark }, { text: '10am – 10pm', size: 96, weight: '700' }], 0.34, 0.2, { bg: COLORS.cream });
+    hours.position.set(0.5, 1.5, wz + 0.06);
+    add(hours);
     const mat = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.8), std('#b98a62', { roughness: 1 }));
     mat.rotation.x = -Math.PI / 2;
     mat.position.set(0, 0.006, wz - 0.75);
@@ -2073,12 +2208,21 @@ export function buildWorld(renderer) {
 
     // sun arcs from east (+x) to west (−x), behind the back wall so the
     // light comes in through the back door and the left windows
-    const a = ((hour - 6) / 12.5) * Math.PI;
-    sun.position.set(Math.cos(a) * -30 - 10, Math.max(3, Math.sin(a) * 34), -26);
+    // Morning sun comes low and golden through the front windows (from the
+    // street side, +z), climbs high at midday, and goes down through the
+    // left windows (−x) in the late afternoon — long patches of light on the floor.
+    const tt = Math.min(1, Math.max(0, (hour - 6) / 12.5));
+    const elev = (6 + Math.sin(tt * Math.PI) * 58) * Math.PI / 180;
+    const az = 0.42 - tt * 1.95; // angle round from the front (+z) towards the left (−x)
+    sun.position.set(Math.sin(az) * Math.cos(elev) * 40, Math.sin(elev) * 40, Math.cos(az) * Math.cos(elev) * 40);
+    sun.target.position.set(0, 0, 0);
     // clouds, rain and dust soften the daylight; the sun itself can vanish
     const daylight = day * (0.45 + 0.55 * wx.sun);
     sun.intensity = 3.2 * day * wx.sun;
-    sun.color.set(dusk > 0.3 ? '#ffb27a' : wx.fogColor && wx.fog > 0.6 ? wx.fogColor : '#ffe8c4');
+    // the lower the sun, the warmer the light: golden mornings, amber evenings
+    const low = Math.max(0, 1 - (elev * 180 / Math.PI - 6) / 30);
+    sun.color.set(wx.fogColor && wx.fog > 0.6 ? wx.fogColor : '#fff1dc').lerp(new THREE.Color(dusk > 0.3 ? '#ff9a5a' : '#ffbe78'), Math.min(1, low * 1.1 + dusk * 0.4));
+    lightWindows(sun.position.clone().normalize(), day * Math.max(0, wx.sun - 0.15) / 0.85, sun.color);
     hemi.intensity = 0.1 + daylight * 0.5;
     hemi.color.set(night > 0.5 ? '#9fa9d6' : wx.sun < 0.4 ? '#dfe4ea' : '#fff3e0');
     fill.intensity = 0.06 + daylight * 0.12;
@@ -2086,7 +2230,10 @@ export function buildWorld(renderer) {
     baseHemi = hemi.intensity;
 
     // lamps glow more after dark — at night the room is lit by them alone
-    const lampK = 0.55 + night * 0.85;
+    const open = hour >= 10 && hour < 22;
+    doorSigns.forEach(d => { d.sign.visible = d.state === (open ? 'open' : 'closed'); });
+    // after closing the café keeps a few lamps low — still warm, never dark
+    const lampK = (0.55 + night * 0.85) * (open ? 1 : 0.72);
     [...lamps, ...upLamps].forEach(l => { l.light.intensity = 3.5 * lampK; l.shade.material.emissiveIntensity = 0.2 + night * 0.5; });
     bulbs.forEach(b => b.material.color.set(night > 0.5 ? '#ffd49a' : '#ffe9c9'));
 
@@ -2094,7 +2241,7 @@ export function buildWorld(renderer) {
     const lampK2 = lampK * (1 + (1 - wx.sun) * 0.2 * day);
     [...lamps, ...upLamps].forEach(l => { l.light.intensity = 3.5 * lampK2; });
     outside.setSky(hour, day, dusk, night);
-    return { day, night };
+    return { day, night, open };
   }
   let baseHemi = 0.9;
 
@@ -2161,10 +2308,32 @@ export function buildWorld(renderer) {
     }
   }
 
+  // Photos in the frames: { p1: { cover, caption }, … } (cover: media id or link).
+  const photoKeys = {};
+  function setPhotos(photos = {}) {
+    for (const [id, pic] of Object.entries(photoMeshes)) {
+      const p = photos[id] || {};
+      const src = p.cover == null || p.cover === '' ? null : /^\d+$/.test(String(p.cover)) ? `/api/media/${p.cover}` : String(p.cover);
+      if (photoKeys[id] === src) continue;
+      photoKeys[id] = src;
+      const n = Object.keys(photoMeshes).indexOf(id);
+      const f = PHOTO_FRAMES[n];
+      const set = tex => { if (pic.material.map) pic.material.map.dispose(); pic.material.map = tex; pic.material.needsUpdate = true; };
+      if (!src) { set(sakuraPrint(n, f.w / f.h)); continue; }
+      new THREE.TextureLoader().setCrossOrigin('anonymous').load(src, tex => {
+        tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+        // cover the frame without stretching: crop the picture to the frame's shape
+        const ia = tex.image.width / tex.image.height, fa = (f.w - 0.1) / (f.h - 0.1);
+        if (ia > fa) { tex.repeat.set(fa / ia, 1); tex.offset.set((1 - fa / ia) / 2, 0); } else { tex.repeat.set(1, ia / fa); tex.offset.set(0, (1 - ia / fa) / 2); }
+        if (photoKeys[id] === src) set(tex);
+      }, undefined, () => {});
+    }
+  }
+
   const api = Object.assign(api_, {
     scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
-    setBookOfWeek,
+    setBookOfWeek, setPhotos, photoFrames: PHOTO_FRAMES,
     walk, kitchen: { ...KIT, door: { x: KX, z: ROOM.minZ - 0.1 } }, updateDoors, counter,
     fire: { x: fire.x - 0.4, y: 0.5, z: fire.z }, board, tree,
   });
