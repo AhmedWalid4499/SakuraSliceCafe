@@ -1691,13 +1691,71 @@ export function buildWorld(renderer) {
   windowBar('bar-left', 'the window bar', mapX(-6) - 1.8, mapX(-6) + 1.8, 4);
   windowBar('bar-right', 'the street bar', mapX(6) - 2.8, mapX(6) + 0.6, 4); // kept clear of the sakura tree
 
+  // ── sunlight on the floor: each window throws its shape (panes and all)
+  // across the boards, following the sun — long and golden in the morning
+  // through the front, amber through the left windows late in the day.
+  const paneTex = (() => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+    const x = c.getContext('2d');
+    x.fillStyle = '#000'; x.fillRect(0, 0, 256, 128);
+    const g = x.createRadialGradient(128, 64, 10, 128, 64, 150);
+    g.addColorStop(0, '#fff'); g.addColorStop(1, '#bbb');
+    x.fillStyle = g; x.fillRect(8, 6, 240, 116);
+    x.fillStyle = '#000';
+    for (const bx of [84, 170]) x.fillRect(bx - 4, 0, 8, 128); // mullions
+    x.fillRect(0, 60, 256, 7);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const windowsLit = [
+    { wall: 'front', a: mapX(-6) - 2, b: mapX(-6) + 2 }, { wall: 'front', a: mapX(6) - 2, b: mapX(6) + 2 },
+    { wall: 'left', a: mapZ(-3.5) - 1.5, b: mapZ(-3.5) + 1.5 }, { wall: 'left', a: mapZ(2.5) - 1.5, b: mapZ(2.5) + 1.5 },
+  ].map(w => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
+    geo.setIndex([0, 1, 2, 0, 2, 3]);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      map: paneTex, color: '#ffd9a0', transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+      depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2,
+    }));
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 1;
+    root.add(fixed(mesh));
+    return { ...w, mesh };
+  });
+  function lightWindows(sunDir, strength, color) {
+    // sunDir: from the room towards the sun
+    const L = sunDir.clone().negate(); // the way the light travels
+    for (const w of windowsLit) {
+      const into = w.wall === 'front' ? -L.z : L.x; // how squarely it comes in through this wall
+      const ok = L.y < -0.05 && into > 0.08;
+      const k = ok ? strength * Math.min(1, into * 1.6) * Math.min(1, -L.y * 4) : 0;
+      w.mesh.visible = k > 0.01;
+      if (!w.mesh.visible) continue;
+      w.mesh.material.opacity = 0.42 * k;
+      w.mesh.material.color.copy(color);
+      const pos = w.mesh.geometry.attributes.position;
+      // the window's corners: [along the wall, height]
+      const corners = [[w.a, 1.0], [w.b, 1.0], [w.b, 3.0], [w.a, 3.0]];
+      corners.forEach(([u, y], i) => {
+        const t = Math.min(14, y / -L.y);
+        const px = w.wall === 'front' ? u : ROOM.minX, pz = w.wall === 'front' ? ROOM.maxZ : u;
+        pos.setXYZ(i, px + L.x * t, 0.012, pz + L.z * t);
+      });
+      pos.needsUpdate = true;
+    }
+  }
+
   // ── the photo wall: frames on the left wall for real photos of the café
   // (the owner hangs them from inside the café — see setPhotos). Until a
   // photo goes in, each one holds a soft sakura print.
   const PHOTO_FRAMES = [
-    { id: 'p1', z: -1.75, y: 2.05, w: 0.62, h: 0.8 },
-    { id: 'p2', z: -0.55, y: 2.2, w: 0.9, h: 0.66 },
-    { id: 'p3', z: 0.6, y: 1.95, w: 0.56, h: 0.72 },
+    // either side of the café's name sign, and a row past the second window
+    { id: 'p1', z: -2.75, y: 2.05, w: 0.62, h: 0.8 },
+    { id: 'p2', z: 1.25, y: 2.15, w: 0.9, h: 0.66 },
+    { id: 'p3', z: 8.4, y: 1.95, w: 0.56, h: 0.72 },
     { id: 'p4', z: 5.9, y: 2.0, w: 0.86, h: 0.64 },
     { id: 'p5', z: 7.15, y: 2.05, w: 0.6, h: 0.78 },
   ];
@@ -2164,6 +2222,7 @@ export function buildWorld(renderer) {
     // the lower the sun, the warmer the light: golden mornings, amber evenings
     const low = Math.max(0, 1 - (elev * 180 / Math.PI - 6) / 30);
     sun.color.set(wx.fogColor && wx.fog > 0.6 ? wx.fogColor : '#fff1dc').lerp(new THREE.Color(dusk > 0.3 ? '#ff9a5a' : '#ffbe78'), Math.min(1, low * 1.1 + dusk * 0.4));
+    lightWindows(sun.position.clone().normalize(), day * Math.max(0, wx.sun - 0.15) / 0.85, sun.color);
     hemi.intensity = 0.1 + daylight * 0.5;
     hemi.color.set(night > 0.5 ? '#9fa9d6' : wx.sun < 0.4 ? '#dfe4ea' : '#fff3e0');
     fill.intensity = 0.06 + daylight * 0.12;
