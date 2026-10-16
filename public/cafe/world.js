@@ -1544,6 +1544,121 @@ export function buildWorld(renderer) {
   }
   board.placed = true;
 
+  // ── more tables, added after the café grew (already at their real places,
+  // so built after the spread-out above). A mix of round tables, little square
+  // tables for two, and a bar along each front window with stools — the way a
+  // real café fills its floor.
+  function squareTable(x, z, w = 0.72, h = 0.76, ry = 0) {
+    const g = new THREE.Group();
+    const t = rbox(w, 0.05, w, 0.015, M.wood);
+    t.position.y = h;
+    const apron = rbox(w - 0.08, 0.08, w - 0.08, 0.01, M.woodDark);
+    apron.position.y = h - 0.065;
+    g.add(t, apron);
+    for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const leg = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, h - 0.03, 16), M.woodDark));
+      leg.position.set(lx * (w / 2 - 0.07), (h - 0.03) / 2, lz * (w / 2 - 0.07));
+      g.add(leg);
+    }
+    g.position.set(x, 0, z);
+    g.rotation.y = ry;
+    root.add(g);
+    t.userData.surface = 'table';
+    t.userData.top = h + 0.026 + FY;
+    surfaces.push(t);
+    colliders.push({ type: 'circle', x, z, r: w * 0.62 + 0.12 });
+    return { group: g, top: t };
+  }
+  function seatAt(id, label, cx, cz, ry, i, h, mesh) {
+    colliders.push({ type: 'circle', x: cx, z: cz, r: 0.26 });
+    const seat = { id: `${id}-${i}`, label, x: cx, z: cz, y: FY, h, ry, chair: mesh, table: id };
+    seats.push(seat);
+    mesh.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat, label: `Sit at ${label}` }; interactables.push(o); } });
+  }
+  function addSquare(id, number, x, z, ry, sides) {
+    const t = squareTable(x, z, 0.72, 0.76, ry);
+    const label = `Table ${number}`;
+    t.top.userData.tableName = label;
+    vase(x - 0.12, t.top.userData.top - FY, z - 0.1);
+    numberCard(number, x + 0.16, t.top.userData.top - FY, z + 0.12, ry + 0.4);
+    sides.forEach((a, i) => {
+      const ang = ry + a;
+      const cx = x + Math.sin(ang) * 0.72, cz = z + Math.cos(ang) * 0.72;
+      seatAt(id, label, cx, cz, ang + Math.PI, i, 0.54, chair(cx, cz, ang + Math.PI, i % 2 ? M.cushionSage : M.cushion));
+    });
+  }
+  function addRound(id, number, x, z, angles) {
+    const label = `Table ${number}`;
+    const t = roundTable(x, z);
+    t.top.userData.tableName = label;
+    vase(x, t.top.userData.top - FY, z);
+    numberCard(number, x + 0.26, t.top.userData.top - FY, z + 0.16, 0.4);
+    angles.forEach((ang, i) => {
+      const cx = x + Math.sin(ang) * 0.85, cz = z + Math.cos(ang) * 0.85;
+      seatAt(id, label, cx, cz, ang + Math.PI, i, 0.54, chair(cx, cz, ang + Math.PI));
+    });
+  }
+  // a tall stool: round seat, four splayed legs, a footrest ring
+  function stool(x, z, ry) {
+    const g = new THREE.Group();
+    const top = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.18, 0.05, 32), M.woodLight));
+    top.position.y = 0.7;
+    const pad = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.17, 0.035, 32), M.cushion));
+    pad.position.y = 0.74;
+    g.add(top, pad);
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + Math.PI / 4;
+      const leg = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.72, 12), M.woodDark));
+      leg.position.set(Math.cos(a) * 0.15, 0.35, Math.sin(a) * 0.15);
+      leg.rotation.set(Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12);
+      g.add(leg);
+    }
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.012, 8, 32), M.brass);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.26;
+    g.add(ring);
+    g.position.set(x, 0, z);
+    g.rotation.y = ry;
+    root.add(g);
+    return g;
+  }
+  // a bar along a front window: a deep wooden ledge on brackets, stools facing the street
+  function windowBar(id, label, x0, x1, n) {
+    const z = ROOM.maxZ - 0.32, h = 0.98, w = x1 - x0;
+    const top = rbox(w, 0.05, 0.42, 0.015, M.wood);
+    top.position.set((x0 + x1) / 2, h, z);
+    root.add(top);
+    top.userData.surface = 'table';
+    top.userData.top = h + 0.026 + FY;
+    top.userData.tableName = label;
+    surfaces.push(top);
+    for (let k = 0; k <= 2; k++) {
+      const bx = x0 + 0.2 + (w - 0.4) * k / 2;
+      const post = rbox(0.06, h - 0.03, 0.06, 0.01, M.woodDark);
+      post.position.set(bx, (h - 0.03) / 2, z + 0.1);
+      root.add(post);
+    }
+    colliders.push({ type: 'box', minX: x0, maxX: x1, minZ: z - 0.25, maxZ: ROOM.maxZ, fixed: true });
+    for (let i = 0; i < n; i++) {
+      const sx = x0 + w * (i + 0.5) / n, sz = z - 0.55;
+      seatAt(id, label, sx, sz, 0, i, 0.75, stool(sx, sz, 0));
+    }
+    // a couple of small things on the ledge, like a real one
+    vase((x0 + x1) / 2, h + 0.026, z + 0.05);
+    const card = makeSign([{ text: label, size: 110, weight: '700' }, { text: 'watch Cairo go by', font: 'Dancing Script, cursive', size: 80, color: COLORS.sakuraDark }], 0.3, 0.17);
+    card.position.set(x0 + 0.35, h + 0.12, z - 0.02);
+    card.rotation.y = Math.PI;
+    root.add(card);
+  }
+
+  addRound('t8', 8, -11.6, 2.4, [0, Math.PI / 2, Math.PI]);
+  addSquare('t9', 9, -8.6, 7.0, 0.2, [Math.PI / 2, -Math.PI / 2]);
+  addSquare('t10', 10, 8.6, -2.0, 0, [Math.PI / 2, -Math.PI / 2]);
+  addRound('t11', 11, 6.2, 2.6, [0, Math.PI / 2, Math.PI, -Math.PI / 2]);
+  addSquare('t12', 12, -5.4, 4.6, -0.15, [0, Math.PI]);
+  windowBar('bar-left', 'the window bar', mapX(-6) - 1.8, mapX(-6) + 1.8, 4);
+  windowBar('bar-right', 'the street bar', mapX(6) - 2.8, mapX(6) + 0.6, 4); // kept clear of the sakura tree
+
   // Weather haze is for outside: nothing inside the café fogs up.
   for (const f of Object.values(floors)) noFog(f.group);
 
