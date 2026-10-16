@@ -4,6 +4,11 @@
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWorld, ROOM, STAIRS, noFog } from './world.js';
 import { mapZ } from './layout.mjs';
 import { currentWeather, WEATHER } from './weather.js';
@@ -13,6 +18,7 @@ import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
 import { createStaff } from './staff.js';
 import { fullMenu, SEASONS } from './drinks.mjs';
+import { createRadio, audioDuration } from './radio.js';
 
 const $ = id => document.getElementById(id);
 
@@ -69,7 +75,41 @@ function applyQuality(q) {
   renderer.setPixelRatio(q === 'gentle' ? 1 : q === 'balanced' ? Math.min(dpr, 1.5) : Math.min(dpr, 2));
   renderer.shadowMap.enabled = q !== 'gentle';
   world.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+  post.on = q === 'high' && post.ok;
   resize();
+}
+
+// On the sharpest setting the picture gets the touches a camera would give
+// it: soft shadows where things meet (ambient occlusion — under the tables,
+// in the corners, where a cup sits) and a gentle glow off the lamps.
+const post = { on: false, ok: true, composer: null, ao: null };
+function makePost() {
+  try {
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    const composer = new EffectComposer(renderer, rt);
+    composer.addPass(new RenderPass(world.scene, camera));
+    const ao = new GTAOPass(world.scene, camera, 1, 1);
+    ao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.6, thickness: 1.2, scale: 1.1, samples: 12 });
+    ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+    ao.blendIntensity = 0.85;
+    // name tags, bubbles, glass and rain shouldn't throw ambient shadows
+    const hideOwn = ao.overrideVisibility.bind(ao);
+    ao.overrideVisibility = function () {
+      hideOwn();
+      this.scene.traverse(o => {
+        const m = o.material;
+        if (o.isSprite || (m && !Array.isArray(m) && m.transparent && (m.opacity < 0.95 || m.depthWrite === false))) o.visible = false;
+      });
+    };
+    composer.addPass(ao);
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.16, 0.45, 0.92));
+    composer.addPass(new OutputPass());
+    post.composer = composer;
+    post.ao = ao;
+  } catch (e) {
+    console.warn('post-processing unavailable', e);
+    post.ok = false;
+  }
 }
 
 const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 400);
@@ -83,6 +123,7 @@ await Promise.all([
 ]).catch(() => {});
 
 const world = buildWorld(renderer);
+makePost();
 // the team walks about, and brings orders to your table (see staff.js)
 const staff = createStaff(world, { say: (n, line) => bubble(n.av.group, line, 'npc') });
 world.onThunder = () => sound.thunder();
@@ -93,6 +134,7 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
+  if (post.composer) { post.composer.setPixelRatio(renderer.getPixelRatio()); post.composer.setSize(w, h); }
   camera.aspect = w / h;
   camera.fov = w < 640 ? 65 : 55;
   camera.updateProjectionMatrix();
@@ -831,7 +873,7 @@ function handle(m) {
       break;
     }
     case 'music':
-      showMusic(true);
+      showMusic(true, 'spotify');
       musicAction(m.action);
       toast(m.action === 'pause' ? `⏸ ${m.by} paused the café playlist.` : `🎧 ${m.by} is playing the café playlist for everyone — if it's quiet, tap ▶ in the player.`);
       break;
@@ -1399,6 +1441,8 @@ function click(x, y) {
     send({ t: 'emote', e: 'wave' });
     return;
   }
+  if (d.kind === 'shelf') return openShelf();
+  if (d.kind === 'bookweek') return openBook();
   if (d.kind === 'info') {
     $('infoTitle').textContent = d.label;
     $('infoText').textContent = d.text || '';
@@ -1439,7 +1483,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -1509,11 +1553,165 @@ $('openMusic').onclick = () => { closePanels(); showMusic(true); };
 $('musicBtn').onclick = () => showMusic($('musicDock').classList.contains('hidden'));
 $('musicClose').onclick = () => showMusic(false);
 // The player stays in the page when hidden, so the music keeps going.
-function showMusic(on) {
+function showMusic(on, tab) {
   $('musicDock').classList.toggle('hidden', !on);
   $('musicBtn').classList.toggle('on', on);
-  if (on) openSpotify();
+  if (tab) musicTab(tab);
+  if (on) { if (state.musicTab === 'spotify') openSpotify(); else renderRadio(); }
 }
+state.musicTab = 'radio';
+function musicTab(t) {
+  state.musicTab = t;
+  document.querySelectorAll('[data-mtab]').forEach(b => b.classList.toggle('on', b.dataset.mtab === t));
+  $('radioTab').classList.toggle('hidden', t !== 'radio');
+  $('spotifyTab').classList.toggle('hidden', t !== 'spotify');
+  if (t === 'spotify') openSpotify(); else renderRadio();
+}
+document.querySelectorAll('[data-mtab]').forEach(b => { b.onclick = () => musicTab(b.dataset.mtab); });
+// The generated piano steps aside while real music plays.
+function duck() { sound.duckMusic(!!(spotify.playing || radio.state.playing)); }
+
+// ── The café radio (radio.js): the owner's songs, heard together.
+const radio = createRadio({ api, onChange: () => { duck(); renderRadio(); } });
+const fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+function renderRadio() {
+  const r = radio.state;
+  const admin = !!(state.me && state.me.isAdmin);
+  $('radioOwner').classList.toggle('hidden', !admin);
+  const t = r.current;
+  $('radioPlay').textContent = r.listening && r.playing ? '⏸' : '▶';
+  $('radioPlay').classList.toggle('on', r.listening && r.playing);
+  $('radioPlay').setAttribute('aria-label', r.listening ? 'Stop listening' : 'Listen');
+  if (!r.tracks.length) {
+    $('radioTitle').textContent = 'The café radio';
+    $('radioArtist').textContent = admin ? 'No songs yet — upload some below.' : 'Quiet for now — the café hasn\'t put any songs on yet.';
+    $('radioBar').style.width = '0';
+  } else if (!r.on) {
+    $('radioTitle').textContent = 'The radio is off';
+    $('radioArtist').textContent = 'The café turned it off for now.';
+    $('radioBar').style.width = '0';
+  } else if (t) {
+    $('radioTitle').textContent = t.title || 'A song';
+    const at = radio.progress();
+    $('radioArtist').textContent = `${t.artist ? t.artist + ' · ' : ''}${fmt(at)} / ${fmt(t.duration)}`;
+    $('radioBar').style.width = `${Math.min(100, (at / t.duration) * 100)}%`;
+  }
+  $('radioNote').textContent = r.blocked
+    ? 'Your browser wants one tap first — press ▶.'
+    : 'Everyone in the café hears the same song at the same moment.';
+  $('radioOnOff').textContent = r.on ? '⏻ Turn the radio off' : '⏻ Turn the radio on';
+  if (admin) {
+    const list = $('radioList');
+    const ids = r.tracks.map(x => x.id);
+    if (list.dataset.ids !== ids.join(',') + '|' + (t && t.id)) {
+      list.dataset.ids = ids.join(',') + '|' + (t && t.id);
+      list.replaceChildren(...r.tracks.map((x, i) => {
+        const li = document.createElement('li');
+        li.classList.toggle('now', !!(t && t.id === x.id));
+        li.append(`${x.title || 'A song'}${x.artist ? ' — ' + x.artist : ''} (${fmt(x.duration)}) `);
+        const mk = (label, title, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.title = title; b.onclick = fn; return b; };
+        if (i > 0) li.append(mk('↑', 'Earlier', () => moveTrack(i, -1)));
+        if (i < r.tracks.length - 1) li.append(mk('↓', 'Later', () => moveTrack(i, 1)));
+        li.append(mk('✕', 'Take it off the radio', () => removeTrack(x)));
+        return li;
+      }));
+    }
+    if (r.waiting) $('radioUp').textContent = `${r.waiting} song(s) without a length — upload them again from this panel.`;
+  }
+}
+setInterval(() => { if (!$('musicDock').classList.contains('hidden') && state.musicTab === 'radio') renderRadio(); }, 1000);
+$('radioPlay').onclick = () => {
+  const on = !(radio.state.listening && (radio.state.playing || !radio.state.blocked));
+  radio.listen(on || radio.state.blocked);
+  try { localStorage.setItem('cafe.radio.off', radio.state.listening ? '' : '1'); } catch (e) { /* private window */ }
+  if (radio.state.listening && spotify.controller && spotify.playing) { try { spotify.controller.pause(); } catch (e) { /* ignore */ } }
+};
+$('radioVol').oninput = () => {
+  radio.setVolume($('radioVol').value / 100);
+  try { localStorage.setItem('cafe.radio.vol', $('radioVol').value); } catch (e) { /* ignore */ }
+};
+try { const v = localStorage.getItem('cafe.radio.vol'); if (v) { $('radioVol').value = v; radio.setVolume(v / 100); } } catch (e) { /* ignore */ }
+
+// Save a new running order, keeping the song that's on playing where it is
+// (so nobody hears a jump when the owner adds or moves songs).
+async function saveRadio(order, { restart = false, on } = {}) {
+  const r = radio.state;
+  const cur = radio.where();
+  const conf = { ...(state.content['cafe.radio'] || {}), order, on: on ?? r.on };
+  const byId = new Map(r.tracks.map(t => [t.id, t]));
+  const next = order.map(id => byId.get(id)).filter(Boolean);
+  const now = Date.now() + r.skew;
+  if (restart || !cur || !next.some(t => t.id === cur.track.id)) conf.startedAt = now;
+  else {
+    let before = 0;
+    for (const t of next) { if (t.id === cur.track.id) break; before += t.duration; }
+    conf.startedAt = Math.round(now - (before + cur.offset) * 1000);
+  }
+  await api('/admin/content/cafe.radio', { method: 'PUT', body: { value: conf, description: 'The café radio: the songs in order (media ids), when it started (ms), and whether it is on. Changed from the 🎧 panel in the café.' } });
+  state.content['cafe.radio'] = conf;
+  await radio.load();
+}
+async function moveTrack(i, d) {
+  $('radioErr').textContent = '';
+  const order = radio.state.tracks.map(t => t.id);
+  [order[i], order[i + d]] = [order[i + d], order[i]];
+  try { await saveRadio(order); } catch (e) { $('radioErr').textContent = e.message; }
+}
+async function removeTrack(t) {
+  if (!confirm(`Take "${t.title || 'this song'}" off the radio?`)) return;
+  $('radioErr').textContent = '';
+  try {
+    await saveRadio(radio.state.tracks.map(x => x.id).filter(id => id !== t.id));
+    await api(`/admin/media/${t.id}`, { method: 'DELETE' });
+    await radio.load();
+  } catch (e) { $('radioErr').textContent = e.message; }
+}
+$('radioRestart').onclick = async () => {
+  try { await saveRadio(radio.state.tracks.map(t => t.id), { restart: true }); toast('📻 The radio starts again from the first song — for everyone.'); } catch (e) { $('radioErr').textContent = e.message; }
+};
+$('radioOnOff').onclick = async () => {
+  try { await saveRadio(radio.state.tracks.map(t => t.id), { on: !radio.state.on }); } catch (e) { $('radioErr').textContent = e.message; }
+};
+const AUDIO_TYPES = { mp3: 'audio/mpeg', m4a: 'audio/mp4', mp4: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', wav: 'audio/wav', webm: 'audio/webm', flac: 'audio/flac' };
+const IMAGE_TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
+function fileType(file, table) {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  return table[ext] || file.type || 'application/octet-stream';
+}
+async function upload(file, type, meta = {}) {
+  const q = new URLSearchParams({ name: file.name, ...meta });
+  const res = await fetch('/api/admin/upload?' + q, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': type }, body: file });
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* empty */ }
+  if (!res.ok) throw new Error((data && data.error) || (res.status === 413 ? 'That file is too big (30 MB at most).' : 'The upload didn\'t work. Please try again.'));
+  return data.media;
+}
+$('radioFiles').onchange = async e => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  if (!files.length) return;
+  $('radioErr').textContent = '';
+  const added = [];
+  for (const [n, f] of files.entries()) {
+    $('radioUp').textContent = `Uploading ${n + 1} of ${files.length}: ${f.name}…`;
+    try {
+      const duration = await audioDuration(f);
+      if (!duration) throw new Error(`Couldn't read "${f.name}" as a song.`);
+      const base = f.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ');
+      const [artist, title] = base.includes(' - ') ? base.split(' - ', 2) : ['', base];
+      const m = await upload(f, fileType(f, AUDIO_TYPES), { title: title.trim(), artist: artist.trim(), duration: duration.toFixed(2) });
+      added.push(m.id);
+    } catch (err) { $('radioErr').textContent = err.message; }
+  }
+  $('radioUp').textContent = added.length ? `Added ${added.length} song(s) to the end of the radio.` : '';
+  if (added.length) {
+    try {
+      const before = radio.state.tracks.map(t => t.id);
+      await radio.load(); // picks up the new songs (on the end)
+      await saveRadio([...before, ...added]);
+    } catch (err) { $('radioErr').textContent = err.message; }
+  }
+};
 
 // ── Lofi from Spotify: the café's playlist (site_content 'cafe.spotify'),
 // played in Spotify's own player. Everyone gets the same playlist; while it
@@ -1541,7 +1739,11 @@ function openSpotify() {
     api.createController(holder, { uri, width: '100%', height: 152 }, controller => {
       spotify.controller = controller;
       spotify.uri = uri;
-      controller.addListener('playback_update', e => { spotify.playing = !!(e.data && !e.data.isPaused); sound.duckMusic(spotify.playing); });
+      controller.addListener('playback_update', e => {
+        spotify.playing = !!(e.data && !e.data.isPaused);
+        if (spotify.playing && radio.state.listening) radio.listen(false); // one music at a time
+        duck();
+      });
       controller.addListener('ready', () => { if (spotify.pending) { const a = spotify.pending; spotify.pending = null; musicAction(a); } });
     });
   };
@@ -1564,7 +1766,7 @@ function musicAction(action) {
 }
 $('playAll').onclick = () => {
   send({ t: 'music', action: 'play' });
-  showMusic(true);
+  showMusic(true, 'spotify');
   musicAction('play');
   toast('🎧 The café playlist is playing — for everyone in the café.');
 };
@@ -1592,6 +1794,147 @@ $('muteBtn').onclick = () => {
   savePrefs();
 };
 $('helpBtn').onclick = () => openPanel('helpPanel');
+
+// ───────────────────────────────────────── the story shelf
+
+state.shelfTab = 'all';
+const storyList = () => (Array.isArray(state.content['stories.library']) ? state.content['stories.library'] : []).filter(x => x && x.paragraphs && x.paragraphs.length);
+function storyLine(x) {
+  return [x.kind === 'night' ? '🌙 Bedtime' : '☀️ Morning', x.edition, x.day, x.date].filter(Boolean).join(' · ');
+}
+function renderShelf() {
+  const all = storyList();
+  const show = all.map((x, i) => [x, i]).filter(([x]) => state.shelfTab === 'all' || (x.kind === 'night' ? 'night' : 'morning') === state.shelfTab);
+  document.querySelectorAll('[data-shelf]').forEach(b => b.classList.toggle('on', b.dataset.shelf === state.shelfTab));
+  const books = $('shelfBooks');
+  if (!show.length) {
+    const p = document.createElement('p');
+    p.className = 'fine';
+    p.textContent = all.length ? 'Nothing on this side of the shelf yet.' : 'The shelf is waiting for its first stories.';
+    books.replaceChildren(p);
+  } else {
+    books.replaceChildren(...show.map(([x, i]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'shelf-book';
+      const top = document.createElement('span'); top.textContent = storyLine(x);
+      const t = document.createElement('b'); t.textContent = x.title || 'A story';
+      const first = document.createElement('span'); first.textContent = String(x.paragraphs[0]).replace(/\*/g, '').slice(0, 90) + '…';
+      b.append(top, t, first);
+      b.onclick = () => readStory(i);
+      return b;
+    }));
+  }
+  const admin = !!(state.me && state.me.isAdmin);
+  $('shelfOwner').classList.toggle('hidden', !admin);
+  const sh = state.content['stories.sheet'] || {};
+  $('shelfStatus').textContent = sh.lastSync ? `Last read ${new Date(sh.lastSync).toLocaleString()} — ${sh.count} stories.` : (sh.hasSheet ? 'Not read yet.' : '');
+}
+function readStory(i) {
+  const x = storyList()[i];
+  if (!x) return;
+  $('shelfList').classList.add('hidden');
+  $('shelfRead').classList.remove('hidden');
+  $('storyEyebrow').textContent = storyLine(x);
+  $('storyTitle').textContent = x.title || 'A story';
+  // *soft emphasis* from the letters becomes italics
+  $('storyText').replaceChildren(...x.paragraphs.map(par => {
+    const p = document.createElement('p');
+    String(par).split(/(\*[^*]+\*)/).forEach(bit => {
+      if (/^\*[^*]+\*$/.test(bit)) { const em = document.createElement('em'); em.textContent = bit.slice(1, -1); p.append(em); }
+      else if (bit) p.append(bit);
+    });
+    return p;
+  }));
+  $('storyText').scrollTop = 0;
+}
+async function openShelf() {
+  $('shelfList').classList.remove('hidden');
+  $('shelfRead').classList.add('hidden');
+  renderShelf();
+  openPanel('shelfPanel');
+  if (state.me && state.me.isAdmin && !$('shelfSheet').value) {
+    api('/admin/stories/sheet').then(c => { if (c.url && !$('shelfSheet').value) $('shelfSheet').value = c.url; }).catch(() => {});
+  }
+}
+document.querySelectorAll('[data-shelf]').forEach(b => { b.onclick = () => { state.shelfTab = b.dataset.shelf; renderShelf(); }; });
+$('shelfBack').onclick = () => { $('shelfRead').classList.add('hidden'); $('shelfList').classList.remove('hidden'); };
+async function shelfCall(path, body) {
+  $('shelfErr').textContent = '';
+  $('shelfStatus').textContent = 'Reading the sheet…';
+  try {
+    const r = await api(path, { method: 'POST', body });
+    toast(`📚 ${r.count} stories on the shelf.`);
+    // the new list arrives over the socket too; take it now in case
+    try { state.content['stories.library'] = await api('/content/stories.library'); state.content['stories.sheet'] = await api('/content/stories.sheet'); } catch (e) { /* ignore */ }
+    renderShelf();
+  } catch (e) { $('shelfErr').textContent = e.message; $('shelfStatus').textContent = ''; }
+}
+$('shelfSave').onclick = () => shelfCall('/admin/stories/sheet', { url: $('shelfSheet').value.trim() });
+$('shelfSync').onclick = () => shelfCall('/admin/stories/sync', {});
+
+// ───────────────────────────────────────── the book of the week
+
+const coverUrl = c => (c === '' || c == null ? '' : /^\d+$/.test(String(c)) ? `/api/media/${c}` : String(c));
+function renderBook() {
+  const b = state.content['cafe.bookOfWeek'] || {};
+  $('bookTitle').textContent = b.title || 'Coming soon';
+  $('bookAuthor').textContent = b.author ? `by ${b.author}` : '';
+  $('bookNote').textContent = b.note || '';
+  const url = coverUrl(b.cover);
+  $('bookImg').classList.toggle('hidden', !url);
+  if (url) { $('bookImg').src = url; $('bookImg').alt = `The cover of ${b.title || 'the book'}`; }
+}
+function openBook() {
+  renderBook();
+  const admin = !!(state.me && state.me.isAdmin);
+  $('bookOwner').classList.toggle('hidden', !admin);
+  if (admin) {
+    const b = state.content['cafe.bookOfWeek'] || {};
+    $('bookSetTitle').value = b.title || '';
+    $('bookSetAuthor').value = b.author || '';
+    $('bookSetNote').value = b.note || '';
+    $('bookSetUrl').value = /^\d+$/.test(String(b.cover || '')) ? '' : (b.cover || '');
+    $('bookCoverNote').textContent = /^\d+$/.test(String(b.cover || '')) ? 'Using the cover you uploaded.' : '';
+    state.bookCover = b.cover || '';
+  }
+  $('bookErr').textContent = '';
+  openPanel('bookPanel');
+}
+$('bookFile').onchange = async e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  $('bookErr').textContent = '';
+  $('bookCoverNote').textContent = 'Uploading…';
+  try {
+    const m = await upload(f, fileType(f, IMAGE_TYPES), { title: $('bookSetTitle').value.trim() });
+    state.bookCover = m.id;
+    $('bookSetUrl').value = '';
+    $('bookCoverNote').textContent = `✓ ${f.name} — press "Hang it up".`;
+    $('bookImg').src = `/api/media/${m.id}`;
+    $('bookImg').classList.remove('hidden');
+  } catch (err) { $('bookCoverNote').textContent = ''; $('bookErr').textContent = err.message; }
+};
+$('bookSave').onclick = async () => {
+  $('bookErr').textContent = '';
+  let cover = state.bookCover || '';
+  const link = $('bookSetUrl').value.trim();
+  try {
+    // a picture from elsewhere is copied into the café, so the 3D frame can show it
+    if (link && link !== String(cover)) {
+      if (!/^https?:\/\//.test(link)) throw new Error('The cover link should start with https://');
+      const r = await api('/admin/media/from-url', { method: 'POST', body: { url: link, title: $('bookSetTitle').value.trim() } });
+      cover = r.media.id;
+    }
+    const value = { title: $('bookSetTitle').value.trim(), author: $('bookSetAuthor').value.trim(), note: $('bookSetNote').value.trim(), cover };
+    if (!value.title) throw new Error('Give the book a title.');
+    await api('/admin/content/cafe.bookOfWeek', { method: 'PUT', body: { value, description: 'The book of the week, framed on the café wall by the bookshelf: { title, author, note, cover } — cover is an uploaded picture (media id) or a link.' } });
+    state.content['cafe.bookOfWeek'] = value;
+    applyContent('cafe.bookOfWeek');
+    toast('🖼️ The book of the week is on the wall.');
+  } catch (e) { $('bookErr').textContent = e.message; }
+};
 
 // ───────────────────────────────────────── actions
 
@@ -1634,6 +1977,9 @@ $('outBtn').onclick = async () => {
 function applyContent(key) {
   const c = state.content;
   if (key === 'cafe.spotify' && spotify.controller) openSpotify();
+  if (key === 'cafe.radio') radio.load().catch(() => {});
+  if (!key || key === 'cafe.bookOfWeek') { world.setBookOfWeek(c['cafe.bookOfWeek'] || {}); if (!$('bookPanel').classList.contains('hidden')) renderBook(); }
+  if (key === 'stories.library' && !$('shelfPanel').classList.contains('hidden')) renderShelf();
   if (!key || key === 'cafe.weather') refreshWeather();
   if (!key || key === 'cafe.board') {
     const b = c['cafe.board'];
@@ -1868,8 +2214,15 @@ $('enterBtn').onclick = async () => {
   $('chatAct').classList.toggle('on', !small);
   $('adminLink').classList.toggle('hidden', !state.me.isAdmin);
   $('wxOwnerBtn').classList.toggle('hidden', !state.me.isAdmin);
-  showMusic(!small);
-  if (small) setTimeout(() => toast('🎧 Tap 🎧 at the top for the café playlist.'), 4000);
+  // The radio comes on as you walk in (this click lets the browser play it),
+  // unless you turned it off last time.
+  let radioOff = false;
+  try { radioOff = localStorage.getItem('cafe.radio.off') === '1'; } catch (e) { /* ignore */ }
+  radio.load().then(() => {
+    if (!radioOff && radio.state.tracks.length && radio.state.on) radio.listen(true);
+    showMusic(!small, radio.state.tracks.length || state.me.isAdmin ? 'radio' : 'spotify');
+  }).catch(() => showMusic(!small, 'spotify'));
+  if (small) setTimeout(() => toast('🎧 Tap 🎧 at the top for the café radio.'), 4000);
   state.started = true;
   canvas.focus();
 
@@ -2324,12 +2677,13 @@ function frame() {
     camera.lookAt(0, 1.3, -2.8);
   }
   if (preview) preview.frame(dt);
-  renderer.render(scene, camera);
+  if (post.on) post.composer.render(dt);
+  else renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff, radio, post, openShelf, openBook };
 
 // ───────────────────────────────────────── start
 

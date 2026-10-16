@@ -138,8 +138,8 @@ export function makeLabel(text, opts = {}) {
  * avatar: { body, skin, hair, hairStyle, outfit, accent, accessory }
  * extra:  { apron, pocket, bowtie, bow, neckerchief, glasses: 'tortoise', scale }
  *
- * Chibi proportions (a big soft head on a small rounded body), faces that
- * blink and smile, and a few details per kind: a fox's bushy tail and dark
+ * Storybook proportions — a gently large head on a rounded body, but not
+ * chibi — faces that blink and smile, and a few details per kind: a fox's bushy tail and dark
  * paws, a rabbit's floppy ear, an owl's half-shut eyes and feathered chest.
  */
 export function buildAvatar(avatar = {}, extra = {}) {
@@ -339,7 +339,7 @@ function buildAvatarParts(avatar, extra) {
   head.position.y = isOwl ? 0.97 : HEAD;
   rig.add(head);
   parts.head = head;
-  if (!isOwl) head.scale.setScalar(1.3); // big-headed: softer, friendlier
+  if (!isOwl) head.scale.setScalar(1.12); // a touch large, like a storybook — not a toy
 
   const headR = isOwl ? 0.3 : 0.25;
   const skull = sphere(headR, null, skinM);
@@ -412,17 +412,17 @@ function buildAvatarParts(avatar, extra) {
   const eyeY = isOwl ? 0.035 : 0.005;
   const eyeX = isOwl ? 0.09 : 0.09;
   const eyeZ = isOwl ? 0.285 : 0.214;
-  const shineM = mat('#ffffff', { emissive: '#ffffff', emissiveIntensity: 0.7 });
+  const shineM = mat('#ffffff', { emissive: '#ffffff', emissiveIntensity: 0.35 });
   for (const side of [-1, 1]) {
     const eye = new THREE.Group();
     eye.position.set(eyeX * side, eyeY, eyeZ);
     eye.rotation.y = side * (isOwl ? 0.32 : 0.4);
-    const ball = sphere(isOwl ? 0.058 : 0.037, null, darkM);
-    ball.scale.set(1, isOwl ? 1 : 1.3, 0.55);
-    const big = sphere(isOwl ? 0.016 : 0.012, null, shineM);
-    big.position.set(0.012, isOwl ? 0.02 : 0.02, 0.022);
-    const small = sphere(isOwl ? 0.008 : 0.006, null, shineM);
-    small.position.set(-0.01, -0.015, 0.022);
+    const ball = sphere(isOwl ? 0.058 : 0.03, null, darkM);
+    ball.scale.set(1, isOwl ? 1 : 1.15, 0.55);
+    const big = sphere(isOwl ? 0.016 : 0.0075, null, shineM);
+    big.position.set(isOwl ? 0.012 : 0.009, isOwl ? 0.02 : 0.013, isOwl ? 0.022 : 0.016);
+    const small = sphere(isOwl ? 0.008 : 0.0035, null, shineM);
+    small.position.set(-0.008, -0.011, isOwl ? 0.022 : 0.016);
     eye.add(ball, big, small);
     if (isOwl) {
       // Me3temed's soft, half-open eyes: a lid over the top half
@@ -437,8 +437,8 @@ function buildAvatarParts(avatar, extra) {
     }
     if (she && !isOwl) {
       // lashes, flicking out at the corner
-      for (const [x, y, r] of [[0.03, 0.036, -0.85], [0.018, 0.047, -0.45]]) {
-        const lash = capsule(0.0045, 0.018, null, darkM);
+      for (const [x, y, r] of [[0.022, 0.027, -0.85], [0.013, 0.034, -0.45]]) {
+        const lash = capsule(0.0035, 0.014, null, darkM);
         lash.position.set(x * side, y, 0.014);
         lash.rotation.z = r * side;
         eye.add(lash);
@@ -450,19 +450,19 @@ function buildAvatarParts(avatar, extra) {
       // brows
       const brow = capsule(he ? 0.011 : 0.008, 0.035, null, mat(furry ? shade(a.skin, -0.3) : a.hair, { roughness: 0.6 }));
       brow.rotation.z = Math.PI / 2 + 0.18 * side;
-      brow.position.set(eyeX * side, eyeY + 0.075, eyeZ + 0.01);
+      brow.position.set(eyeX * side, eyeY + 0.062, eyeZ + 0.01);
       brow.rotation.y = side * 0.4;
       head.add(brow);
     }
-    const blush = new THREE.Mesh(new THREE.CircleGeometry(0.036, SEG),
-      new THREE.MeshBasicMaterial({ color: '#f2a7bb', transparent: true, opacity: furry ? 0.45 : 0.6 }));
+    const blush = new THREE.Mesh(new THREE.CircleGeometry(0.034, SEG),
+      new THREE.MeshBasicMaterial({ color: '#e8a0ab', transparent: true, opacity: furry ? 0.18 : 0.22, depthWrite: false }));
     blush.position.set((eyeX + 0.065) * side, eyeY - 0.07, eyeZ - 0.035);
     blush.lookAt(blush.position.clone().multiplyScalar(3));
     head.add(blush);
   }
   // a small smile
   if (!isOwl) {
-    const smile = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.0065, 8, 18, Math.PI), mat(she ? '#c25a6a' : '#8a4a4a', { roughness: 0.5 }));
+    const smile = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.0045, 8, 18, Math.PI), mat(she ? '#b0566a' : '#7f4a46', { roughness: 0.5 }));
     smile.rotation.z = Math.PI;
     const mz = isFox ? 0.33 : isCat ? 0.27 : isRabbit ? 0.237 : 0.232;
     smile.position.set(0, isFox ? -0.115 : isRabbit ? -0.105 : -0.085, mz);
@@ -830,7 +830,7 @@ function buildAvatarParts(avatar, extra) {
     }
   }
 
-  const height = (isOwl ? 1.35 : 1.92) * (extra.scale || 1);
+  const height = (isOwl ? 1.35 : 1.86) * (extra.scale || 1);
   return { group: root, parts, setDrink, setDessert, update, height, play };
 }
 

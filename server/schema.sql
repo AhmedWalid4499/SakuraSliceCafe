@@ -164,3 +164,32 @@ ALTER TABLE cafe_notes    ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT 'm
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT 'main';
 CREATE INDEX IF NOT EXISTS cafe_notes_room_idx ON cafe_notes(room, created_at DESC);
 CREATE INDEX IF NOT EXISTS chat_room_idx ON chat_messages(room, created_at DESC);
+
+-- Files the owner uploads: songs for the café radio, the book-of-the-week
+-- cover. Kept in Postgres so everything lives in one place on Railway.
+CREATE TABLE IF NOT EXISTS media (
+  id          SERIAL PRIMARY KEY,
+  kind        TEXT NOT NULL,                          -- 'audio' | 'image'
+  mime        TEXT NOT NULL,
+  name        TEXT NOT NULL DEFAULT '',
+  title       TEXT NOT NULL DEFAULT '',
+  artist      TEXT NOT NULL DEFAULT '',
+  duration    REAL NOT NULL DEFAULT 0,                -- seconds (songs)
+  size        INTEGER NOT NULL DEFAULT 0,
+  bytes       BYTEA NOT NULL,
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- What the kindness check didn't let through (see server/moderation.js), for the owner to look over.
+CREATE TABLE IF NOT EXISTS moderation_log (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  place TEXT NOT NULL,
+  text TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  reason TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS moderation_log_created ON moderation_log (created_at DESC);

@@ -196,6 +196,35 @@
   #musicDock .fine { margin-top: 6px; }
   @media (max-width: 640px) { #musicDock { top: auto; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 21; } }
   #musicBtn.on { background: var(--sakura-light); }
+  .md-tabs { flex-wrap: nowrap; gap: 6px; }
+  .md-tabs .chip { padding: 5px 10px; font-size: 12.5px; white-space: nowrap; }
+  #radioOwner summary { cursor: pointer; font-size: 13px; color: var(--sakura-dark); margin-top: 10px; }
+  .radio-now { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
+  .radio-play { width: 46px; height: 46px; flex: none; border-radius: 50%; border: 0; background: var(--sakura-dark); color: #fff; font-size: 18px; cursor: pointer; }
+  .radio-play.on { background: var(--sakura-light); color: var(--sakura-dark); }
+  .radio-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .radio-meta b { font-size: 14px; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .radio-meta .fine { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .radio-bar { height: 4px; border-radius: 4px; background: var(--field); overflow: hidden; margin-top: 4px; }
+  .radio-bar i { display: block; height: 100%; width: 0; background: var(--sakura-dark); transition: width .5s linear; }
+  .radio-vol { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 13px; }
+  .radio-vol input { flex: 1; }
+  .radio-list { margin: 8px 0 0; padding-left: 20px; max-height: 180px; overflow: auto; font-size: 13px; }
+  .radio-list li { padding: 3px 0; }
+  .radio-list li.now { font-weight: 700; color: var(--sakura-dark); }
+  .radio-list li button { border: 0; background: none; cursor: pointer; padding: 0 3px; font-size: 12px; opacity: .7; }
+  .radio-list li button:hover { opacity: 1; }
+  .file-btn { cursor: pointer; }
+  .shelf-books { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; max-height: 46vh; overflow: auto; }
+  .shelf-book { text-align: left; border: 1px solid var(--line); background: var(--field); border-radius: 14px; padding: 10px 12px; cursor: pointer; font: inherit; color: inherit; }
+  .shelf-book:hover { border-color: var(--sakura-dark); }
+  .shelf-book b { display: block; font-size: 13.5px; color: var(--text-dark); margin: 2px 0; }
+  .shelf-book span { font-size: 11.5px; opacity: .75; }
+  .story-text { max-height: 56vh; overflow: auto; font-size: 15px; line-height: 1.7; padding-right: 4px; }
+  .story-text p { margin: 0 0 12px; }
+  .book-week { display: flex; gap: 16px; align-items: flex-start; }
+  .book-week img { width: 120px; flex: none; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+  @media (max-width: 480px) { .book-week { flex-direction: column; align-items: center; text-align: center; } }
   .spot-embed iframe { display: block; border: 0; border-radius: 14px; }
   .serve { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 12px; border-radius: 14px; background: var(--sakura-light); color: var(--sakura-dark); font-weight: 700; font-size: 13.5px; cursor: pointer; }
   .serve input { accent-color: var(--sakura-dark); width: 16px; height: 16px; }
@@ -368,7 +397,7 @@
     <button class="icon" id="soundBtn" title="Sound" aria-label="Sound">🔊</button>
     <button class="icon" id="avatarBtn" title="Change your avatar" aria-label="Change your avatar">🪞</button>
     <button class="icon" id="helpBtn" title="How to move" aria-label="Help">?</button>
-    <button class="icon" id="musicBtn" title="The café playlist" aria-label="The café playlist">🎧</button>
+    <button class="icon" id="musicBtn" title="The café radio" aria-label="The café radio">🎧</button>
     <a class="icon hidden" id="adminLink" href="/admin" title="Café admin" aria-label="Admin">🗝️</a>
     <button class="icon" id="outBtn" title="Leave the café" aria-label="Sign out">🚪</button>
   </div>
@@ -452,28 +481,112 @@
   </div>
   <div class="opt-group" style="margin-top:18px"><span>Picture</span><div class="chips" id="optQuality"></div></div>
   <div class="spot">
-    <p class="eyebrow">🎧 Lofi from Spotify</p>
-    <p class="fine">The café's playlist plays in its own little player.</p>
-    <button class="btn ghost" id="openMusic" type="button" style="margin-top:8px">🎧 Open the café playlist</button>
+    <p class="eyebrow">🎧 The café's music</p>
+    <p class="fine">📻 The café radio — the same song, at the same moment, for everyone — or the café's Spotify playlist.</p>
+    <button class="btn ghost" id="openMusic" type="button" style="margin-top:8px">🎧 Open the café radio</button>
   </div>
 </div>
 
-<!-- The café playlist: the owner picks it, everyone listens -->
+<!-- The café's music: the radio (songs the owner uploaded, heard together)
+     or the Spotify playlist. The owner picks; everyone listens. -->
 <div id="musicDock" class="hud card hidden">
   <div class="md-head">
-    <b>🎧 The café playlist</b>
+    <div class="chips md-tabs">
+      <button type="button" class="chip on" data-mtab="radio">📻 Café radio</button>
+      <button type="button" class="chip" data-mtab="spotify">🎵 Spotify</button>
+    </div>
     <button type="button" id="musicClose" title="Hide the player (the music keeps playing)" aria-label="Hide the player">✕</button>
   </div>
-  <div id="spotEmbed" class="spot-embed"></div>
-  <p class="fine" id="spotNote">Chosen by the café, the same for everyone — press ▶ to listen. Signed in to Spotify in this browser? Full songs; otherwise 30-second previews.</p>
-  <div id="spotOwner" class="hidden">
-    <p class="fine" style="margin:8px 0 6px">🗝️ Paste a Spotify playlist, album or track link — it changes for everyone:</p>
-    <div class="row" style="gap:6px"><input type="text" inputmode="url" autocomplete="off" id="spotLink" placeholder="https://open.spotify.com/playlist/…" style="flex:1"><button class="btn" id="spotSave" type="button">Use it</button></div>
-    <div class="row" style="gap:6px;margin-top:8px">
-      <button class="btn" id="playAll" type="button">▶ Play for everyone</button>
-      <button class="btn ghost" id="pauseAll" type="button">⏸ Pause for everyone</button>
+  <div id="radioTab">
+    <div class="radio-now">
+      <button type="button" id="radioPlay" class="radio-play" aria-label="Listen">▶</button>
+      <div class="radio-meta">
+        <b id="radioTitle">The café radio</b>
+        <span id="radioArtist" class="fine"></span>
+        <div class="radio-bar"><i id="radioBar"></i></div>
+      </div>
     </div>
-    <div class="error" id="spotErr"></div>
+    <label class="radio-vol"><span>🔉</span><input type="range" id="radioVol" min="0" max="100" value="70"></label>
+    <p class="fine" id="radioNote">Everyone in the café hears the same song at the same moment.</p>
+    <details id="radioOwner" class="hidden">
+      <summary>🗝️ Look after the radio</summary>
+      <p class="fine" style="margin:8px 0 6px">🗝️ Add songs (mp3, m4a, ogg — up to 30 MB each). They go on the end of the list, for everyone.</p>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        <label class="btn ghost file-btn">⬆️ Upload songs<input type="file" id="radioFiles" accept="audio/*" multiple hidden></label>
+        <button class="btn ghost" id="radioRestart" type="button" title="Start the list again from the first song, for everyone">⏮ From the top</button>
+        <button class="btn ghost" id="radioOnOff" type="button">⏻ Turn the radio off</button>
+      </div>
+      <div class="fine" id="radioUp"></div>
+      <ol class="radio-list" id="radioList"></ol>
+      <div class="error" id="radioErr"></div>
+    </details>
+  </div>
+  <div id="spotifyTab" class="hidden">
+    <div id="spotEmbed" class="spot-embed"></div>
+    <p class="fine" id="spotNote">Chosen by the café, the same for everyone — press ▶ to listen. Signed in to Spotify in this browser? Full songs; otherwise 30-second previews.</p>
+    <div id="spotOwner" class="hidden">
+      <p class="fine" style="margin:8px 0 6px">🗝️ Paste a Spotify playlist, album or track link — it changes for everyone:</p>
+      <div class="row" style="gap:6px"><input type="text" inputmode="url" autocomplete="off" id="spotLink" placeholder="https://open.spotify.com/playlist/…" style="flex:1"><button class="btn" id="spotSave" type="button">Use it</button></div>
+      <div class="row" style="gap:6px;margin-top:8px">
+        <button class="btn" id="playAll" type="button">▶ Play for everyone</button>
+        <button class="btn ghost" id="pauseAll" type="button">⏸ Pause for everyone</button>
+      </div>
+      <div class="error" id="spotErr"></div>
+    </div>
+  </div>
+</div>
+
+<div id="shelfPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <div id="shelfList">
+    <p class="eyebrow">The story shelf</p>
+    <h3>Stories from the letters</h3>
+    <p class="lede" style="font-size:13.5px">Every morning and bedtime story the café has sent, kept on the shelf. Pick one and sit a while.</p>
+    <div class="chips" id="shelfTabs">
+      <button type="button" class="chip on" data-shelf="all">All</button>
+      <button type="button" class="chip" data-shelf="morning">☀️ Morning</button>
+      <button type="button" class="chip" data-shelf="night">🌙 Bedtime</button>
+    </div>
+    <div class="shelf-books" id="shelfBooks"></div>
+    <div id="shelfOwner" class="hidden up-more" style="margin-top:14px">
+      <p class="eyebrow">🗝️ Fill the shelf from your Google Sheet</p>
+      <p class="fine" style="margin:4px 0 8px">Share the sheet as <b>Anyone with the link → Viewer</b>, then paste its link. Headings it understands: <i>Title, Story, Date, Type</i> (morning/bedtime), <i>Edition, Day</i>. It checks again every 6 hours.</p>
+      <div class="row" style="gap:6px"><input type="text" inputmode="url" autocomplete="off" id="shelfSheet" placeholder="https://docs.google.com/spreadsheets/d/…" style="flex:1"><button class="btn" id="shelfSave" type="button">Use it</button></div>
+      <div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost" id="shelfSync" type="button">↻ Sync now</button><span class="fine" id="shelfStatus"></span></div>
+      <div class="error" id="shelfErr"></div>
+    </div>
+  </div>
+  <div id="shelfRead" class="hidden">
+    <button type="button" class="btn ghost" id="shelfBack" style="margin-bottom:10px">← Back to the shelf</button>
+    <p class="eyebrow" id="storyEyebrow"></p>
+    <h3 id="storyTitle"></h3>
+    <div class="story-text" id="storyText"></div>
+  </div>
+</div>
+
+<div id="bookPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The book of the week</p>
+  <div class="book-week">
+    <img id="bookImg" alt="" class="hidden">
+    <div>
+      <h3 id="bookTitle" style="margin:0 0 4px"></h3>
+      <p class="fine" id="bookAuthor" style="margin:0 0 10px"></p>
+      <p class="lede" id="bookNote" style="font-size:13.5px"></p>
+    </div>
+  </div>
+  <div id="bookOwner" class="hidden up-more" style="margin-top:14px">
+    <p class="eyebrow">🗝️ Change the book</p>
+    <label class="field"><span>Title</span><input type="text" id="bookSetTitle" maxlength="120"></label>
+    <label class="field"><span>Author</span><input type="text" id="bookSetAuthor" maxlength="120"></label>
+    <label class="field"><span>A line about it</span><textarea id="bookSetNote" maxlength="600" rows="3"></textarea></label>
+    <div class="row" style="gap:6px;flex-wrap:wrap">
+      <label class="btn ghost file-btn">🖼️ Upload the cover<input type="file" id="bookFile" accept="image/jpeg,image/png,image/webp" hidden></label>
+      <span class="fine" id="bookCoverNote"></span>
+    </div>
+    <label class="field" style="margin-top:8px"><span>…or a link to the cover picture</span><input type="text" inputmode="url" id="bookSetUrl" placeholder="https://…/cover.jpg"></label>
+    <div class="error" id="bookErr"></div>
+    <div class="row end"><button class="btn" id="bookSave" type="button">Hang it up</button></div>
   </div>
 </div>
 
@@ -577,6 +690,8 @@
     <li>Holding a drink? Press <b>🍵 Put drink down</b> near a table — or click the table. Click your cup to pick it back up.</li>
     <li>Click <b>Hana or the counter</b> (or ☕ <b>Order</b>) for a drink — or a dessert from the <b>🍡 Desserts</b> tab. A plate goes in your other hand: <b>🍡 Take a bite</b>, or set it down next to your cup.</li>
     <li>Sitting at a table? Tick <b>🛎️ Bring it to my table</b> on the menu and Hana or Yuki will carry it over. <b>☕ Take a sip</b> (<kbd>C</kbd>) and <b>🍡 Take a bite</b> (<kbd>B</kbd>) work on what's in your hands — or on your table.</li>
+    <li><b>🎧 The café radio</b> plays the songs the café chose — everyone hears the same song at the same moment. ▶ to listen, ⏸ to stop just for you.</li>
+    <li>Click the <b>bookshelf</b> for the story shelf — every morning and bedtime story from the letters. The framed <b>Book of the week</b> hangs above it.</li>
     <li>The tables are numbered — <b>Table 4</b> is the one by the window. The <b>kitchen</b> is through the back door: walk up and the doors swing open.</li>
     <li>Any menu closes with its <b>✕</b>, with <kbd>Esc</kbd>, or by tapping the café behind it. The chat has its own <b>✕</b> (💬 brings it back).</li>
     <li>The clock and the weather are top left (tap them for more) — and on the street clock and chalkboards outside.</li>

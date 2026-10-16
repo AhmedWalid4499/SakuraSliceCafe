@@ -129,6 +129,11 @@
     <div class="scroll"><table><thead><tr><th>Note</th><th>By</th><th></th></tr></thead><tbody id="guestbook"></tbody></table></div>
   </section>
 
+  <section class="card span12">
+    <div class="row between"><h2>Held back by the kindness check</h2><span class="muted">Rude or hurtful messages that never went up — chat, notes, the guestbook, names, and things said to the team</span></div>
+    <div class="scroll"><table><thead><tr><th>What they wrote</th><th>Where</th><th>Why</th><th>By</th></tr></thead><tbody id="moderation"></tbody></table></div>
+  </section>
+
   <section class="card span6">
     <div class="row between"><h2>Letter subscribers</h2><a class="btn small" href="/api/admin/subscribers?format=csv">Download CSV</a></div>
     <div class="scroll"><table><thead><tr><th>Email</th><th>Since</th></tr></thead><tbody id="subs"></tbody></table></div>
@@ -168,7 +173,7 @@
     $('gate').classList.add('hidden');
     $('app').classList.remove('hidden');
     $('who').textContent = 'signed in as ' + me.displayName;
-    await Promise.all([loadStats(), loadContent(), loadNotes(), loadGuestbook(), loadSubs(), loadUsers()]);
+    await Promise.all([loadStats(), loadContent(), loadNotes(), loadGuestbook(), loadSubs(), loadUsers(), loadModeration()]);
   }
 
   $('loginForm').addEventListener('submit', async e => {
@@ -270,6 +275,18 @@
       del.onclick = async () => { if (!confirm('Take this note down for everyone?')) return; await api('/notes/' + n.id, { method: 'DELETE' }); loadNotes(); loadStats(); };
       const td = el('td'); td.append(del);
       tr.append(t, el('td', n.author), td);
+      return tr;
+    }));
+  }
+
+  async function loadModeration() {
+    const { items } = await api('/admin/moderation');
+    if (!items.length) { const tr = el('tr'); tr.append(el('td', 'Nothing yet — everyone has been kind 🌸', 'muted')); $('moderation').replaceChildren(tr); return; }
+    $('moderation').replaceChildren(...items.map(m => {
+      const tr = el('tr');
+      const t = el('td', m.text, 'text');
+      t.append(el('div', date(m.createdAt), 'muted'));
+      tr.append(t, el('td', m.place), el('td', [m.category, m.reason].filter(Boolean).join(' — ')), el('td', m.by || '—'));
       return tr;
     }));
   }
