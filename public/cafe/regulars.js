@@ -9,7 +9,8 @@
 // worked out here, on each screen.
 
 import * as THREE from 'three';
-import { buildAvatar, makeCup, disposeTree } from './avatar.js';
+import { buildAvatar, makeCup, disposeTree, tempOf } from './avatar.js';
+import { makeDessert, setBites } from './pastries.js';
 
 const SLOT = 75e3;               // a possible arrival every 75 seconds
 const SPEED = 1.1;               // metres per second, unhurried
@@ -43,11 +44,13 @@ const OUTFIT = ['#7a8fa6', '#b7a58c', '#5f7a64', '#a86b5a', '#4d5566', '#d9c8b0'
 const ACCENT = ['#fef9f5', '#efe6da', '#2f2a28', '#d9d2c5'];
 const LINES = ['A {d}, please.', 'Could I get a {d}?', 'One {d} — thank you!', 'The {d}, like always.', 'Just a {d} today 🌸'];
 
-export function createRegulars({ world, staff, sound, menu, takenBy, say, now = () => Date.now(), hour }) {
+export function createRegulars({ world, staff, sound, menu, pastries = () => [], takenBy, say, now = () => Date.now(), hour }) {
   const main = world.floors.main;
   const group = new THREE.Group();
   main.group.add(group);
   const live = new Map(); // visit id → regular
+  const dirty = [];       // tables left with empty cups and plates, waiting for the team
+  let clock = 0;          // seconds of café time, for how long a table has waited
   let cap = 9;
 
   // the counter: where they queue to order
@@ -68,7 +71,7 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
         body: 'person', gender: r() < 0.5 ? 'she' : 'he', skin: pick(r, SKIN), hair: pick(r, HAIR),
         outfit: pick(r, OUTFIT), accent: pick(r, ACCENT),
       },
-      drinkR: r(), lineR: r(),
+      drinkR: r(), lineR: r(), pastry: r() < 0.35 ? r() : -1, leaveBehind: r() < 0.2,
     };
     v.look.hairStyle = v.look.gender === 'she' ? pick(r, ['long', 'bun', 'bob', 'curly', 'long']) : pick(r, ['short', 'short', 'curly', 'none', 'short']);
     v.look.bottom = v.look.gender === 'she' && r() < 0.4 ? 'skirt' : 'trousers';
@@ -83,7 +86,7 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
     const start = Math.floor(v.seatPref * all.length);
     for (let i = 0; i < all.length; i++) {
       const s = all[(start + i * 7) % all.length]; // a stride, so they spread across the room
-      if (!busy.has(s.id) && !takenBy(s)) return s;
+      if (!busy.has(s.id) && !takenBy(s) && !dirty.some(d => d.table === s.table)) return s;
     }
     return null;
   }
@@ -164,9 +167,17 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
     const spot = tableSpot(g.seat);
     const side = new THREE.Vector3(Math.cos(g.seat.ry), 0, -Math.sin(g.seat.ry)).multiplyScalar(0.13);
     g.level = quiet ? 0.35 + Math.random() * 0.6 : 1;
-    g.cup = makeCup(g.drink.color, g.level);
+    g.cup = makeCup(g.drink.color, g.level, tempOf(g.drink));
     g.cup.position.copy(spot).add(side).add(new THREE.Vector3(0, 0.055, 0));
     group.add(g.cup);
+    const ps = pastries();
+    if (g.v.pastry >= 0 && ps.length) {
+      const pastry = ps[Math.floor(g.v.pastry * ps.length) % ps.length];
+      g.bites = quiet ? Math.floor(Math.random() * 3) : 0;
+      g.plate = makeDessert(pastry.shape, g.bites);
+      g.plate.position.copy(spot).add(new THREE.Vector3(Math.sin(g.seat.ry) * 0.17, -0.006, Math.cos(g.seat.ry) * 0.17)).sub(side.clone().multiplyScalar(0.4));
+      group.add(g.plate);
+    }
     if (g.v.thing !== 'none') {
       g.prop = prop(g.v.thing);
       g.prop.position.copy(spot).sub(side.clone().multiplyScalar(0.6));
@@ -180,8 +191,13 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
     if (g.phase === 'leaving') return;
     const wasSeated = g.phase === 'seated';
     g.phase = 'leaving';
-    if (g.cup) { group.remove(g.cup); disposeTree(g.cup); g.cup = null; }
-    if (g.prop) { group.remove(g.prop); disposeTree(g.prop); g.prop = null; }
+    // the empty cup and plate stay on the table for the team to clear (and now and then a book or the paper)
+    const left = [];
+    if (g.cup) { g.cup.userData.setLevel(0.03); left.push(g.cup); g.cup = null; }
+    if (g.plate) { setBites(g.plate, 3); left.push(g.plate); g.plate = null; }
+    if (g.prop) { if (wasSeated && g.v.leaveBehind && g.v.thing !== 'laptop' && g.v.thing !== 'phone') left.push(g.prop); else { group.remove(g.prop); disposeTree(g.prop); } g.prop = null; }
+    if (left.length && wasSeated && g.seat) dirty.push({ items: left, table: g.seat.table, spot: new THREE.Vector3(g.seat.x, 0, g.seat.z), t: clock, clearing: false });
+    else left.forEach(m => { group.remove(m); disposeTree(m); });
     if (wasSeated && g.seat) {
       sound.chair(g.pos);
       g.pos.set(g.seat.x + Math.cos(g.seat.ry) * 0.62, 0, g.seat.z - Math.sin(g.seat.ry) * 0.62);
@@ -192,6 +208,7 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
 
   function remove(g) {
     if (g.cup) { group.remove(g.cup); disposeTree(g.cup); }
+    if (g.plate) { group.remove(g.plate); disposeTree(g.plate); }
     if (g.prop) { group.remove(g.prop); disposeTree(g.prop); }
     group.remove(g.av.group);
     disposeTree(g.av.group);
@@ -236,9 +253,62 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
     }
   }
 
+  // The team notice a table that needs clearing after a little while.
+  function clearTables() {
+    const d = dirty.find(x => !x.clearing && clock - x.t > 25);
+    if (!d) return;
+    const who = ['yuto', 'hana', 'yuki'].find(id => !staff.busy(id));
+    if (!who) return;
+    d.clearing = true;
+    const ok = staff.clear(who, d.spot, () => {
+      sound.cupDown(d.items[0] ? d.items[0].position : d.spot);
+      d.items.forEach(m => { group.remove(m); disposeTree(m); });
+      dirty.splice(dirty.indexOf(d), 1);
+    });
+    if (!ok) d.clearing = false;
+  }
+  // When you walk in, a table or two hasn't been cleared yet — as in any real café.
+  let seeded = false;
+  function seedUsedTables() {
+    seeded = true;
+    const ps = pastries();
+    const all = seats().filter(s => !takenBy(s) && s.h < 0.7);
+    for (let n = 0; n < 2 && all.length; n++) {
+      const s = all.splice(Math.floor(Math.random() * all.length), 1)[0];
+      if (dirty.some(d => d.table === s.table) || mine().has(s.id)) continue;
+      const items = menu();
+      const d = items[Math.floor(Math.random() * items.length)] || { color: '#d9b48f' };
+      const spot = tableSpot(s);
+      const cup = makeCup(d.color, 0.03, tempOf(d));
+      cup.position.copy(spot).add(new THREE.Vector3(0, 0.055, 0));
+      group.add(cup);
+      const left = [cup];
+      if (ps.length && Math.random() < 0.6) {
+        const plate = makeDessert(ps[Math.floor(Math.random() * ps.length)].shape, 3);
+        plate.position.copy(spot).add(new THREE.Vector3(Math.cos(s.ry) * 0.14, -0.006, -Math.sin(s.ry) * 0.14));
+        group.add(plate);
+        left.push(plate);
+      }
+      if (Math.random() < 0.4) {
+        const paper = prop(Math.random() < 0.5 ? 'paper' : 'book');
+        paper.position.copy(spot).add(new THREE.Vector3(-Math.cos(s.ry) * 0.16, 0, Math.sin(s.ry) * 0.16));
+        paper.rotation.y = s.ry + Math.PI + 0.3;
+        group.add(paper);
+        left.push(paper);
+      }
+      dirty.push({ items: left, table: s.table, spot: new THREE.Vector3(s.x, 0, s.z), t: clock + Math.random() * 40, clearing: false });
+    }
+  }
+
   function update(dt) {
+    clock += dt;
     checkIn -= dt;
-    if (checkIn <= 0) { checkIn = 2; schedule(); }
+    if (checkIn <= 0) {
+      checkIn = 2;
+      if (!seeded) seedUsedTables();
+      schedule();
+      clearTables();
+    }
     for (const g of [...live.values()]) {
       let moving = false;
       if (g.phase === 'enter') {
@@ -253,7 +323,7 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
         g.wait -= dt;
         if (g.wait <= 0) {
           sound.counterBell(counterPos);
-          g.av.setDrink(g.drink.color, 1);
+          g.av.setDrink(g.drink.color, 1, tempOf(g.drink));
           if (!g.seat || takenBy(g.seat)) g.seat = freeSeat(g.v);
           if (!g.seat) leave(g);
           else { g.phase = 'toSeat'; g.path = route(g.pos, new THREE.Vector3(g.seat.x, 0, g.seat.z)); }
@@ -271,7 +341,7 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
             g.sipIn = 25 + Math.random() * 45;
             g.level = Math.max(0.08, g.level - 0.12);
             g.cup.visible = false;
-            g.av.setDrink(g.drink.color, g.level);
+            g.av.setDrink(g.drink.color, g.level, tempOf(g.drink));
             g.av.play('sip');
             setTimeout(() => {
               if (!g.cup) return;
@@ -280,6 +350,10 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
               g.cup.visible = true;
               sound.cupDown(g.cup.position);
             }, 2600);
+          }
+          if (g.plate && g.bites < 3) {
+            g.biteIn = (g.biteIn ?? 40 + Math.random() * 60) - dt;
+            if (g.biteIn <= 0) { g.biteIn = 50 + Math.random() * 80; g.bites++; g.av.play('bite'); setBites(g.plate, g.bites); }
           }
           if (g.v.thing === 'book' || g.v.thing === 'paper') {
             g.pageIn -= dt;
@@ -302,6 +376,7 @@ export function createRegulars({ world, staff, sound, menu, takenBy, say, now = 
     seatTaken: seat => [...live.values()].some(g => g.seat && g.seat.id === seat.id && g.phase !== 'leaving'),
     positions: () => [...live.values()].map(g => g.pos),
     count: () => live.size,
+    dirtyTables: () => dirty.length,
     debug: () => [...live.values()].map(g => ({ phase: g.phase, seat: g.seat && g.seat.label, thing: g.v.thing, drink: g.drink.name })),
   };
 }

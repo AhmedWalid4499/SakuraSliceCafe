@@ -190,7 +190,7 @@ export function createStaff(world, { say } = {}) {
     s.task = 'deliver';
     s.after = null;
     s.n.av.setDessert(item.dessertShape || null, 0);
-    s.n.av.setDrink(item.drinkColor || null);
+    s.n.av.setDrink(item.drinkColor || null, 1, item.drinkTemp);
     const ok1 = goTo(s, spot, () => {
       s.n.av.play('bite');
       setTimeout(() => {
@@ -206,6 +206,27 @@ export function createStaff(world, { say } = {}) {
       // can't find a way (very unlikely): put it down anyway
       s.n.av.setDessert(null); s.n.av.setDrink(null); s.task = null; done && done();
     }
+    return true;
+  }
+
+  // ── clearing a table: walk over, gather the empty cups and plates, carry them back
+  function clear(id, spot, done) {
+    const s = team.get(id);
+    if (!s || s.task || s.id === 'me3temed') return false;
+    s.task = 'clear';
+    s.after = null;
+    const ok1 = goTo(s, spot, () => {
+      s.n.av.play('bite'); // reaching down for them
+      setTimeout(() => {
+        done && done();
+        s.n.av.setDrink('#e8dccb', 0.02);
+        s.task = null;
+        s.wait = 1.5;
+        s.after = () => goTo(s, behindCounter(), () => { s.n.av.setDrink(null); s.wait = 5; }, { x: s.g.position.x, z: cbox.max.z + 3 });
+      }, 700);
+      s.wait = 99;
+    }, spot);
+    if (!ok1) { s.task = null; done && done(); }
     return true;
   }
 
@@ -270,7 +291,7 @@ export function createStaff(world, { say } = {}) {
   }
 
   return {
-    update, deliver, findPath, attend,
+    update, deliver, clear, findPath, attend,
     busy: id => !!(team.get(id) && team.get(id).task),
     positions: () => [...team.values()].filter(s => s.id !== 'me3temed').map(s => s.g.position),
     grid: { staffFree, guestFree, nx, nz, minX, minZ, CELL },
