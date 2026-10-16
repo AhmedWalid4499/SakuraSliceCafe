@@ -50,6 +50,7 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
   main.group.add(group);
   const live = new Map(); // visit id → regular
   const dirty = [];       // tables left with empty cups and plates, waiting for the team
+  let clock = 0;          // seconds of café time, for how long a table has waited
   let cap = 9;
 
   // the counter: where they queue to order
@@ -195,7 +196,7 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
     if (g.cup) { g.cup.userData.setLevel(0.03); left.push(g.cup); g.cup = null; }
     if (g.plate) { setBites(g.plate, 3); left.push(g.plate); g.plate = null; }
     if (g.prop) { if (wasSeated && g.v.leaveBehind && g.v.thing !== 'laptop' && g.v.thing !== 'phone') left.push(g.prop); else { group.remove(g.prop); disposeTree(g.prop); } g.prop = null; }
-    if (left.length && wasSeated && g.seat) dirty.push({ items: left, table: g.seat.table, spot: new THREE.Vector3(g.seat.x, 0, g.seat.z), t: performance.now(), clearing: false });
+    if (left.length && wasSeated && g.seat) dirty.push({ items: left, table: g.seat.table, spot: new THREE.Vector3(g.seat.x, 0, g.seat.z), t: clock, clearing: false });
     else left.forEach(m => { group.remove(m); disposeTree(m); });
     if (wasSeated && g.seat) {
       sound.chair(g.pos);
@@ -254,7 +255,7 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
 
   // The team notice a table that needs clearing after a little while.
   function clearTables() {
-    const d = dirty.find(x => !x.clearing && performance.now() - x.t > 25e3);
+    const d = dirty.find(x => !x.clearing && clock - x.t > 25);
     if (!d) return;
     const who = ['yuto', 'hana', 'yuki'].find(id => !staff.busy(id));
     if (!who) return;
@@ -295,11 +296,12 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
         group.add(paper);
         left.push(paper);
       }
-      dirty.push({ items: left, table: s.table, spot: new THREE.Vector3(s.x, 0, s.z), t: performance.now() + Math.random() * 40e3, clearing: false });
+      dirty.push({ items: left, table: s.table, spot: new THREE.Vector3(s.x, 0, s.z), t: clock + Math.random() * 40, clearing: false });
     }
   }
 
   function update(dt) {
+    clock += dt;
     checkIn -= dt;
     if (checkIn <= 0) {
       checkIn = 2;

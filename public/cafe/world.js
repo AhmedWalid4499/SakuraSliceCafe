@@ -2413,8 +2413,8 @@ export function buildWorld(renderer) {
         leg.add(face);
         specials.face = face;
       }
-      leg.rotation.x = -0.17 * s;
-      leg.position.z = 0.08 * s;
+      leg.rotation.x = -0.17 * s; // the two boards lean together at the top, like an A
+      leg.position.z = 0.22 * s;
       if (s < 0) leg.rotation.y = Math.PI;
       g.add(leg);
     }
