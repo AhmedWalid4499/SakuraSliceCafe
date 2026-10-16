@@ -2726,8 +2726,8 @@ export function buildWorld(renderer) {
     face.rotation.x = -0.12;
     g.add(ledge, board, face);
     easel.face = face;
-    g.position.set(ROOM.maxX - 2.1, 0, 5.7);
-    g.rotation.y = -Math.PI / 2 - 0.3;
+    g.position.set(ROOM.maxX - 1.1, 0, 4.9); // between the fire and the bookshelf, clear of both
+    g.rotation.y = -Math.PI / 2 - 0.45;
     root.add(g);
     colliders.push({ type: 'circle', x: g.position.x, z: g.position.z, r: 0.5, fixed: true });
     const hover = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.1, 0.4), new THREE.MeshBasicMaterial({ visible: false }));
