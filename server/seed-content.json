@@ -1558,5 +1558,76 @@
       "link": "https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn"
     },
     "description": "The café's Spotify playlist (the sound panel's player, the same for everyone). Any Spotify playlist, album or track link."
+  },
+  "stories.library": {
+    "value": [
+      {
+        "title": "The Tuesday Morning Lecture",
+        "kind": "morning",
+        "edition": "Website",
+        "day": "Tuesday",
+        "date": "April 2026",
+        "image": "",
+        "paragraphs": [
+          "Yuto's alarm goes off at 6:45 on Tuesday mornings.",
+          "Me3temed is always already awake.",
+          "He doesn't explain how. He is simply there — perched on the edge of the desk, watching the room with his soft half-open eyes, waiting for the morning to be officially acknowledged. When the alarm goes off and Yuto reaches to turn it off, Me3temed makes a small sound that means: *finally.*",
+          "By 7:15 they are both ready. Yuto in jeans and a clean shirt — the specific clothes of someone who is not quite a student and not quite a professor but something warmer than either. Me3temed in his café apron, which he refuses to remove even on university days, plus — for occasions of academic seriousness — a tiny pair of glasses that Yuto found for him in a curiosity shop in Khan el Khalili and which fit, against all reasonable expectation, perfectly.",
+          "They match. They have been told this. They do not disagree.",
+          "The drive to the university takes twenty minutes on a good Cairo morning, thirty-five on a Tuesday. They take it without complaint. Me3temed watches Cairo through the window the way he watches everything — quietly, completely, missing nothing. 🌿",
+          "The classroom smells like old books and whiteboard marker and the specific dusty warmth of a room that has held a lot of thinking.",
+          "Yuto loves it immediately, every time.",
+          "He sets his bag down. Opens his laptop. Writes one thing on the board before anyone arrives — not a topic, not an agenda. Just a question. The kind that doesn't have a clean answer and knows it.",
+          "The students come in slowly, the way students do at 9am — some still carrying coffee, some clearly having decided that presence counts as participation, a few already looking at him with the expression of people who came ready and are glad to be here.",
+          "Me3temed settles on Yuto's left shoulder. Adjusts his glasses. Surveys the room.",
+          "He has decided he is co-teaching. Yuto has not corrected this. 🦉",
+          "What Yuto loves about teaching — the thing he couldn't have explained before he started but now couldn't unknow — is the moment a room changes.",
+          "It doesn't always happen. Some sessions are good and practical and useful and that is enough. But sometimes — maybe once in a few weeks, maybe more — something shifts. A student says something that reframes the whole discussion. A question opens a door everyone was standing in front of without noticing. The room stops being a room full of people who showed up and becomes something else: a room full of people who are thinking together, following something, pulled forward by the same thread.",
+          "Those moments, Yuto has learned, cannot be manufactured. They can only be created conditions for.",
+          "So he creates conditions. He asks the strange questions. He leaves space after them. He doesn't fill the silence too quickly because he has learned that silence, attended to carefully, is often just a thought finishing its sentence.",
+          "Me3temed, on his shoulder, watches all of it with his steady eyes. Occasionally a student notices the small owl in the tiny glasses and loses their train of thought entirely. Yuto has factored this into the pacing. 🌸",
+          "By eleven the session is done. The students gather their things slowly — the ones who are in no rush to leave are, in Yuto's experience, always the ones who got something from it, even if they couldn't say what yet.",
+          "One student stops at the door.",
+          "“I've been thinking about that question you asked last week,” she says. “I think I finally have something like an answer.”",
+          "“Tell me next time,” Yuto says. “I want to hear it.”",
+          "She nods and goes. Me3temed watches her leave.",
+          "*Good one,* Me3temed says, in the way he says things — which is not in words, but in the specific stillness that means: yes. that was the right thing.",
+          "They stop at the café on the way back.",
+          "Not because they have to. Because it is where the day makes sense when they get back to it. Yuto unlocks the door. Puts the kettle on. Sits at table four for ten minutes before anyone arrives — the way Yuki does on Fridays, giving the space its five minutes to remember what it is.",
+          "Me3temed removes his academic glasses. Returns to his corner stool. Looks out the window at the Cairo afternoon with the expression of someone who has had a full morning and is exactly where he is supposed to be.",
+          "Yuto writes one thing in his notebook — not notes from the session, not a task, just a sentence. Something one of the students said that he wants to keep.",
+          "The café begins to fill.",
+          "The Tuesday continues.",
+          "Some days, Yuto thinks, are the kind that remind you why you chose everything you chose. The university in the morning, the café in the afternoon, the questions in between. The students who stop at the door. The small owl in the tiny glasses who watches it all and says nothing and means everything.",
+          "Those days, he has learned, are not rare.",
+          "They are Tuesdays.",
+          "*They are always Tuesdays.* 🌿🌸"
+        ]
+      }
+    ],
+    "description": "The story shelf in the 3D café (the bookshelf). Filled from the Google Sheet in stories.sheet, or by hand: [{ title, kind: \"morning\"|\"night\", edition, day, date, paragraphs: [] }]. *italic* works."
+  },
+  "stories.sheet": {
+    "value": {
+      "url": ""
+    },
+    "description": "The Google Sheet the story shelf reads from (shared as \"Anyone with the link\"). Columns are found by their headings: Title, Story, Date, Type (morning/night), Edition, Day."
+  },
+  "cafe.radio": {
+    "value": {
+      "on": true,
+      "order": [],
+      "startedAt": null
+    },
+    "description": "The café radio: the song order (media ids) and when it started. Everyone hears the same song at the same moment. Upload songs from the 🎧 player in the café."
+  },
+  "cafe.bookOfWeek": {
+    "value": {
+      "title": "Project Hail Mary",
+      "author": "Andy Weir",
+      "cover": "",
+      "note": "Yuto's first pick — loved by all four of us. About the kind of friendship that needs no language."
+    },
+    "description": "The framed Book of the week on the café wall. cover = an uploaded picture (media id, set from the café) or an image link."
   }
 }

@@ -17,8 +17,8 @@ export const FLOOR2_H = 3.6;      // upstairs ceiling height
 export const STAIRS = { x: mapX(1.1), z: mapZ(-6.7), r: 1.15 };
 
 const COLORS = {
-  plaster: '#f6ece2', sage: '#9fbf98', sageDark: '#6f9a6c', wood: '#a8754f', woodDark: '#7a5236',
-  woodLight: '#c99b72', cream: '#fef9f5', sakura: '#f2a7bb', sakuraDark: '#d4678a', forest: '#2f5d3a',
+  plaster: '#efe6db', sage: '#93ab8c', sageDark: '#6a8c66', wood: '#9a6a46', woodDark: '#6e472e',
+  woodLight: '#bf9168', cream: '#f8f2ea', sakura: '#dd9aab', sakuraDark: '#c4627f', forest: '#2f5d3a',
   amber: '#f0b56a', text: '#2d1f1f',
 };
 
@@ -98,6 +98,76 @@ function woodFloorTexture() {
       ctx.fillRect(0, row * ph, s, 2);
     }
   }, { repeat: [5, 4] });
+}
+
+// Surfaces that read as real things up close: near-white maps (the
+// material's colour still decides the hue) with a matching bump, so light
+// rakes across plaster, wood grain and woven fabric instead of flat paint.
+function surface(size, draw, repeat) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(...repeat);
+  map.anisotropy = 8;
+  const bump = map.clone();
+  bump.colorSpace = THREE.NoColorSpace;
+  return { map, bump };
+}
+function plasterSurface() {
+  return surface(512, (ctx, s) => {
+    ctx.fillStyle = '#f4f1ec'; ctx.fillRect(0, 0, s, s);
+    const r = rand(11);
+    // soft trowel clouds, then a fine grit
+    for (let i = 0; i < 260; i++) {
+      const x = r() * s, y = r() * s, rad = 20 + r() * 70;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+      const v = r() < 0.5 ? '255,255,255' : '214,204,192';
+      g.addColorStop(0, `rgba(${v},0.22)`); g.addColorStop(1, `rgba(${v},0)`);
+      ctx.fillStyle = g;
+      for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) { ctx.save(); ctx.translate(dx, dy); ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2); ctx.restore(); }
+    }
+    for (let i = 0; i < 14000; i++) {
+      ctx.fillStyle = r() < 0.5 ? 'rgba(190,178,164,0.18)' : 'rgba(255,255,255,0.25)';
+      ctx.fillRect(r() * s, r() * s, 1 + r() * 1.5, 1 + r() * 1.5);
+    }
+  }, [3, 3]);
+}
+function woodSurface() {
+  return surface(512, (ctx, s) => {
+    ctx.fillStyle = '#ece4da'; ctx.fillRect(0, 0, s, s);
+    const r = rand(23);
+    for (let i = 0; i < 120; i++) {
+      const y0 = r() * s, amp = 3 + r() * 8, f = 1 + Math.floor(r() * 3);
+      ctx.strokeStyle = r() < 0.6 ? `rgba(120,90,60,${0.08 + r() * 0.14})` : `rgba(255,250,240,${0.1 + r() * 0.15})`;
+      ctx.lineWidth = 0.6 + r() * 2.2;
+      ctx.beginPath();
+      for (let x = 0; x <= s; x += 8) {
+        const y = y0 + Math.sin((x / s) * Math.PI * 2 * f + i) * amp;
+        x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+    }
+    // a knot or two
+    for (let k = 0; k < 2; k++) {
+      const x = r() * s, y = r() * s;
+      for (let j = 6; j > 0; j--) { ctx.strokeStyle = `rgba(110,75,45,${0.06 * j})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(x, y, j * 5, j * 2.2, 0, 0, Math.PI * 2); ctx.stroke(); }
+    }
+  }, [1, 1]);
+}
+function fabricSurface() {
+  return surface(256, (ctx, s) => {
+    ctx.fillStyle = '#f2eee9'; ctx.fillRect(0, 0, s, s);
+    const r = rand(5);
+    for (let y = 0; y < s; y += 4) for (let x = 0; x < s; x += 4) {
+      const over = ((x + y) / 4) % 2;
+      ctx.fillStyle = over ? `rgba(255,255,255,${0.35 + r() * 0.2})` : `rgba(170,160,150,${0.2 + r() * 0.15})`;
+      ctx.fillRect(x, y, 4, 2);
+      ctx.fillRect(x + (over ? 0 : 2), y + 2, 2, 2);
+    }
+  }, [4, 4]);
 }
 
 function corkTexture() {
@@ -251,15 +321,17 @@ export function buildWorld(renderer) {
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
   // ── materials
+  const plasterS = plasterSurface(), woodS = woodSurface(), fabricS = fabricSurface();
+  const tex = (S, bumpScale) => ({ map: S.map, bumpMap: S.bump, bumpScale });
   const M = {
-    plaster: std(COLORS.plaster, { roughness: 0.95 }),
-    sage: std(COLORS.sage, { roughness: 0.85 }),
-    wood: std(COLORS.wood, { roughness: 0.6 }),
-    woodDark: std(COLORS.woodDark, { roughness: 0.55 }),
-    woodLight: std(COLORS.woodLight, { roughness: 0.55 }),
+    plaster: std(COLORS.plaster, { roughness: 0.95, ...tex(plasterS, 1.2) }),
+    sage: std(COLORS.sage, { roughness: 0.88, ...tex(plasterS, 1.0) }),
+    wood: std(COLORS.wood, { roughness: 0.58, ...tex(woodS, 0.8) }),
+    woodDark: std(COLORS.woodDark, { roughness: 0.5, ...tex(woodS, 0.8) }),
+    woodLight: std(COLORS.woodLight, { roughness: 0.55, ...tex(woodS, 0.8) }),
     cream: std(COLORS.cream, { roughness: 0.7 }),
-    cushion: std(COLORS.sakura, { roughness: 0.95 }),
-    cushionSage: std(COLORS.sage, { roughness: 0.95 }),
+    cushion: std(COLORS.sakura, { roughness: 0.98, ...tex(fabricS, 1.5) }),
+    cushionSage: std(COLORS.sage, { roughness: 0.98, ...tex(fabricS, 1.5) }),
     forest: std(COLORS.forest, { roughness: 0.35, metalness: 0.25 }),
     brass: std('#c9a25b', { roughness: 0.3, metalness: 0.9 }),
     ceramic: std('#fffaf4', { roughness: 0.25 }),
@@ -844,6 +916,7 @@ export function buildWorld(renderer) {
   setBoardSign('The Community Board', 'pin something kind for a stranger');
 
   // ── a bookshelf on the right wall
+  const bookCover = { mesh: null };
   {
     const g = new THREE.Group();
     const caseM = M.woodDark;
@@ -873,13 +946,37 @@ export function buildWorld(renderer) {
         x += w + 0.005 + (lean ? 0.05 : 0);
       }
     }
+    // the Book of the week, framed on the wall above the shelf
+    {
+      const frame = new THREE.Group();
+      const outer = rbox(0.8, 1.1, 0.06, 0.015, M.woodDark);
+      const mount = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.0), M.cream);
+      mount.position.z = 0.032;
+      bookCover.mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.84), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.55 }));
+      bookCover.mesh.position.z = 0.034;
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.0), new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.05, transmission: 0, transparent: true, opacity: 0.08, depthWrite: false }));
+      glass.position.z = 0.045;
+      frame.add(outer, mount, bookCover.mesh, glass);
+      frame.position.set(0, 3.25, 0.05);
+      g.add(frame);
+      const plaque = makeSign([
+        { text: 'Book of the week', font: 'Dancing Script, cursive', size: 150, color: COLORS.sakuraDark, weight: '700' },
+      ], 0.5, 0.12, { radius: 30 });
+      plaque.position.set(0, 2.6, 0.08);
+      g.add(plaque);
+      const fh = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.4, 0.2), new THREE.MeshBasicMaterial({ visible: false }));
+      fh.position.set(0, 3.1, 0.1);
+      fh.userData = { kind: 'bookweek', label: 'The Book of the week' };
+      g.add(fh);
+      interactables.push(fh);
+    }
     g.position.set(10.75, 0, 5.4);
     g.rotation.y = -Math.PI / 2;
     root.add(g);
     colliders.push({ type: 'box', minX: 10.3, maxX: 11, minZ: 4.3, maxZ: 6.5 });
     const hover = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.4, 2), new THREE.MeshBasicMaterial({ visible: false }));
     hover.position.set(10.7, 1.2, 5.4);
-    hover.userData = { kind: 'info', label: 'The bookshelf', text: "This month's picks: Project Hail Mary (Yuto's) and A Study in Drowning (Yuki's). Borrow anything — bring it back whenever." };
+    hover.userData = { kind: 'shelf', label: 'The story shelf — the stories from the letters' };
     interactables.push(hover);
     root.add(hover);
   }
@@ -1867,10 +1964,10 @@ export function buildWorld(renderer) {
     const daylight = day * (0.45 + 0.55 * wx.sun);
     sun.intensity = 3.2 * day * wx.sun;
     sun.color.set(dusk > 0.3 ? '#ffb27a' : wx.fogColor && wx.fog > 0.6 ? wx.fogColor : '#ffe8c4');
-    hemi.intensity = 0.12 + daylight * 0.78;
+    hemi.intensity = 0.1 + daylight * 0.5;
     hemi.color.set(night > 0.5 ? '#9fa9d6' : wx.sun < 0.4 ? '#dfe4ea' : '#fff3e0');
-    fill.intensity = 0.1 + daylight * 0.3;
-    scene.environmentIntensity = 0.08 + daylight * 0.27;
+    fill.intensity = 0.06 + daylight * 0.12;
+    scene.environmentIntensity = 0.14 + daylight * 0.42;
     baseHemi = hemi.intensity;
 
     // lamps glow more after dark — at night the room is lit by them alone
@@ -1909,9 +2006,50 @@ export function buildWorld(renderer) {
     }
   }
 
+  // The cover in the frame: an uploaded picture (same site, so WebGL can use
+  // it), or a drawn cover with the title until there is one.
+  let coverKey = '';
+  function setBookOfWeek(b = {}) {
+    const key = JSON.stringify([b.title, b.author, b.cover]);
+    if (key === coverKey || !bookCover.mesh) return;
+    coverKey = key;
+    const m = bookCover.mesh.material;
+    const drawn = () => {
+      const c = document.createElement('canvas');
+      c.width = 560; c.height = 840;
+      const x = c.getContext('2d');
+      const grad = x.createLinearGradient(0, 0, 0, 840);
+      grad.addColorStop(0, '#2f3a33'); grad.addColorStop(1, '#1d2420');
+      x.fillStyle = grad; x.fillRect(0, 0, 560, 840);
+      x.strokeStyle = '#c9a25b'; x.lineWidth = 6; x.strokeRect(30, 30, 500, 780);
+      x.fillStyle = '#fdf6ee'; x.textAlign = 'center';
+      const words = String(b.title || 'Book of the week').split(' ');
+      const lines = []; let line = '';
+      x.font = '700 64px Georgia, serif';
+      for (const w of words) { const t = line ? line + ' ' + w : w; if (x.measureText(t).width > 440) { lines.push(line); line = w; } else line = t; }
+      lines.push(line);
+      lines.forEach((l, i) => x.fillText(l, 280, 330 + i * 76 - (lines.length - 1) * 38));
+      x.font = 'italic 36px Georgia, serif'; x.fillStyle = '#f2a7bb';
+      x.fillText(b.author || '', 280, 620);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      return t;
+    };
+    const set = tex => { if (m.map) m.map.dispose(); m.map = tex; m.needsUpdate = true; };
+    set(drawn());
+    const src = b.cover == null || b.cover === '' ? null : /^\d+$/.test(String(b.cover)) ? `/api/media/${b.cover}` : String(b.cover);
+    if (src) {
+      const loader = new THREE.TextureLoader();
+      loader.setCrossOrigin('anonymous');
+      loader.load(src, tex => { tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; set(tex); }, undefined, () => {});
+    }
+  }
+
   const api = Object.assign(api_, {
     scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
+    setBookOfWeek,
     walk, kitchen: { ...KIT, door: { x: KX, z: ROOM.minZ - 0.1 } }, updateDoors, counter,
     fire: { x: fire.x - 0.4, y: 0.5, z: fire.z }, board, tree,
   });
@@ -2620,7 +2758,8 @@ function buildCairo(scene) {
   function dropAt(i, y) {
     let x, z;
     do { x = (Math.random() - 0.5) * 100; z = (Math.random() - 0.5) * 90; }
-    while (Math.abs(x) < 15.6 && Math.abs(z) < 11.6); // the café has a roof
+    // the café has a roof — and so does the kitchen behind the back door
+    while ((Math.abs(x) < 15.6 && Math.abs(z) < 11.6) || (x > -15.4 && x < -6.4 && z > -15 && z < -10.6));
     rainSeed[i * 3] = x; rainSeed[i * 3 + 1] = y; rainSeed[i * 3 + 2] = z;
   }
   for (let i = 0; i < RAIN_N; i++) dropAt(i, Math.random() * 30);

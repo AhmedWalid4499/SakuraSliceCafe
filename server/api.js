@@ -4,7 +4,7 @@ const express = require('express');
 const { query, pool } = require('./db');
 const auth = require('./auth');
 const realtime = require('./realtime');
-const { rateLimit, cleanText, isHexColor, clamp, wrap } = require('./util');
+const { rateLimit, cleanText, isHexColor, clamp, wrap, publicContent } = require('./util');
 const groups = require('./groups');
 const npc = require('./npc');
 
@@ -302,13 +302,13 @@ api.post('/subscribe', writeLimit, wrap(async (req, res) => {
 api.get('/content', wrap(async (_req, res) => {
   const { rows } = await query('SELECT key, value FROM site_content');
   res.set('Cache-Control', 'no-cache');
-  res.json(Object.fromEntries(rows.map(r => [r.key, r.value])));
+  res.json(Object.fromEntries(rows.map(r => [r.key, publicContent(r.key, r.value)])));
 }));
 
 api.get('/content/:key', wrap(async (req, res) => {
   const { rows } = await query('SELECT value FROM site_content WHERE key = $1', [req.params.key]);
   if (!rows[0]) return res.status(404).json({ error: 'No such content.' });
-  res.json(rows[0].value);
+  res.json(publicContent(req.params.key, rows[0].value));
 }));
 
 api.get('/cafe/stats', wrap(async (_req, res) => {
@@ -356,7 +356,7 @@ admin.put('/content/:key', wrap(async (req, res) => {
   } finally {
     client.release();
   }
-  realtime.broadcast({ t: 'content', key, value: req.body.value });
+  realtime.broadcast({ t: 'content', key, value: publicContent(key, req.body.value) });
   res.json({ ok: true });
 }));
 
@@ -431,6 +431,7 @@ admin.delete('/chat/:id', wrap(async (req, res) => {
 }));
 
 api.use(groups.router);
+api.use(require('./media').router);
 api.use(npc);
 api.use('/admin', admin);
 

@@ -41,4 +41,14 @@ const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, Number(n)));
 // Async route wrapper so thrown errors reach the error handler.
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-module.exports = { rateLimit, cleanText, isHexColor, clamp, wrap };
+// Some content rows hold things only the owner should see (the story
+// sheet's link may lead to a sheet with subscribers' addresses in it).
+// Everyone else gets the harmless part.
+function publicContent(key, value) {
+  if (key === 'stories.sheet' && value && typeof value === 'object') {
+    return { hasSheet: !!value.url, lastSync: value.lastSync || null, count: value.count || 0 };
+  }
+  return value;
+}
+
+module.exports = { rateLimit, cleanText, isHexColor, clamp, wrap, publicContent };

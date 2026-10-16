@@ -33,6 +33,8 @@ const VERSION = {
 };
 app.get('/healthz', (_req, res) => res.json({ ok: true, ...VERSION }));
 app.get('/version', (_req, res) => res.set('Cache-Control', 'no-cache').json(VERSION));
+// uploads come in raw (a song or a picture), so they go before the JSON-only API
+app.use('/api/admin/upload', require('./media').uploadRouter);
 app.use('/api', api);
 
 // Three.js comes from npm (version pinned in package.json), not a CDN.
