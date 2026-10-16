@@ -761,6 +761,7 @@ export function buildWorld(renderer) {
 
   // ── the counter
   const counter = new THREE.Group();
+  const menuBoard = { slate: null };
   {
     const body = rbox(7.2, 1.0, 0.9, 0.04, M.sage);
     body.position.set(6.5, 0.5, -4.7);
@@ -903,14 +904,20 @@ export function buildWorld(renderer) {
     plaque.position.set(6.6, 2.5, -7.55);
     root.add(plaque);
 
-    // chalk menu on the back wall above the shelves
-    const menu = makeSign([
-      { text: 'today', font: 'Dancing Script, cursive', size: 70, color: '#f7c9d5' },
-      { text: 'matcha · hojicha · cardamom milk', font: 'Nunito, sans-serif', size: 46, color: '#fef9f5' },
-      { text: 'sakura tea · the sakura slice', font: 'Nunito, sans-serif', size: 46, color: '#fef9f5' },
-    ], 3.2, 0.9, { bg: '#2f3a33', border: COLORS.woodDark, radius: 24 });
-    menu.position.set(6.5, 3.35, -7.97);
-    root.add(menu);
+    // the menu board: a big chalkboard on the back wall above the shelves,
+    // written out from the day's menu (see setMenuBoard)
+    const mb = new THREE.Group();
+    const frame = rbox(4.5, 1.55, 0.05, 0.02, M.woodDark);
+    const slate = new THREE.Mesh(new THREE.PlaneGeometry(4.36, 1.42), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }));
+    slate.position.z = 0.027;
+    mb.add(frame, slate);
+    mb.position.set(6.5, 3.33, -7.96);
+    root.add(mb);
+    menuBoard.slate = slate;
+    const hover = new THREE.Mesh(new THREE.BoxGeometry(4.5, 1.55, 0.1), new THREE.MeshBasicMaterial({ visible: false }));
+    hover.userData = { kind: 'order', label: 'The menu — click to order' };
+    mb.add(hover);
+    interactables.push(hover);
   }
 
   // ── the community board (back wall)
@@ -1841,6 +1848,20 @@ export function buildWorld(renderer) {
 
   // ── the front door: two glazed leaves that fill the opening exactly
   const doorSigns = [];
+  // The opening hours (10am–10pm; later in Ramadan), on the door and for the open/closed sign.
+  const doorHours = { open: 10, close: 22, mesh: null, at: null, add: null, label: '' };
+  const fmtH = h => { const k = ((h % 24) + 24) % 24; return k === 0 ? 'midnight' : k === 12 ? 'noon' : k < 12 ? `${k}am` : `${k - 12}pm`; };
+  function setHours(open, close, label = 'every day') {
+    Object.assign(doorHours, { open, close, label });
+    if (!doorHours.at) return;
+    if (doorHours.mesh) { doorHours.mesh.parent.remove(doorHours.mesh); doorHours.mesh.material.map.dispose(); }
+    const m = makeSign([{ text: label, size: 70, color: COLORS.woodDark }, { text: `${fmtH(open)} – ${fmtH(close)}`, size: 96, weight: '700' }], 0.38, 0.2, { bg: COLORS.cream });
+    m.position.copy(doorHours.at);
+    doorHours.add(m);
+    doorHours.mesh = m;
+    if (doorHours.ready) setTimeOfDay(lastHour);
+  }
+  const isOpenAt = h => (doorHours.close > doorHours.open ? h >= doorHours.open && h < doorHours.close : h >= doorHours.open || h < doorHours.close);
   {
     const wz = ROOM.maxZ + 0.1, W2 = 2.2, H2 = 2.8;
     add(doorCasing(0, wz, W2, H2));
@@ -1864,9 +1885,9 @@ export function buildWorld(renderer) {
         add(sign);
       }
     }
-    const hours = makeSign([{ text: 'every day', size: 70, color: COLORS.woodDark }, { text: '10am – 10pm', size: 96, weight: '700' }], 0.34, 0.2, { bg: COLORS.cream });
-    hours.position.set(0.5, 1.5, wz + 0.06);
-    add(hours);
+    doorHours.at = new THREE.Vector3(0.5, 1.5, wz + 0.06);
+    doorHours.add = add;
+    setHours(10, 22);
     const mat = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.8), std('#b98a62', { roughness: 1 }));
     mat.rotation.x = -Math.PI / 2;
     mat.position.set(0, 0.006, wz - 0.75);
@@ -2196,6 +2217,7 @@ export function buildWorld(renderer) {
   function setWeather(look) {
     wx = { ...wx, ...look };
     outside.setWeather(wx);
+    details.setRainy(wx.rain > 0);
     setTimeOfDay(lastHour);
   }
 
@@ -2230,7 +2252,7 @@ export function buildWorld(renderer) {
     baseHemi = hemi.intensity;
 
     // lamps glow more after dark — at night the room is lit by them alone
-    const open = hour >= 10 && hour < 22;
+    const open = isOpenAt(hour);
     doorSigns.forEach(d => { d.sign.visible = d.state === (open ? 'open' : 'closed'); });
     // after closing the café keeps a few lamps low — still warm, never dark
     const lampK = (0.55 + night * 0.85) * (open ? 1 : 0.72);
@@ -2308,6 +2330,435 @@ export function buildWorld(renderer) {
     }
   }
 
+  // ── chalk: the menu board and the week's specials, drawn like a barista would
+  function chalkCanvas(w, h) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    x.fillStyle = '#26302b'; x.fillRect(0, 0, w, h);
+    // old chalk, rubbed out: soft smudges
+    const r = rand(5);
+    for (let i = 0; i < 60; i++) {
+      const px = r() * w, py = r() * h, rad = 30 + r() * 140;
+      const g = x.createRadialGradient(px, py, 0, px, py, rad);
+      g.addColorStop(0, 'rgba(255,255,255,0.035)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.fillRect(px - rad, py - rad, rad * 2, rad * 2);
+    }
+    return { c, x };
+  }
+  const chalk = (x, text, px, py, { size = 40, font = 'Nunito, sans-serif', weight = '600', color = '#f4efe6', align = 'left', max = 9999 } = {}) => {
+    let s = size;
+    x.font = `${weight} ${s}px ${font}`;
+    while (x.measureText(text).width > max && s > 12) { s -= 2; x.font = `${weight} ${s}px ${font}`; }
+    x.textAlign = align; x.textBaseline = 'alphabetic';
+    x.fillStyle = color; x.globalAlpha = 0.92;
+    x.fillText(text, px, py);
+    x.globalAlpha = 0.18; x.fillText(text, px + 1.5, py + 1); // the grain of chalk
+    x.globalAlpha = 1;
+    return s;
+  };
+  function doodle(x, cx, cy, k = 1) {
+    for (let i = 0; i < 5; i++) {
+      const a = i * Math.PI * 2 / 5;
+      x.fillStyle = 'rgba(247,201,213,0.85)';
+      x.beginPath(); x.ellipse(cx + Math.cos(a) * 9 * k, cy + Math.sin(a) * 9 * k, 7 * k, 5 * k, a, 0, Math.PI * 2); x.fill();
+    }
+    x.fillStyle = '#f0c35a'; x.beginPath(); x.arc(cx, cy, 3.5 * k, 0, Math.PI * 2); x.fill();
+  }
+  // board: { title, columns: [{ head, items: [name] }], note }
+  function setMenuBoard(board) {
+    if (!menuBoard.slate) return;
+    const W = 2048, H = 668;
+    const { c, x } = chalkCanvas(W, H);
+    chalk(x, board.title || 'Menu', W / 2, 96, { size: 92, font: 'Dancing Script, cursive', weight: '700', color: '#f7c9d5', align: 'center' });
+    doodle(x, W / 2 - 230, 66); doodle(x, W / 2 + 230, 66, 0.8);
+    const cols = board.columns || [];
+    const cw = (W - 160) / Math.max(1, cols.length);
+    cols.forEach((col, i) => {
+      const x0 = 80 + i * cw, x1 = x0 + cw - 50;
+      chalk(x, col.head, x0, 178, { size: 46, weight: '800', color: '#bfe3b0' });
+      x.strokeStyle = 'rgba(191,227,176,0.6)'; x.lineWidth = 3;
+      x.beginPath(); x.moveTo(x0, 192); x.lineTo(x0 + 180, 194); x.stroke();
+      col.items.slice(0, 6).forEach((name, k) => {
+        const y = 250 + k * 62;
+        chalk(x, name, x0, y, { size: 36, max: cw - 190 });
+        chalk(x, 'free', x1, y, { size: 32, font: 'Dancing Script, cursive', weight: '700', color: '#f7c9d5', align: 'right' });
+        // a row of chalk dots between the name and the price
+        x.font = '600 36px Nunito, sans-serif';
+        const nameEnd = x0 + Math.min(x.measureText(name).width, cw - 190) + 14;
+        x.fillStyle = 'rgba(244,239,230,0.35)';
+        for (let d = nameEnd; d < x1 - 70; d += 14) x.fillRect(d, y - 6, 3, 3);
+      });
+    });
+    chalk(x, board.note || 'Everything here is free — pay it forward with a kind note 🌸', W / 2, H - 34, { size: 34, font: 'Dancing Script, cursive', color: '#f4efe6', align: 'center', max: W - 200 });
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
+    const m = menuBoard.slate.material;
+    if (m.map) m.map.dispose();
+    m.map = t; m.needsUpdate = true;
+  }
+
+  // the week's specials, on an A-frame chalkboard by the counter
+  const specials = { face: null };
+  {
+    const g = new THREE.Group();
+    for (const s of [1, -1]) {
+      const leg = new THREE.Group();
+      const board = rbox(0.66, 1.0, 0.03, 0.012, M.woodDark);
+      board.position.y = 0.5;
+      leg.add(board);
+      if (s > 0) {
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.88), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }));
+        face.position.set(0, 0.52, 0.017);
+        leg.add(face);
+        specials.face = face;
+      }
+      leg.rotation.x = -0.17 * s;
+      leg.position.z = 0.08 * s;
+      if (s < 0) leg.rotation.y = Math.PI;
+      g.add(leg);
+    }
+    g.position.set(cbMinX() - 1.1, 0, ROOM.minZ + 5.6);
+    g.rotation.y = 0.35;
+    root.add(g);
+    colliders.push({ type: 'circle', x: g.position.x, z: g.position.z, r: 0.45, fixed: true });
+    const hover = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.05, 0.35), new THREE.MeshBasicMaterial({ visible: false }));
+    hover.position.y = 0.5;
+    hover.userData = { kind: 'specials', label: "This week's specials" };
+    g.add(hover);
+    interactables.push(hover);
+  }
+  function cbMinX() { const b = new THREE.Box3().setFromObject(counter); return b.min.x; }
+  // specials: { title, items: [{ name, note }] }
+  function setSpecials(sp) {
+    if (!specials.face) return;
+    const W = 560, H = 880;
+    const { c, x } = chalkCanvas(W, H);
+    chalk(x, sp.title || 'This week', W / 2, 92, { size: 72, font: 'Dancing Script, cursive', weight: '700', color: '#f7c9d5', align: 'center', max: W - 60 });
+    doodle(x, 70, 70, 0.9); doodle(x, W - 70, 70, 0.9);
+    (sp.items || []).slice(0, 3).forEach((it, k) => {
+      const y = 200 + k * 210;
+      chalk(x, it.name, W / 2, y, { size: 42, weight: '800', align: 'center', max: W - 50, color: k % 2 ? '#bfe3b0' : '#f4efe6' });
+      // the note, wrapped over two lines
+      const words = String(it.note || '').split(' ');
+      const lines = ['']; x.font = '600 28px Nunito, sans-serif';
+      for (const w of words) { const t = lines[lines.length - 1] ? lines[lines.length - 1] + ' ' + w : w; if (x.measureText(t).width > W - 70 && lines.length < 3) lines.push(w); else lines[lines.length - 1] = t; }
+      lines.slice(0, 3).forEach((l, i) => chalk(x, l, W / 2, y + 46 + i * 34, { size: 28, align: 'center', color: 'rgba(244,239,230,0.85)', max: W - 50 }));
+    });
+    chalk(x, 'free, like everything 🌸', W / 2, H - 40, { size: 32, font: 'Dancing Script, cursive', align: 'center', color: '#f7c9d5' });
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
+    const m = specials.face.material;
+    if (m.map) m.map.dispose();
+    m.map = t; m.needsUpdate = true;
+  }
+
+  // ── the small things a real café has
+  const details = { umbrellas: [], setRainy: () => {} };
+  {
+    const fz = ROOM.maxZ;
+    // a coat rail by the door, with a couple of coats, a scarf and a tote bag
+    const rail = rbox(1.6, 0.1, 0.04, 0.01, M.woodDark);
+    rail.position.set(4.2, 1.85, fz - 0.05);
+    root.add(rail);
+    const coatColors = ['#5d6b7a', '#b48a62', '#7d4f4f'];
+    [3.6, 4.05, 4.5, 4.95].forEach((hx, i) => {
+      const hook = new THREE.Mesh(new THREE.CapsuleGeometry(0.015, 0.06, 4, 8), M.brass);
+      hook.rotation.x = Math.PI / 2;
+      hook.position.set(hx, 1.83, fz - 0.1);
+      root.add(hook);
+      if (i === 0 || i === 2) {
+        const coat = new THREE.Group();
+        const body = rbox(0.36, 0.78, 0.07, 0.03, std(coatColors[i / 2], { roughness: 0.9 }));
+        body.position.y = -0.42;
+        const collar = rbox(0.22, 0.08, 0.09, 0.03, std(coatColors[i / 2], { roughness: 0.9 }));
+        collar.position.y = -0.04;
+        const sleeve = rbox(0.09, 0.55, 0.07, 0.03, std(coatColors[i / 2], { roughness: 0.9 }));
+        sleeve.position.set(0.15, -0.38, 0.03); sleeve.rotation.z = 0.08;
+        coat.add(body, collar, sleeve);
+        coat.position.set(hx, 1.83, fz - 0.14);
+        coat.rotation.y = Math.PI;
+        root.add(coat);
+      } else if (i === 1) {
+        const scarf = rbox(0.1, 0.7, 0.025, 0.01, std('#d4678a', { roughness: 1 }));
+        scarf.position.set(hx, 1.48, fz - 0.12);
+        root.add(scarf);
+      } else {
+        const bag = rbox(0.3, 0.32, 0.05, 0.02, std('#e8dcc4', { roughness: 1 }));
+        bag.position.set(hx, 1.45, fz - 0.12);
+        const handle = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.008, 6, 20, Math.PI), std('#e8dcc4', { roughness: 1 }));
+        handle.position.set(hx, 1.6, fz - 0.12);
+        const logo = makeSign([{ text: 'BookBeans', font: 'Dancing Script, cursive', size: 120, color: COLORS.woodDark, weight: '700' }], 0.22, 0.08, { bg: null });
+        logo.position.set(hx, 1.45, fz - 0.15);
+        logo.rotation.y = Math.PI;
+        root.add(bag, handle, logo);
+      }
+    });
+    // an umbrella stand: more umbrellas in it on rainy days
+    const stand = new THREE.Group();
+    const pot = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.48, 24, 1, true), std('#4f6b5a', { roughness: 0.5, side: THREE.DoubleSide })));
+    pot.position.y = 0.24;
+    const potBase = new THREE.Mesh(new THREE.CircleGeometry(0.13, 24), std('#3c5245'));
+    potBase.rotation.x = -Math.PI / 2; potBase.position.y = 0.02;
+    stand.add(pot, potBase);
+    const umbColors = ['#2f3a4a', '#d4678a', '#c9a24a', '#5f7a64'];
+    umbColors.forEach((c, i) => {
+      const u = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.85, 8), M.woodDark);
+      shaft.position.y = 0.45;
+      const canopy = shadowy(new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.55, 8), std(c, { roughness: 0.6 })));
+      canopy.position.y = 0.42; canopy.rotation.x = Math.PI;
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 6, 14, Math.PI), M.woodDark);
+      handle.position.set(0.035, 0.88, 0);
+      u.add(shaft, canopy, handle);
+      u.position.set(Math.cos(i * 1.6) * 0.05, 0, Math.sin(i * 1.6) * 0.05);
+      u.rotation.set(Math.sin(i * 2) * 0.12, i, Math.cos(i * 2) * 0.12);
+      u.visible = i === 0;
+      stand.add(u);
+      details.umbrellas.push(u);
+    });
+    stand.position.set(1.75, 0, fz - 0.45);
+    root.add(stand);
+    colliders.push({ type: 'circle', x: stand.position.x, z: stand.position.z, r: 0.22, fixed: true });
+    details.setRainy = on => details.umbrellas.forEach((u, i) => { u.visible = i === 0 || on; });
+    // "please seat yourself" — a little stand inside the door
+    const sy = new THREE.Group();
+    const foot = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.03, 24), M.brass));
+    const pole = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.0, 10), M.brass));
+    pole.position.y = 0.5;
+    sy.add(foot, pole);
+    for (const ry of [0, Math.PI]) {
+      const sg = makeSign([{ text: 'Please seat yourself', size: 92, weight: '700' }, { text: "anywhere you like — we'll come to you 🌸", font: 'Dancing Script, cursive', size: 70, color: COLORS.sakuraDark }], 0.46, 0.22, { bg: COLORS.cream });
+      sg.position.set(0, 1.08, ry ? -0.006 : 0.006);
+      sg.rotation.y = ry;
+      sy.add(sg);
+    }
+    sy.position.set(-1.8, 0, fz - 0.95);
+    sy.rotation.y = 0.25;
+    root.add(sy);
+    colliders.push({ type: 'circle', x: sy.position.x, z: sy.position.z, r: 0.25, fixed: true });
+    // on the counter: a tip jar and a card reader (nothing to pay — it says so)
+    const cb = new THREE.Box3().setFromObject(counter);
+    const ctop = 1.085, cz = cb.max.z - 0.3;
+    const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.065, 0.17, 24, 1, true),
+      new THREE.MeshStandardMaterial({ color: '#eef6fb', roughness: 0.05, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }));
+    jar.position.set(cb.min.x + 0.7, ctop + 0.085, cz);
+    const coins = new THREE.Group();
+    for (let i = 0; i < 9; i++) {
+      const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.004, 12), M.brass);
+      coin.position.set((Math.random() - 0.5) * 0.08, 0.006 + i * 0.004, (Math.random() - 0.5) * 0.08);
+      coin.rotation.set(Math.random() * 0.6, 0, Math.random() * 0.6);
+      coins.add(coin);
+    }
+    const note = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.002), std('#a8c79a'));
+    note.position.set(0.01, 0.07, 0.01); note.rotation.set(0.2, 0.4, 0.3);
+    coins.add(note);
+    coins.position.set(jar.position.x, ctop, cz);
+    const jarLabel = makeSign([{ text: 'kindness', font: 'Dancing Script, cursive', size: 110, color: COLORS.sakuraDark, weight: '700' }, { text: 'pay it forward', size: 60, color: COLORS.woodDark }], 0.13, 0.07, { bg: COLORS.cream, radius: 30 });
+    jarLabel.position.set(jar.position.x, ctop + 0.08, cz + 0.072);
+    root.add(jar, coins, jarLabel);
+    const reader = new THREE.Group();
+    const rb = rbox(0.09, 0.025, 0.16, 0.01, std('#2b2d31', { roughness: 0.4 }));
+    rb.position.y = 0.012;
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.05), new THREE.MeshStandardMaterial({ color: '#cfe9d8', emissive: '#9fd6b0', emissiveIntensity: 0.4 }));
+    screen.rotation.x = -Math.PI / 2; screen.position.set(0, 0.026, -0.035);
+    const keys = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.06), std('#4a4d55'));
+    keys.rotation.x = -Math.PI / 2; keys.position.set(0, 0.026, 0.035);
+    reader.add(rb, screen, keys);
+    reader.position.set(cb.min.x + 1.1, ctop, cz);
+    reader.rotation.y = 0.3;
+    root.add(reader);
+    const rh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 0.25), new THREE.MeshBasicMaterial({ visible: false }));
+    rh.position.set(cb.min.x + 0.9, ctop + 0.1, cz);
+    rh.userData = { kind: 'info', label: 'The tip jar and the card reader', text: "Nothing here costs anything, so the card reader just says \"free 🌸\". The jar is for kindness: leave a note for a stranger on the board, and that's the tip." };
+    interactables.push(rh);
+    root.add(rh);
+  }
+
+  // ── the seasons, Ramadan and Eid: decorations that come and go with the calendar
+  const decor = {};
+  {
+    const mk = () => { const g = new THREE.Group(); g.visible = false; root.add(g); return g; };
+    for (const k of ['spring', 'summer', 'autumn', 'winter', 'ramadan', 'eid']) decor[k] = mk();
+    // bunting (or a garland of leaves) strung across the room under the beams
+    function garland(into, x0, z0, x1, z1, y, colors, shape = 'flag', sag = 0.35) {
+      const pts = [];
+      const n = Math.max(2, Math.round(Math.hypot(x1 - x0, z1 - z0) / 0.32));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        pts.push(new THREE.Vector3(x0 + (x1 - x0) * t, y - Math.sin(Math.PI * t) * sag, z0 + (z1 - z0) * t));
+      }
+      const cord = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n * 2, 0.006, 4), std('#efe4d2'));
+      into.add(cord);
+      const geo = shape === 'flag'
+        ? new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(-0.09, 0), new THREE.Vector2(0.09, 0), new THREE.Vector2(0, -0.2)]))
+        : new THREE.CircleGeometry(0.07, 7);
+      const mats = colors.map(c => std(c, { roughness: 0.9, side: THREE.DoubleSide }));
+      const ry = Math.atan2(x1 - x0, z1 - z0) + Math.PI / 2;
+      pts.forEach((p, i) => {
+        if (i === 0 || i === pts.length - 1) return;
+        const f = new THREE.Mesh(geo, mats[i % mats.length]);
+        f.position.copy(p);
+        f.rotation.y = ry;
+        if (shape !== 'flag') { f.scale.set(0.8, 1.35, 1); f.position.y -= 0.08; f.rotation.z = (i % 3 - 1) * 0.5; }
+        into.add(f);
+      });
+    }
+    const lines = [[-14.5, -3, 14.5, -3], [-14.5, 4, 14.5, 4], [-14.2, 9.6, 14.2, 9.6]];
+    for (const [a, b, c, d] of lines) {
+      garland(decor.spring, a, b, c, d, 3.75, ['#f2a7bb', '#fef9f5', '#d4678a', '#c9dcc0']);
+      garland(decor.summer, a, b, c, d, 3.75, ['#f3df7a', '#bfe3b0', '#fef9f5', '#9fd0d6']);
+      garland(decor.autumn, a, b, c, d, 3.75, ['#c8703a', '#a8452e', '#e0a23f', '#8a5a2e'], 'leaf');
+      garland(decor.winter, a, b, c, d, 3.75, ['#3f6b4f', '#2f5d3a', '#4f7d5a'], 'leaf', 0.25);
+    }
+    // summer: a bowl of lemons on the counter
+    {
+      const cb = new THREE.Box3().setFromObject(counter);
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), std('#fffaf4', { roughness: 0.3, side: THREE.DoubleSide }));
+      bowl.position.set(cb.max.x - 0.8, 1.215, cb.max.z - 0.35);
+      decor.summer.add(bowl);
+      for (let i = 0; i < 5; i++) {
+        const l = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 12), std('#f0d24a', { roughness: 0.5 }));
+        l.scale.set(1, 0.85, 1.25);
+        l.position.set(bowl.position.x + Math.cos(i * 1.3) * 0.06, 1.16 + (i > 3 ? 0.05 : 0), bowl.position.z + Math.sin(i * 1.3) * 0.06);
+        decor.summer.add(l);
+      }
+    }
+    // winter: a candle in a little glass on every table, and blankets on the armchairs
+    const flameM = new THREE.MeshBasicMaterial({ color: '#ffcf7a' });
+    for (const t of surfaces.filter(m => m.userData.surface === 'table' && m.userData.tableName && m.userData.top < 0.9)) {
+      const p = new THREE.Vector3(); t.getWorldPosition(p);
+      const c = new THREE.Group();
+      const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.032, 0.07, 16, 1, true), new THREE.MeshStandardMaterial({ color: '#ffe6c4', transparent: true, opacity: 0.35, roughness: 0.1, side: THREE.DoubleSide, depthWrite: false }));
+      glass.position.y = 0.035;
+      const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.04, 16), std('#fff6e8'));
+      wax.position.y = 0.02;
+      const flame = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 8), flameM);
+      flame.scale.y = 2;
+      flame.position.y = 0.056;
+      flame.onBeforeRender = () => { const k = 1 + Math.sin(performance.now() / 90 + p.x) * 0.15; flame.scale.set(k, 2 * k, k); };
+      c.add(glass, wax, flame);
+      c.position.set(p.x - 0.2, t.userData.top, p.z - 0.2);
+      decor.winter.add(c);
+    }
+    for (const id of ['arm1', 'arm2']) {
+      const seat = seats.find(x => x.id === id);
+      if (!seat) continue;
+      const blanket = new THREE.Group();
+      const fold = rbox(0.62, 0.05, 0.42, 0.02, std(id === 'arm1' ? '#c7605a' : '#d9c3a3', { roughness: 1 }));
+      fold.position.set(0, 0.68, -0.05);
+      const drape = rbox(0.62, 0.42, 0.05, 0.02, std(id === 'arm1' ? '#c7605a' : '#d9c3a3', { roughness: 1 }));
+      drape.position.set(0, 0.95, -0.35); drape.rotation.x = 0.15;
+      blanket.add(fold, drape);
+      blanket.position.set(seat.x, 0, seat.z);
+      blanket.rotation.y = seat.ry;
+      decor.winter.add(blanket);
+    }
+    // Ramadan: fanous lanterns hanging through the room, a string of crescents and stars, the greeting
+    const lanternColors = ['#c0392b', '#2e7d4f', '#2f5fa8', '#e0a23f', '#8e44ad'];
+    const lanternSpots = [[-11, -6], [-6, 1], [-1, -4], [3, 2], [8, 6], [-8, 7], [12, -1], [1, 8.5]];
+    lanternSpots.forEach(([lx, lz], i) => {
+      const L = new THREE.Group();
+      const brass = M.brass;
+      const top = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.16, 6), brass); top.position.y = 0.2;
+      const glassM = new THREE.MeshStandardMaterial({ color: lanternColors[i % 5], emissive: lanternColors[i % 5], emissiveIntensity: 0.9, transparent: true, opacity: 0.85, roughness: 0.3 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.24, 6), glassM);
+      const bottom = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.1, 6), brass); bottom.position.y = -0.17; bottom.rotation.x = Math.PI;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.006, 6, 12), brass); ring.position.y = 0.3;
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffe2a0' }));
+      const len = 0.5 + (i % 3) * 0.25;
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, len, 5), M.woodDark); cord.position.y = 0.3 + len / 2;
+      L.add(top, body, bottom, ring, glow, cord);
+      L.position.set(lx, ROOM.h - 0.3 - len, lz);
+      decor.ramadan.add(L);
+    });
+    {
+      const crescentM = new THREE.MeshBasicMaterial({ color: '#ffd98a' });
+      const n = 26;
+      for (let i = 0; i <= n; i++) {
+        const t = i / n, x = -14 + t * 28, y = 3.3 - Math.sin(Math.PI * ((t * 4) % 1)) * 0.18;
+        const shape = i % 2
+          ? (() => { const sh = new THREE.Shape(); sh.absarc(0, 0, 0.06, 0.6, Math.PI * 2 - 0.6, false); sh.absarc(0.03, 0, 0.05, Math.PI * 2 - 0.9, 0.9, true); return sh; })()
+          : (() => { const sh = new THREE.Shape(); for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5 - Math.PI / 2, r = k % 2 ? 0.022 : 0.05; k ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); } return sh; })();
+        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), crescentM);
+        m.position.set(x, y, ROOM.maxZ - 0.15);
+        m.rotation.y = Math.PI;
+        decor.ramadan.add(m);
+      }
+    }
+    for (const [k, lines] of [['ramadan', [{ text: 'رمضان كريم', size: 120, weight: '700', color: '#7a4e1e' }, { text: 'Ramadan Kareem 🌙', font: 'Dancing Script, cursive', size: 92, color: COLORS.sakuraDark }]],
+      ['eid', [{ text: 'عيد مبارك', size: 120, weight: '700', color: '#7a4e1e' }, { text: 'Eid Mubarak ✨', font: 'Dancing Script, cursive', size: 92, color: COLORS.sakuraDark }]]]) {
+      for (const ry of [0, Math.PI]) {
+        const b = makeSign(lines, 2.4, 0.62, { bg: '#fbf0dc' });
+        b.position.set(0, 3.35, 2.0 + (ry ? -0.006 : 0.006));
+        b.rotation.y = ry;
+        decor[k].add(b);
+      }
+    }
+    noFog(root);
+  }
+  // { season: 'spring'|'summer'|'autumn'|'winter', ramadan: bool, eid: bool }
+  function setSeason({ season, ramadan = false, eid = false } = {}) {
+    for (const k of ['spring', 'summer', 'autumn', 'winter']) decor[k].visible = k === season && !ramadan;
+    decor.ramadan.visible = !!ramadan;
+    decor.eid.visible = !!eid && !ramadan;
+  }
+
+  // ── "What's on": story readings and book-club nights, on an easel by the fire
+  const easel = { face: null };
+  {
+    const g = new THREE.Group();
+    const legM = M.woodDark;
+    for (const [lx, lz, rx, rz] of [[-0.32, 0.12, 0.12, -0.06], [0.32, 0.12, 0.12, 0.06], [0, -0.38, -0.35, 0]]) {
+      const leg = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 1.75, 8), legM));
+      leg.position.set(lx, 0.85, lz);
+      leg.rotation.set(rx, 0, rz);
+      g.add(leg);
+    }
+    const ledge = rbox(0.8, 0.04, 0.08, 0.01, legM);
+    ledge.position.set(0, 0.62, 0.2);
+    const board = rbox(0.78, 0.95, 0.03, 0.01, legM);
+    board.position.set(0, 1.12, 0.17);
+    board.rotation.x = -0.12;
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.86), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }));
+    face.position.set(0, 1.12, 0.19);
+    face.rotation.x = -0.12;
+    g.add(ledge, board, face);
+    easel.face = face;
+    g.position.set(ROOM.maxX - 2.1, 0, 5.7);
+    g.rotation.y = -Math.PI / 2 - 0.3;
+    root.add(g);
+    colliders.push({ type: 'circle', x: g.position.x, z: g.position.z, r: 0.5, fixed: true });
+    const hover = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.1, 0.4), new THREE.MeshBasicMaterial({ visible: false }));
+    hover.position.set(0, 1.1, 0.15);
+    hover.userData = { kind: 'events', label: "What's on — story evenings and book club" };
+    g.add(hover);
+    interactables.push(hover);
+  }
+  // events: [{ when: 'Fri 8pm', title, now: bool }]
+  function setEvents(list = []) {
+    if (!easel.face) return;
+    const W = 700, H = 860;
+    const { c, x } = chalkCanvas(W, H);
+    chalk(x, "What's on", W / 2, 96, { size: 84, font: 'Dancing Script, cursive', weight: '700', color: '#f7c9d5', align: 'center' });
+    doodle(x, 90, 70); doodle(x, W - 90, 70, 0.8);
+    if (!list.length) chalk(x, 'Story evenings — coming soon', W / 2, 300, { size: 40, align: 'center', max: W - 60 });
+    list.slice(0, 4).forEach((e, k) => {
+      const y = 200 + k * 160;
+      chalk(x, e.now ? '✨ happening now' : e.when, W / 2, y, { size: 36, weight: '800', align: 'center', color: e.now ? '#f0c35a' : '#bfe3b0', max: W - 60 });
+      chalk(x, e.title, W / 2, y + 56, { size: 44, align: 'center', max: W - 50 });
+      if (e.where) chalk(x, e.where, W / 2, y + 100, { size: 28, align: 'center', color: 'rgba(244,239,230,0.75)', max: W - 60 });
+    });
+    chalk(x, 'everyone welcome 🌸', W / 2, H - 36, { size: 36, font: 'Dancing Script, cursive', align: 'center', color: '#f7c9d5' });
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
+    const m = easel.face.material;
+    if (m.map) m.map.dispose();
+    m.map = t; m.needsUpdate = true;
+  }
+
   // Photos in the frames: { p1: { cover, caption }, … } (cover: media id or link).
   const photoKeys = {};
   function setPhotos(photos = {}) {
@@ -2330,10 +2781,11 @@ export function buildWorld(renderer) {
     }
   }
 
+  doorHours.ready = true;
   const api = Object.assign(api_, {
     scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
-    setBookOfWeek, setPhotos, photoFrames: PHOTO_FRAMES,
+    setBookOfWeek, setPhotos, photoFrames: PHOTO_FRAMES, setMenuBoard, setSpecials, setSeason, setEvents, setHours,
     walk, kitchen: { ...KIT, door: { x: KX, z: ROOM.minZ - 0.1 } }, updateDoors, counter,
     fire: { x: fire.x - 0.4, y: 0.5, z: fire.z }, board, tree,
   });

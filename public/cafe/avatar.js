@@ -79,9 +79,54 @@ function shade(hex, amt) {
   return c;
 }
 
-// A cup with a drink in it, held in the right hand. `level` (0–1) is how
+// Soft puffs for steam, and droplets for a cold glass (drawn once, shared).
+let steamTex = null, dropTex = null;
+function steamTexture() {
+  if (steamTex) return steamTex;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  steamTex = new THREE.CanvasTexture(c);
+  steamTex.userData.shared = true;
+  return steamTex;
+}
+function dropTexture() {
+  if (dropTex) return dropTex;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  for (let i = 0; i < 140; i++) {
+    const px = Math.random() * 128, py = Math.random() * 128, r = 0.6 + Math.random() * 1.8;
+    x.fillStyle = `rgba(255,255,255,${0.35 + Math.random() * 0.5})`;
+    x.beginPath(); x.ellipse(px, py, r, r * 1.3, 0, 0, Math.PI * 2); x.fill();
+  }
+  // a few drops that have run down the glass
+  for (let i = 0; i < 6; i++) { const px = Math.random() * 128; x.fillStyle = 'rgba(255,255,255,0.3)'; x.fillRect(px, Math.random() * 60, 1.2, 20 + Math.random() * 40); }
+  dropTex = new THREE.CanvasTexture(c);
+  dropTex.wrapS = dropTex.wrapT = THREE.RepeatWrapping;
+  dropTex.repeat.set(2, 1);
+  dropTex.userData.shared = true;
+  return dropTex;
+}
+
+// Is this drink served hot or iced? (from the menu's temp, or its name)
+export function tempOf(d = {}) {
+  const t = String(d.temp || '').toLowerCase();
+  if (/ice|cold|chill/.test(t)) return 'iced';
+  if (/warm|hot/.test(t)) return 'hot';
+  return /iced|cold|smoothie|slush|float|lemonade|sparkling|soda|juice|frapp|tonic|spritz|cooler|shake/i.test(d.name || '') ? 'iced' : 'hot';
+}
+
+// A drink, held in the right hand or set on a table. `level` (0–1) is how
 // full it is; g.userData.setLevel changes it as the drink goes down.
-export function makeCup(drinkColor, level = 1) {
+// Hot drinks come in a ceramic cup with steam rising off them; iced ones in
+// a clear glass with ice, a straw, and condensation beading on the outside.
+export function makeCup(drinkColor, level = 1, temp = 'hot') {
+  return temp === 'iced' ? makeGlass(drinkColor, level) : makeMug(drinkColor, level);
+}
+
+function makeMug(drinkColor, level) {
   const g = new THREE.Group();
   const cup = new THREE.Mesh(
     new THREE.CylinderGeometry(0.055, 0.045, 0.11, SEG, 1, true),
@@ -94,11 +139,71 @@ export function makeCup(drinkColor, level = 1) {
   const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.057, 0.052, 0.04, SEG, 1, true), mat('#d4678a'));
   cup.castShadow = true;
   g.add(cup, base, drink, sleeve);
+  // steam: a few soft puffs drifting up and fading, animated as they're drawn
+  const steam = new THREE.Group();
+  const puffs = [];
+  for (let i = 0; i < 4; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: steamTexture(), transparent: true, depthWrite: false, opacity: 0, fog: false }));
+    sp.userData.phase = i / 4 + Math.random() * 0.1;
+    sp.userData.drift = (Math.random() - 0.5) * 0.03;
+    sp.onBeforeRender = () => {
+      const t = (performance.now() / 2600 + sp.userData.phase) % 1;
+      sp.position.set(sp.userData.drift * t * 4 + Math.sin(t * 6 + i) * 0.008, 0.06 + t * 0.2, 0);
+      const k = 0.03 + t * 0.07;
+      sp.scale.set(k, k * 1.4, 1);
+      sp.material.opacity = Math.sin(Math.PI * t) * 0.32 * steam.userData.strength;
+    };
+    puffs.push(sp);
+    steam.add(sp);
+  }
+  steam.userData.strength = 1;
+  g.add(steam);
   g.userData.setLevel = l => {
     l = Math.max(0, Math.min(1, l));
     drink.visible = l > 0.02;
     drink.position.y = -0.048 + 0.088 * l;
     drink.scale.setScalar(0.85 + 0.15 * l); // the cup narrows towards the bottom
+    steam.visible = l > 0.05;
+    steam.userData.strength = 0.4 + 0.6 * l;
+  };
+  g.userData.setLevel(level);
+  return g;
+}
+
+function makeGlass(drinkColor, level) {
+  const g = new THREE.Group();
+  const H = 0.13, R0 = 0.042, R1 = 0.05;
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(R1, R0, H, SEG, 1, true),
+    new THREE.MeshStandardMaterial({ color: '#eef6fb', roughness: 0.08, metalness: 0, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }));
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(R0, R0, 0.012, SEG), new THREE.MeshStandardMaterial({ color: '#eef6fb', roughness: 0.1, transparent: true, opacity: 0.5 }));
+  base.position.y = -H / 2 + 0.006;
+  // condensation, beading on the outside of a cold glass
+  const wet = new THREE.Mesh(new THREE.CylinderGeometry(R1 + 0.0015, R0 + 0.0015, H * 0.82, SEG, 1, true),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', map: dropTexture(), transparent: true, opacity: 0.55, roughness: 0.05, depthWrite: false }));
+  wet.position.y = -H * 0.06;
+  const liquid = new THREE.Mesh(new THREE.CylinderGeometry(R1 - 0.004, R0 - 0.003, 1, SEG),
+    new THREE.MeshStandardMaterial({ color: drinkColor, roughness: 0.15, transparent: true, opacity: 0.82 }));
+  const ice = new THREE.Group();
+  const iceM = new THREE.MeshStandardMaterial({ color: '#f4fbff', roughness: 0.05, transparent: true, opacity: 0.6 });
+  for (let i = 0; i < 3; i++) {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.024, 0.026), iceM);
+    c.position.set(Math.cos(i * 2.1) * 0.018, 0, Math.sin(i * 2.1) * 0.018);
+    c.rotation.set(i * 0.7, i * 1.3, i * 0.4);
+    ice.add(c);
+  }
+  const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.2, 10), new THREE.MeshStandardMaterial({ color: '#f2a7bb', roughness: 0.4 }));
+  straw.position.set(0.015, 0.04, 0.008);
+  straw.rotation.z = -0.18;
+  g.add(base, liquid, ice, straw, glass, wet);
+  glass.renderOrder = 2; wet.renderOrder = 3;
+  g.userData.setLevel = l => {
+    l = Math.max(0, Math.min(1, l));
+    const h = Math.max(0.001, (H - 0.016) * l);
+    liquid.visible = l > 0.02;
+    liquid.scale.y = h;
+    liquid.position.y = -H / 2 + 0.012 + h / 2;
+    ice.position.y = -H / 2 + 0.024 + Math.max(0.006, h - 0.012);
+    wet.visible = l > 0.15;
   };
   g.userData.setLevel(level);
   return g;
@@ -730,12 +835,13 @@ function buildAvatarParts(avatar, extra) {
 
   // ── a drink in the right hand
   let cup = null, cupColor = null;
-  function setDrink(color, level = 1) {
-    if (cup && color && color === cupColor) { cup.userData.setLevel(level); return; }
-    if (cup) { cup.parent.remove(cup); cup = null; cupColor = null; }
+  function setDrink(color, level = 1, temp = 'hot') {
+    const key = color && color + temp;
+    if (cup && color && key === cupColor) { cup.userData.setLevel(level); return; }
+    if (cup) { cup.parent.remove(cup); disposeTree(cup); cup = null; cupColor = null; }
     if (!color || isOwl) return;
-    cup = makeCup(color, level);
-    cupColor = color;
+    cup = makeCup(color, level, temp);
+    cupColor = key;
     cup.position.set(0, -0.44, 0.08);
     parts.armR.add(cup);
   }
@@ -839,7 +945,7 @@ export function disposeTree(obj) {
     if (o.geometry) o.geometry.dispose();
     if (o.material) {
       const ms = Array.isArray(o.material) ? o.material : [o.material];
-      ms.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
+      ms.forEach(m => { if (m.map && !m.map.userData.shared) m.map.dispose(); m.dispose(); });
     }
   });
 }

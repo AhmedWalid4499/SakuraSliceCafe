@@ -12,7 +12,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWorld, ROOM, STAIRS, noFog } from './world.js';
 import { mapX, mapZ } from './layout.mjs';
 import { currentWeather, WEATHER } from './weather.js';
-import { buildAvatar, makeLabel, makeCup, disposeTree } from './avatar.js';
+import { buildAvatar, makeLabel, makeCup, disposeTree, tempOf } from './avatar.js';
 import { makeDessert } from './pastries.js';
 import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
@@ -166,6 +166,46 @@ function cairoDay() {
     return new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', weekday: 'long' }).format(new Date()) + ' in Cairo';
   } catch (e) { return 'Cairo'; }
 }
+// Cairo's wall clock as plain numbers, for the calendar (seasons, events).
+function cairoNow() {
+  try {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' })
+      .formatToParts(new Date()).map(p => [p.type, p.value]));
+    // a Date whose UTC fields read as Cairo's local time — easy to compare and count in
+    return new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute));
+  } catch (e) { return new Date(); }
+}
+// The Islamic (Hijri) month and day, for Ramadan and the two Eids.
+function hijri() {
+  for (const cal of ['islamic-umalqura', 'islamic-civil', 'islamic']) {
+    try {
+      const f = new Intl.DateTimeFormat(`en-u-ca-${cal}`, { timeZone: 'Africa/Cairo', month: 'numeric', day: 'numeric' });
+      const p = Object.fromEntries(f.formatToParts(new Date()).map(x => [x.type, x.value]));
+      if (p.month) return { month: +p.month, day: +p.day };
+    } catch (e) { /* try the next calendar */ }
+  }
+  return null;
+}
+// The season (or the owner's choice, in site_content 'cafe.season'), Ramadan and Eid, and the hours.
+function calendar() {
+  const conf = state.content['cafe.season'] || {};
+  const m = cairoNow().getUTCMonth() + 1;
+  const auto = m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <= 8 ? 'summer' : m >= 9 && m <= 11 ? 'autumn' : 'winter';
+  const season = ['spring', 'summer', 'autumn', 'winter'].includes(conf.season) ? conf.season : auto;
+  const h = hijri();
+  const ramadan = conf.ramadan === true || conf.ramadan === 'on' ? true : conf.ramadan === false || conf.ramadan === 'off' ? false : !!(h && h.month === 9);
+  const eid = conf.eid === true || conf.eid === 'on' || (conf.eid !== false && conf.eid !== 'off' && !!h && ((h.month === 10 && h.day <= 3) || (h.month === 12 && h.day >= 10 && h.day <= 13)));
+  const hours = ramadan ? { open: 12, close: 2, ...(conf.ramadanHours || {}) } : { open: 10, close: 22, ...(conf.hours || {}) };
+  return { season, ramadan, eid, hours };
+}
+function applyCalendar() {
+  const cal = calendar();
+  state.calendar = cal;
+  world.setSeason(cal);
+  world.setHours(cal.hours.open, cal.hours.close, cal.ramadan ? 'in Ramadan' : 'every day');
+  return cal;
+}
+
 // ── the weather: Cairo's own (seeded by the date), unless the owner set it
 let weatherNow = null;
 function refreshWeather() {
@@ -234,8 +274,15 @@ function openWeather() {
 $('wxChip').onclick = openWeather;
 $('wxOwnerBtn').onclick = openWeather;
 
+let lastDay = '';
 function updateTime() {
   const h = cairoHour();
+  const today = cairoNow().toISOString().slice(0, 10);
+  // (once the café's content is in: the boards and the calendar are drawn from it)
+  if (state.booted) {
+    if (today !== lastDay) { lastDay = today; applyCalendar(); refreshBoards(); }
+    refreshEvents();
+  }
   refreshWeather();
   const { night, open } = world.setTimeOfDay(h);
   state.open = open;
@@ -275,7 +322,7 @@ function playerAvatar() {
   player.label.visible = false; // you know who you are; others see your name
   player.av.group.add(player.label);
   scene.add(player.av.group);
-  if (player.drink) player.av.setDrink(drinkColor(player.drink), levelOf(player.sips));
+  if (player.drink) player.av.setDrink(drinkColor(player.drink), levelOf(player.sips), drinkTemp(player.drink));
   if (player.dessert) player.av.setDessert(pastryOf(player.dessert.id).shape, player.dessert.bites);
 }
 
@@ -463,7 +510,7 @@ function drinkMesh(placed, mine, who) {
   const g = new THREE.Group();
   const both = placed.drink && placed.dessert;
   if (placed.drink) {
-    const cup = makeCup(drinkColor(placed.drink), 1 - (placed.sips || 0) / SIPS);
+    const cup = makeCup(drinkColor(placed.drink), 1 - (placed.sips || 0) / SIPS, drinkTemp(placed.drink));
     cup.position.set(both ? -0.08 : 0, 0.056, 0);
     g.add(cup);
   }
@@ -519,7 +566,7 @@ function pickUpDrink() {
   if (far) return toast('Walk back to your table to pick it up.');
   const pl = player.placed;
   if ((pl.drink && player.drink) || (pl.dessert && player.dessert)) return toast('Your hands are full — put down what you\'re holding first.');
-  if (pl.drink) { player.drink = pl.drink; player.sips = pl.sips || 0; player.av.setDrink(drinkColor(player.drink), levelOf(player.sips)); }
+  if (pl.drink) { player.drink = pl.drink; player.sips = pl.sips || 0; player.av.setDrink(drinkColor(player.drink), levelOf(player.sips), drinkTemp(player.drink)); }
   if (pl.dessert) { player.dessert = { id: pl.dessert, bites: pl.bites || 0 }; player.av.setDessert(pastryOf(pl.dessert).shape, player.dessert.bites); }
   setPlaced(null);
   sound.cue('sit');
@@ -533,7 +580,7 @@ function takeFromTable(kind) {
   if (kind === 'drink') {
     if (player.drink) return false;
     player.drink = pl.drink; player.sips = pl.sips || 0;
-    player.av.setDrink(drinkColor(player.drink), levelOf(player.sips));
+    player.av.setDrink(drinkColor(player.drink), levelOf(player.sips), drinkTemp(player.drink));
     setPlaced(pl.dessert ? { ...pl, drink: null, sips: 0 } : null);
   } else {
     if (player.dessert) return false;
@@ -573,7 +620,7 @@ function takeSip() {
   if (!player.drink && !takeFromTable('drink')) return;
   player.sips = Math.min(SIPS, (player.sips || 0) + 1);
   player.av.play('sip');
-  setTimeout(() => player.drink && player.av.setDrink(drinkColor(player.drink), levelOf(player.sips)), 500);
+  setTimeout(() => player.drink && player.av.setDrink(drinkColor(player.drink), levelOf(player.sips), drinkTemp(player.drink)), 500);
   sound.sip();
   sendMove(true);
   refreshActions();
@@ -743,7 +790,7 @@ function setPersonDrink(p) {
   const cupKey = p.state.drink ? `${p.state.drink}:${p.state.sips || 0}` : null;
   if (p.drinkShown !== cupKey) {
     p.drinkShown = cupKey;
-    p.av.setDrink(p.state.drink ? drinkColor(p.state.drink) : null, levelOf(p.state.sips));
+    p.av.setDrink(p.state.drink ? drinkColor(p.state.drink) : null, levelOf(p.state.sips), drinkTemp(p.state.drink));
   }
   const dKey = p.state.dessert ? `${p.state.dessert}:${p.state.bites || 0}` : null;
   if (p.dessertShown !== dKey) {
@@ -1100,6 +1147,7 @@ function menu() {
   return menuCache.list;
 }
 const drinkColor = id => (menu().find(d => d.id === id) || {}).color || '#d9b48f';
+const drinkTemp = id => tempOf(menu().find(d => d.id === id) || {});
 
 // The pastry counter — the same twelve as the website (site_content 'counter.pastries').
 const pastries = () => (Array.isArray(state.content['counter.pastries']) ? state.content['counter.pastries'] : []).filter(p => p && p.id && p.name);
@@ -1197,7 +1245,7 @@ function bringToTable(kind, item) {
   if (kind === 'drink') sound.espresso(counterSpot(), !/tea|juice|lemonade|smoothie|slush|float/i.test(item.name));
   bubble(npc.av.group, kind === 'drink' ? `One ${item.name}. I'll bring it over.` : `One ${item.name}. Coming to you.`, 'npc');
   toast(`🛎️ ${npc.name} is bringing your ${item.name} to ${where}.`);
-  staff.deliver(who, kind === 'drink' ? { drinkColor: item.color } : { dessertShape: item.shape }, spot, () => {
+  staff.deliver(who, kind === 'drink' ? { drinkColor: item.color, drinkTemp: tempOf(item) } : { dessertShape: item.shape }, spot, () => {
     const prev = player.placed;
     const keep = prev && Math.hypot(prev.x - spot.x, prev.z - spot.z) < 1.2 ? prev : {};
     setPlaced({
@@ -1226,7 +1274,7 @@ function order(d) {
     sound.counterBell(counterSpot());
     player.drink = d.id;
     player.sips = 0;
-    player.av.setDrink(d.color, 1);
+    player.av.setDrink(d.color, 1, tempOf(d));
     sound.cue('drink');
     sendMove(true);
     refreshActions();
@@ -1458,8 +1506,12 @@ function click(x, y) {
   }
   if (d.kind === 'shelf') return openShelf();
   if (d.kind === 'photo') return openPhoto(d.id);
+  if (d.kind === 'specials') return openSpecials();
+  if (d.kind === 'events') return openEvents();
   if (d.kind === 'bookweek') return openBook();
   if (d.kind === 'info') {
+    $('infoEyebrow').textContent = 'In the café';
+    $('infoText').style.whiteSpace = '';
     $('infoTitle').textContent = d.label;
     $('infoText').textContent = d.text || '';
     return openPanel('infoPanel');
@@ -1499,7 +1551,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -1952,6 +2004,153 @@ $('bookSave').onclick = async () => {
   } catch (e) { $('bookErr').textContent = e.message; }
 };
 
+// ───────────────────────────────────────── the menu board and the week's specials
+
+function dayNumber() { return Math.floor(cairoNow().getTime() / 86400e3); }
+function rotate(list, n, seed) {
+  if (!list.length) return [];
+  const out = [];
+  for (let i = 0; i < Math.min(n, list.length); i++) out.push(list[(seed * 5 + i * 7) % list.length]);
+  return [...new Set(out)];
+}
+function refreshBoards() {
+  const cal = state.calendar || calendar();
+  const all = menu();
+  const fresh = all.filter(d => d.season === cal.season || d.season === 'house');
+  const pool = fresh.length >= 8 ? fresh : all;
+  const day = dayNumber();
+  const warm = pool.filter(d => tempOf(d) === 'hot'), iced = pool.filter(d => tempOf(d) === 'iced');
+  const bakes = pastries();
+  world.setMenuBoard({
+    title: cal.ramadan ? 'Menu · Ramadan nights' : 'Menu',
+    columns: [
+      { head: 'Warm', items: rotate(warm, 6, day).map(d => d.name) },
+      { head: 'Iced', items: rotate(iced, 6, day + 3).map(d => d.name) },
+      { head: 'From the oven', items: rotate(bakes, 6, day + 1).map(p => p.name) },
+    ],
+  });
+  world.setSpecials(specials());
+}
+// The owner's specials (site_content 'cafe.specials'), or the week's own picks.
+function specials() {
+  const sp = state.content['cafe.specials'];
+  if (sp && Array.isArray(sp.items) && sp.items.length) return sp;
+  const cal = state.calendar || calendar();
+  const week = Math.floor(dayNumber() / 7);
+  const seasonal = menu().filter(d => d.season === cal.season);
+  const pool = seasonal.length >= 2 ? seasonal : menu();
+  const w = pool.filter(d => tempOf(d) === 'hot'), i = pool.filter(d => tempOf(d) === 'iced');
+  const items = [];
+  if (w.length) { const d = w[(week * 3) % w.length]; items.push({ name: d.name, note: d.mood || `Made by ${d.by}, for slow mornings.` }); }
+  if (i.length) { const d = i[(week * 5) % i.length]; items.push({ name: d.name, note: d.mood || `Made by ${d.by}, cold and bright.` }); }
+  const bakes = pastries();
+  if (bakes.length) { const p = bakes[(week * 7) % bakes.length]; items.push({ name: p.name, note: p.note || p.tagline || (p.drink ? `Lovely with a ${p.drink}.` : 'Fresh from the oven this morning.') }); }
+  return { title: cal.ramadan ? 'For iftar' : 'This week', items };
+}
+function openSpecials() {
+  const sp = specials();
+  $('infoEyebrow').textContent = 'By the counter';
+  $('infoTitle').textContent = sp.title || 'This week';
+  $('infoText').textContent = sp.items.map(it => `• ${it.name} — ${it.note}`).join('\n') + '\n\nOrder any of them from Hana — free, like everything here 🌸';
+  $('infoText').style.whiteSpace = 'pre-line';
+  openPanel('infoPanel');
+}
+
+// ───────────────────────────────────────── what's on: story evenings and book club
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const fmtTime = mins => { const h = Math.floor(mins / 60), m = mins % 60; return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''}${h < 12 ? 'am' : 'pm'}`; };
+const toMins = t => { const [h, m] = String(t || '20:00').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+// The next time each event happens (or the one on now), on Cairo's clock.
+function upcoming() {
+  const list = Array.isArray(state.content['cafe.events']) ? state.content['cafe.events'] : [];
+  const now = cairoNow().getTime();
+  const out = [];
+  for (const e of list) {
+    if (!e || !e.title) continue;
+    const len = (Number(e.minutes) || 60) * 60e3;
+    let start = null;
+    if (e.weekly != null && e.weekly !== '') {
+      const d0 = new Date(now); d0.setUTCHours(0, 0, 0, 0);
+      for (let k = -1; k <= 7 && start == null; k++) {
+        const d = new Date(d0.getTime() + k * 86400e3);
+        if (d.getUTCDay() !== Number(e.weekly)) continue;
+        const st = d.getTime() + toMins(e.time) * 60e3;
+        if (st + len > now) start = st;
+      }
+    } else if (e.date) {
+      const [y, mo, d] = e.date.split('-').map(Number);
+      const st = Date.UTC(y, mo - 1, d) + toMins(e.time) * 60e3;
+      if (st + len > now) start = st;
+    }
+    if (start == null) continue;
+    const sd = new Date(start);
+    const soon = start - now < 6 * 86400e3;
+    const when = (e.weekly != null && e.weekly !== '' ? `Every ${DAY_NAMES[sd.getUTCDay()]}` : soon ? DAYS[sd.getUTCDay()] : `${DAYS[sd.getUTCDay()]} ${sd.getUTCDate()} ${sd.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`) + ` · ${fmtTime(toMins(e.time))}`;
+    out.push({ ...e, start, now: now >= start && now < start + len, when });
+  }
+  return out.sort((a, b) => a.start - b.start);
+}
+const announced = new Set();
+function refreshEvents() {
+  const list = upcoming();
+  world.setEvents(list.map(e => ({ when: e.when, title: e.title, where: e.where, now: e.now })));
+  for (const e of list) {
+    const key = e.title + e.start;
+    if (e.now && !announced.has(key)) {
+      announced.add(key);
+      if (state.started) toast(`${e.kind === 'bookclub' ? '📚' : '📖'} ${e.title} is on now${e.where ? ' — ' + e.where : ''}. Come and listen 🌸`);
+    }
+  }
+  if (!$('eventsPanel').classList.contains('hidden')) renderEvents();
+}
+function renderEvents() {
+  const list = upcoming();
+  const admin = !!(state.me && state.me.isAdmin);
+  const box = $('eventsList');
+  if (!list.length) { const p = document.createElement('p'); p.className = 'fine'; p.textContent = 'Nothing planned just yet — the next story evening will be on the easel.'; box.replaceChildren(p); }
+  else box.replaceChildren(...list.map(e => {
+    const row = document.createElement('div');
+    row.className = 'event-row' + (e.now ? ' now' : '');
+    const when = document.createElement('span'); when.className = 'fine'; when.textContent = e.now ? '✨ happening now' : e.when;
+    const t = document.createElement('b'); t.textContent = `${e.kind === 'bookclub' ? '📚' : '📖'} ${e.title}`;
+    const note = document.createElement('p'); note.className = 'fine'; note.textContent = [e.where, e.note].filter(Boolean).join(' · ');
+    row.append(when, t, note);
+    if (admin) {
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'btn ghost small'; del.textContent = 'Remove';
+      del.onclick = () => saveEvents((state.content['cafe.events'] || []).filter(x => x.id !== e.id));
+      row.append(del);
+    }
+    return row;
+  }));
+  $('eventsOwner').classList.toggle('hidden', !admin);
+}
+async function saveEvents(list) {
+  $('evErr').textContent = '';
+  try {
+    await api('/admin/content/cafe.events', { method: 'PUT', body: { value: list, description: "What's on (the easel by the fire): [{ id, title, kind: 'reading'|'bookclub'|'other', weekly: 0–6 (Sunday = 0) or date: 'YYYY-MM-DD', time: 'HH:MM' (Cairo), minutes, where, note }]." } });
+    state.content['cafe.events'] = list;
+    refreshEvents();
+    renderEvents();
+  } catch (e) { $('evErr').textContent = e.message; }
+}
+function openEvents() { renderEvents(); openPanel('eventsPanel'); }
+$('evAdd').onclick = () => {
+  const title = $('evTitle').value.trim();
+  if (!title) { $('evErr').textContent = 'Give it a name.'; return; }
+  const repeat = $('evRepeat').value;
+  if (repeat === 'once' && !$('evDate').value) { $('evErr').textContent = 'Pick a date.'; return; }
+  const e = {
+    id: Date.now().toString(36), title, kind: $('evKind').value, time: $('evTime').value || '20:00',
+    minutes: Number($('evMinutes').value) || 60, where: $('evWhere').value.trim(), note: $('evNote').value.trim(),
+    ...(repeat === 'once' ? { date: $('evDate').value } : { weekly: Number(repeat) }),
+  };
+  saveEvents([...(state.content['cafe.events'] || []), e]);
+  $('evTitle').value = ''; $('evNote').value = '';
+};
+$('evRepeat').onchange = () => $('evDateRow').classList.toggle('hidden', $('evRepeat').value !== 'once');
+
 // ───────────────────────────────────────── the photo wall
 
 function openPhoto(id) {
@@ -2050,6 +2249,9 @@ function applyContent(key) {
   if (key === 'cafe.spotify' && spotify.controller) openSpotify();
   if (key === 'cafe.radio') radio.load().catch(() => {});
   if (!key || key === 'cafe.photos') world.setPhotos(c['cafe.photos'] || {});
+  if (!key || key === 'cafe.season') { applyCalendar(); if (key) refreshBoards(); }
+  if (!key || ['cafe.menu', 'menu.drinks', 'counter.pastries', 'cafe.specials'].includes(key)) refreshBoards();
+  if (!key || key === 'cafe.events') refreshEvents();
   if (!key || key === 'cafe.bookOfWeek') { world.setBookOfWeek(c['cafe.bookOfWeek'] || {}); if (!$('bookPanel').classList.contains('hidden')) renderBook(); }
   if (key === 'stories.library' && !$('shelfPanel').classList.contains('hidden')) renderShelf();
   if (!key || key === 'cafe.weather') refreshWeather();
@@ -2295,7 +2497,7 @@ $('enterBtn').onclick = async () => {
     showMusic(!small, radio.state.tracks.length || state.me.isAdmin ? 'radio' : 'spotify');
   }).catch(() => showMusic(!small, 'spotify'));
   if (small) setTimeout(() => toast('🎧 Tap 🎧 at the top for the café radio.'), 4000);
-  if (!state.open) setTimeout(() => toast('🌙 The café is closed for the night (open 10am – 10pm, Cairo time) — but the door is never locked for you. Sit as long as you like.'), 2500);
+  if (!state.open) setTimeout(() => toast(`🌙 The café is closed for now (${state.calendar && state.calendar.ramadan ? 'Ramadan hours: noon – 2am' : 'open 10am – 10pm'}, Cairo time) — but the door is never locked for you. Sit as long as you like.`), 2500);
   state.started = true;
   canvas.focus();
 
@@ -2734,7 +2936,7 @@ function watchSpeed(realDt) {
 const counterBox = new THREE.Box3().setFromObject(world.counter);
 const counterSpot = () => ({ x: (counterBox.min.x + counterBox.max.x) / 2, y: 1.1, z: counterBox.max.z - 0.4 });
 const regulars = createRegulars({
-  world, staff, sound, menu,
+  world, staff, sound, menu, pastries,
   takenBy: seatHeld,
   say: (obj, text) => bubble(obj, text),
   hour: cairoHour,
@@ -2784,13 +2986,15 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff, radio, post, openShelf, openBook, openPhoto, regulars, sound };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
 
 // ───────────────────────────────────────── start
 
 (async function boot() {
   try { state.content = await api('/content'); } catch (e) { state.content = {}; }
+  state.booted = true;
   applyContent();
+  updateTime();
   await loadNotes();
   let me = null;
   try { me = (await api('/auth/me')).user; } catch (e) { /* offline */ }

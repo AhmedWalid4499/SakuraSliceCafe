@@ -1629,5 +1629,53 @@
       "note": "Yuto's first pick — loved by all four of us. About the kind of friendship that needs no language."
     },
     "description": "The framed Book of the week on the café wall. cover = an uploaded picture (media id, set from the café) or an image link."
+  },
+  "cafe.events": {
+    "value": [
+      {
+        "id": "fri-story",
+        "title": "Story evening by the fire",
+        "kind": "reading",
+        "weekly": 5,
+        "time": "20:00",
+        "minutes": 60,
+        "where": "by the fireplace",
+        "note": "One of the letters' stories, read aloud. Bring a warm drink."
+      },
+      {
+        "id": "tue-books",
+        "title": "Book club",
+        "kind": "bookclub",
+        "weekly": 2,
+        "time": "19:00",
+        "minutes": 90,
+        "where": "the long table upstairs",
+        "note": "This month: the book of the week. Come even if you haven't finished it."
+      }
+    ],
+    "description": "What's on (the easel by the fire): [{ id, title, kind: 'reading'|'bookclub'|'other', weekly: 0–6 (Sunday = 0) or date: 'YYYY-MM-DD', time: 'HH:MM' (Cairo), minutes, where, note }]. Edit from the easel in the café."
+  },
+  "cafe.season": {
+    "value": {
+      "season": "auto",
+      "ramadan": "auto",
+      "eid": "auto",
+      "hours": {
+        "open": 10,
+        "close": 22
+      },
+      "ramadanHours": {
+        "open": 12,
+        "close": 2
+      }
+    },
+    "description": "The café's calendar. season: 'auto' (from the month) or spring|summer|autumn|winter. ramadan / eid: 'auto' (from the Hijri calendar), 'on' or 'off'. hours and ramadanHours: when the door sign says open (24h, Cairo; close can be after midnight)."
+  },
+  "cafe.specials": {
+    "value": {
+      "title": "",
+      "items": []
+    },
+    "description": "The A-frame specials board by the counter. Leave items empty for the week's own picks, or set { title: 'This week', items: [{ name, note }, …] } (up to 3)."
   }
 }
