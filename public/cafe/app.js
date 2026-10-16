@@ -10,7 +10,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWorld, ROOM, STAIRS, noFog } from './world.js';
-import { mapZ } from './layout.mjs';
+import { mapX, mapZ } from './layout.mjs';
 import { currentWeather, WEATHER } from './weather.js';
 import { buildAvatar, makeLabel, makeCup, disposeTree } from './avatar.js';
 import { makeDessert } from './pastries.js';
@@ -19,6 +19,7 @@ import { Soundscape } from './audio.js';
 import { createStaff } from './staff.js';
 import { fullMenu, SEASONS } from './drinks.mjs';
 import { createRadio, audioDuration } from './radio.js';
+import { createRegulars } from './regulars.js';
 
 const $ = id => document.getElementById(id);
 
@@ -236,7 +237,8 @@ $('wxOwnerBtn').onclick = openWeather;
 function updateTime() {
   const h = cairoHour();
   refreshWeather();
-  const { night } = world.setTimeOfDay(h);
+  const { night, open } = world.setTimeOfDay(h);
+  state.open = open;
   sound.setNight(night > 0.5);
   $('cairoTime').textContent = cairoClock();
   $('cairoDay').textContent = cairoDay();
@@ -335,6 +337,7 @@ function standUp() {
   if (!player.seat) return;
   const s = player.seat;
   player.seat = null;
+  sound.chair(player.pos);
   // step out to the side of the chair, not into the table
   player.pos.set(s.x + Math.cos(s.ry) * 0.62, 0, s.z - Math.sin(s.ry) * 0.62);
   collide(player.pos);
@@ -369,6 +372,7 @@ function sitAt(seat) {
   player.pos.set(sp.x, seat.y, sp.z);
   player.ry = seat.ry;
   sound.cue('sit');
+  sound.chair(player.pos);
   sendMove(true);
   refreshActions();
   toast(`You sit down at ${seat.label}. Walk, or press Stand up, to get up.`);
@@ -377,7 +381,12 @@ function sitAt(seat) {
 // ── sitting ────────────────────────────────────────────────
 
 function seatTaken(seat) {
-  return [...state.people.values()].some(p => p.state.seat === seat.id);
+  return [...state.people.values()].some(p => p.state.seat === seat.id) || (regulars && regulars.seatTaken(seat));
+}
+// a seat a real person has (or is heading for) — the regulars give these up
+function seatHeld(seat) {
+  return [...state.people.values()].some(p => p.state.seat === seat.id)
+    || (player.seat && player.seat.id === seat.id) || (player.goingToSeat && player.goingToSeat.id === seat.id);
 }
 
 function nearestFreeSeat(from, near = null, maxDist = Infinity) {
@@ -499,6 +508,7 @@ function putDrinkDown(at = null) {
   player.av.setDrink(null);
   player.av.setDessert(null);
   sound.cue('drink');
+  sound.cupDown(spot);
   sendMove(true);
   refreshActions();
 }
@@ -752,6 +762,7 @@ function setPersonDrink(p) {
 function updatePeople(dt) {
   for (const p of state.people.values()) {
     const s = p.state;
+    if ((s.seat || null) !== (p.heardSeat ?? null)) { if (p.heardSeat !== undefined) sound.chair(p.pos); p.heardSeat = s.seat || null; }
     const seat = s.seat ? world.seats.find(x => x.id === s.seat) : null;
     const sp = seat ? seatSpot(seat) : null;
     const tx = seat ? sp.x : s.x, tz = seat ? sp.z : s.z;
@@ -1183,6 +1194,7 @@ function bringToTable(kind, item) {
   if (!who) { setTimeout(() => bringToTable(kind, item), 2500); return true; }
   const npc = world.npcs.find(n => n.id === who);
   const where = player.seat ? player.seat.label : 'your table';
+  if (kind === 'drink') sound.espresso(counterSpot(), !/tea|juice|lemonade|smoothie|slush|float/i.test(item.name));
   bubble(npc.av.group, kind === 'drink' ? `One ${item.name}. I'll bring it over.` : `One ${item.name}. Coming to you.`, 'npc');
   toast(`🛎️ ${npc.name} is bringing your ${item.name} to ${where}.`);
   staff.deliver(who, kind === 'drink' ? { drinkColor: item.color } : { dessertShape: item.shape }, spot, () => {
@@ -1196,6 +1208,7 @@ function bringToTable(kind, item) {
       bites: kind === 'dessert' ? 0 : keep.bites || 0,
     });
     sound.cue('drink');
+    sound.cupDown(spot);
     bubble(npc.av.group, SERVED[Math.floor(Math.random() * SERVED.length)], 'npc');
     sendMove(true);
     refreshActions();
@@ -1208,7 +1221,9 @@ function order(d) {
   if (serveToTable() && bringToTable('drink', d)) return;
   const maker = world.npcs.find(n => n.name === d.by) || world.npcs.find(n => n.id === 'hana');
   if (maker) bubble(maker.av.group, `One ${d.name}, coming right up.`, 'npc');
+  sound.espresso(counterSpot(), !/tea|juice|lemonade|smoothie|slush|float/i.test(d.name), true);
   setTimeout(() => {
+    sound.counterBell(counterSpot());
     player.drink = d.id;
     player.sips = 0;
     player.av.setDrink(d.color, 1);
@@ -1442,6 +1457,7 @@ function click(x, y) {
     return;
   }
   if (d.kind === 'shelf') return openShelf();
+  if (d.kind === 'photo') return openPhoto(d.id);
   if (d.kind === 'bookweek') return openBook();
   if (d.kind === 'info') {
     $('infoTitle').textContent = d.label;
@@ -1483,7 +1499,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -1936,6 +1952,61 @@ $('bookSave').onclick = async () => {
   } catch (e) { $('bookErr').textContent = e.message; }
 };
 
+// ───────────────────────────────────────── the photo wall
+
+function openPhoto(id) {
+  const all = state.content['cafe.photos'] || {};
+  const p = all[id] || {};
+  const url = coverUrl(p.cover);
+  const admin = !!(state.me && state.me.isAdmin);
+  state.photoId = id;
+  state.photoCover = p.cover || '';
+  $('photoImg').classList.toggle('hidden', !url);
+  if (url) $('photoImg').src = url;
+  $('photoCaption').textContent = p.caption || (url ? '' : 'A photo of the café will hang here soon.');
+  $('photoOwner').classList.toggle('hidden', !admin);
+  $('photoErr').textContent = '';
+  $('photoNote').textContent = '';
+  if (admin) $('photoSetCaption').value = p.caption || '';
+  openPanel('photoPanel');
+}
+async function savePhoto(cover) {
+  const all = { ...(state.content['cafe.photos'] || {}) };
+  if (cover === null) delete all[state.photoId];
+  else all[state.photoId] = { cover, caption: $('photoSetCaption').value.trim() };
+  await api('/admin/content/cafe.photos', { method: 'PUT', body: { value: all, description: 'The photo wall on the café\'s left wall: { p1…p5: { cover, caption } } — cover is an uploaded picture (media id) or a link. Hung from inside the café.' } });
+  state.content['cafe.photos'] = all;
+  applyContent('cafe.photos');
+}
+$('photoFile').onchange = async e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  $('photoErr').textContent = '';
+  $('photoNote').textContent = 'Uploading…';
+  try {
+    const m = await upload(f, fileType(f, IMAGE_TYPES), { title: $('photoSetCaption').value.trim() });
+    state.photoCover = m.id;
+    await savePhoto(m.id);
+    $('photoImg').src = `/api/media/${m.id}`;
+    $('photoImg').classList.remove('hidden');
+    $('photoNote').textContent = '✓ It\'s on the wall — for everyone.';
+  } catch (err) { $('photoNote').textContent = ''; $('photoErr').textContent = err.message; }
+};
+$('photoSave').onclick = async () => {
+  $('photoErr').textContent = '';
+  try {
+    if (!state.photoCover) throw new Error('Upload a photo first.');
+    await savePhoto(state.photoCover);
+    $('photoCaption').textContent = $('photoSetCaption').value.trim();
+    toast('🖼️ Saved.');
+  } catch (e) { $('photoErr').textContent = e.message; }
+};
+$('photoRemove').onclick = async () => {
+  if (!confirm('Take this photo down? (The frame stays, with its sakura print.)')) return;
+  try { await savePhoto(null); closePanels(); toast('The frame has its sakura print back.'); } catch (e) { $('photoErr').textContent = e.message; }
+};
+
 // ───────────────────────────────────────── actions
 
 $('noteAct').onclick = () => (state.placing ? stopPlacing() : startPlacing());
@@ -1978,6 +2049,7 @@ function applyContent(key) {
   const c = state.content;
   if (key === 'cafe.spotify' && spotify.controller) openSpotify();
   if (key === 'cafe.radio') radio.load().catch(() => {});
+  if (!key || key === 'cafe.photos') world.setPhotos(c['cafe.photos'] || {});
   if (!key || key === 'cafe.bookOfWeek') { world.setBookOfWeek(c['cafe.bookOfWeek'] || {}); if (!$('bookPanel').classList.contains('hidden')) renderBook(); }
   if (key === 'stories.library' && !$('shelfPanel').classList.contains('hidden')) renderShelf();
   if (!key || key === 'cafe.weather') refreshWeather();
@@ -2223,6 +2295,7 @@ $('enterBtn').onclick = async () => {
     showMusic(!small, radio.state.tracks.length || state.me.isAdmin ? 'radio' : 'spotify');
   }).catch(() => showMusic(!small, 'spotify'));
   if (small) setTimeout(() => toast('🎧 Tap 🎧 at the top for the café radio.'), 4000);
+  if (!state.open) setTimeout(() => toast('🌙 The café is closed for the night (open 10am – 10pm, Cairo time) — but the door is never locked for you. Sit as long as you like.'), 2500);
   state.started = true;
   canvas.focus();
 
@@ -2656,6 +2729,32 @@ function watchSpeed(realDt) {
   toast('🌸 The picture is a little gentler now, so the café stays smooth. (You can change it in 🔊.)');
 }
 
+// The background regulars (regulars.js), and the room's sound following
+// where you are and how busy it is.
+const counterBox = new THREE.Box3().setFromObject(world.counter);
+const counterSpot = () => ({ x: (counterBox.min.x + counterBox.max.x) / 2, y: 1.1, z: counterBox.max.z - 0.4 });
+const regulars = createRegulars({
+  world, staff, sound, menu,
+  takenBy: seatHeld,
+  say: (obj, text) => bubble(obj, text),
+  hour: cairoHour,
+});
+let roomTick = 0;
+function listenRoom(dt) {
+  roomTick -= dt;
+  if (roomTick > 0) return;
+  roomTick = 0.5;
+  // fewer regulars when the café is full of real people
+  regulars.setCap(9 - Math.floor(state.people.size * 0.8));
+  sound.setCrowd((regulars.count() + state.people.size + 1) / 11);
+  // the rain is louder by the glass: the front windows and the left ones
+  const p = player.pos;
+  const front = Math.abs(p.z - ROOM.maxZ) + Math.max(0, Math.min(Math.abs(p.x - mapX(-6)), Math.abs(p.x - mapX(6))) - 2);
+  const left = Math.abs(p.x - ROOM.minX) + Math.max(0, Math.min(Math.abs(p.z + mapZ(-3.5)), Math.abs(p.z + mapZ(2.5)), Math.abs(p.z - mapZ(-3.5)), Math.abs(p.z - mapZ(2.5))) - 1.5);
+  const d = world.floor === 'main' ? Math.min(front, left) : 6;
+  sound.setNearWindow(1 - Math.min(1, d / 6));
+}
+
 function frame() {
   const realDt = clock.getDelta();
   watchSpeed(Math.min(realDt, 1));
@@ -2666,7 +2765,9 @@ function frame() {
     updatePlayer(dt);
     updatePeople(dt);
     staff.update(dt);
-    if (world.floor === 'main') world.updateDoors(dt, [player.pos, ...[...state.people.values()].map(p => p.pos), ...staff.positions()]);
+    regulars.update(dt);
+    if (world.floor === 'main') world.updateDoors(dt, [player.pos, ...[...state.people.values()].map(p => p.pos), ...staff.positions(), ...regulars.positions()]);
+    listenRoom(dt);
     updateCamera(dt);
     updateHover();
     updateBubbles();
@@ -2683,7 +2784,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff, radio, post, openShelf, openBook };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff, radio, post, openShelf, openBook, openPhoto, regulars, sound };
 
 // ───────────────────────────────────────── start
 

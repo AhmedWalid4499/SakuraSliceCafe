@@ -222,6 +222,7 @@
   .shelf-book span { font-size: 11.5px; opacity: .75; }
   .story-text { max-height: 56vh; overflow: auto; font-size: 15px; line-height: 1.7; padding-right: 4px; }
   .story-text p { margin: 0 0 12px; }
+  .photo-big { display: block; width: 100%; max-height: 52vh; object-fit: contain; border-radius: 10px; margin-top: 8px; background: var(--field); }
   .book-week { display: flex; gap: 16px; align-items: flex-start; }
   .book-week img { width: 120px; flex: none; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
   @media (max-width: 480px) { .book-week { flex-direction: column; align-items: center; text-align: center; } }
@@ -564,6 +565,25 @@
   </div>
 </div>
 
+<div id="photoPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The photo wall</p>
+  <img id="photoImg" alt="A photo from the café" class="photo-big hidden">
+  <p class="lede" id="photoCaption" style="font-size:14px;margin-top:10px"></p>
+  <div id="photoOwner" class="hidden up-more" style="margin-top:12px">
+    <p class="eyebrow">🗝️ Hang a photo here</p>
+    <p class="fine" style="margin:4px 0 8px">A real photo of the café — the counter, your cups, the window, a moment with friends. It's cropped to fit the frame; everyone sees it straight away.</p>
+    <label class="field"><span>A line under it (optional)</span><input type="text" id="photoSetCaption" maxlength="140" placeholder="The first morning we opened"></label>
+    <div class="row" style="gap:6px;flex-wrap:wrap">
+      <label class="btn file-btn">🖼️ Upload a photo<input type="file" id="photoFile" accept="image/jpeg,image/png,image/webp" hidden></label>
+      <button class="btn ghost" id="photoSave" type="button">Save the line</button>
+      <button class="btn ghost" id="photoRemove" type="button">Take it down</button>
+    </div>
+    <p class="fine" id="photoNote"></p>
+    <div class="error" id="photoErr"></div>
+  </div>
+</div>
+
 <div id="bookPanel" class="panel card hidden">
   <button class="x" data-close aria-label="Close">✕</button>
   <p class="eyebrow">The book of the week</p>
@@ -691,6 +711,7 @@
     <li>Click <b>Hana or the counter</b> (or ☕ <b>Order</b>) for a drink — or a dessert from the <b>🍡 Desserts</b> tab. A plate goes in your other hand: <b>🍡 Take a bite</b>, or set it down next to your cup.</li>
     <li>Sitting at a table? Tick <b>🛎️ Bring it to my table</b> on the menu and Hana or Yuki will carry it over. <b>☕ Take a sip</b> (<kbd>C</kbd>) and <b>🍡 Take a bite</b> (<kbd>B</kbd>) work on what's in your hands — or on your table.</li>
     <li><b>🎧 The café radio</b> plays the songs the café chose — everyone hears the same song at the same moment. ▶ to listen, ⏸ to stop just for you.</li>
+    <li>The <b>photo wall</b> on the left, between the windows, holds photos from the café — click one to see it bigger.</li>
     <li>Click the <b>bookshelf</b> for the story shelf — every morning and bedtime story from the letters. The framed <b>Book of the week</b> hangs above it.</li>
     <li>The tables are numbered 1 to 12 — <b>Table 4</b> is the one by the window — and both front windows have a <b>bar with stools</b> for watching the street. The <b>kitchen</b> is through the back door: walk up and the doors swing open.</li>
     <li>Any menu closes with its <b>✕</b>, with <kbd>Esc</kbd>, or by tapping the café behind it. The chat has its own <b>✕</b> (💬 brings it back).</li>
