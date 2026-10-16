@@ -196,7 +196,9 @@
   #musicDock .fine { margin-top: 6px; }
   @media (max-width: 640px) { #musicDock { top: auto; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 21; } }
   #musicBtn.on { background: var(--sakura-light); }
-  .md-tabs .chip { padding: 5px 10px; font-size: 12.5px; }
+  .md-tabs { flex-wrap: nowrap; gap: 6px; }
+  .md-tabs .chip { padding: 5px 10px; font-size: 12.5px; white-space: nowrap; }
+  #radioOwner summary { cursor: pointer; font-size: 13px; color: var(--sakura-dark); margin-top: 10px; }
   .radio-now { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
   .radio-play { width: 46px; height: 46px; flex: none; border-radius: 50%; border: 0; background: var(--sakura-dark); color: #fff; font-size: 18px; cursor: pointer; }
   .radio-play.on { background: var(--sakura-light); color: var(--sakura-dark); }
@@ -506,8 +508,9 @@
     </div>
     <label class="radio-vol"><span>🔉</span><input type="range" id="radioVol" min="0" max="100" value="70"></label>
     <p class="fine" id="radioNote">Everyone in the café hears the same song at the same moment.</p>
-    <div id="radioOwner" class="hidden">
-      <p class="fine" style="margin:10px 0 6px">🗝️ Add songs (mp3, m4a, ogg — up to 30 MB each). They go on the end of the list, for everyone.</p>
+    <details id="radioOwner" class="hidden">
+      <summary>🗝️ Look after the radio</summary>
+      <p class="fine" style="margin:8px 0 6px">🗝️ Add songs (mp3, m4a, ogg — up to 30 MB each). They go on the end of the list, for everyone.</p>
       <div class="row" style="gap:6px;flex-wrap:wrap">
         <label class="btn ghost file-btn">⬆️ Upload songs<input type="file" id="radioFiles" accept="audio/*" multiple hidden></label>
         <button class="btn ghost" id="radioRestart" type="button" title="Start the list again from the first song, for everyone">⏮ From the top</button>
@@ -516,7 +519,7 @@
       <div class="fine" id="radioUp"></div>
       <ol class="radio-list" id="radioList"></ol>
       <div class="error" id="radioErr"></div>
-    </div>
+    </details>
   </div>
   <div id="spotifyTab" class="hidden">
     <div id="spotEmbed" class="spot-embed"></div>

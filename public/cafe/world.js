@@ -125,12 +125,12 @@ function plasterSurface() {
       const x = r() * s, y = r() * s, rad = 20 + r() * 70;
       const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
       const v = r() < 0.5 ? '255,255,255' : '214,204,192';
-      g.addColorStop(0, `rgba(${v},0.22)`); g.addColorStop(1, `rgba(${v},0)`);
+      g.addColorStop(0, `rgba(${v},0.09)`); g.addColorStop(1, `rgba(${v},0)`);
       ctx.fillStyle = g;
       for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) { ctx.save(); ctx.translate(dx, dy); ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2); ctx.restore(); }
     }
     for (let i = 0; i < 14000; i++) {
-      ctx.fillStyle = r() < 0.5 ? 'rgba(190,178,164,0.18)' : 'rgba(255,255,255,0.25)';
+      ctx.fillStyle = r() < 0.5 ? 'rgba(190,178,164,0.1)' : 'rgba(255,255,255,0.14)';
       ctx.fillRect(r() * s, r() * s, 1 + r() * 1.5, 1 + r() * 1.5);
     }
   }, [3, 3]);
