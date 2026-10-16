@@ -222,6 +222,13 @@
   .shelf-book span { font-size: 11.5px; opacity: .75; }
   .story-text { max-height: 56vh; overflow: auto; font-size: 15px; line-height: 1.7; padding-right: 4px; }
   .story-text p { margin: 0 0 12px; }
+  .card-btn { display: block; margin: 10px 0 0; border: 1px dashed var(--sakura-dark); background: var(--sakura-light); color: var(--sakura-dark); border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .stamp-card { margin: 12px 0 8px; padding: 14px; border-radius: 16px; background: #fffaf2; border: 2px solid #ead8c4; box-shadow: inset 0 0 0 4px #fffaf2, inset 0 0 0 5px #f2a7bb55; }
+  .stamp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .stamp { aspect-ratio: 1; border-radius: 50%; border: 2px dashed #d9c3a3; display: grid; place-items: center; font-size: 13px; color: #b9a184; font-weight: 700; }
+  .stamp.on { border: 2px solid var(--sakura-dark); background: #fde8ef; font-size: 22px; transform: rotate(-8deg); }
+  .stamp.last { border-color: var(--sakura-dark); font-size: 20px; }
+  .stamp-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 13px; color: #6b4c4c; flex-wrap: wrap; }
   .events-list { display: grid; gap: 8px; margin-top: 10px; max-height: 40vh; overflow: auto; }
   .event-row { border: 1px solid var(--line); background: var(--field); border-radius: 14px; padding: 10px 12px; }
   .event-row.now { border-color: var(--sakura-dark); }
@@ -472,6 +479,7 @@
   </div>
   <div class="chips hidden" id="menuShelves" style="margin-top:10px"></div>
   <label class="serve hidden" id="serveRow"><input type="checkbox" id="serveToggle" checked> 🛎️ Bring it to my table</label>
+  <button type="button" class="card-btn" id="cardBtn">🎟️ My stamp card</button>
   <p class="lede" id="menuNote" style="font-size:13.5px">Hana will bring it over. Nothing costs anything here.</p>
   <div class="menu-list" id="menuList"></div>
 </div>
@@ -568,6 +576,20 @@
     <h3 id="storyTitle"></h3>
     <div class="story-text" id="storyText"></div>
   </div>
+</div>
+
+<div id="cardPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Sakura Slice Café</p>
+  <h3>Your stamp card</h3>
+  <p class="lede" style="font-size:13.5px">A stamp for every drink. Ten stamps, and a slice of the sakura cake comes to you — Yuto brings it himself.</p>
+  <div class="stamp-card">
+    <div class="stamp-grid" id="cardStamps"></div>
+    <div class="stamp-foot"><b id="cardCount">0 of 10</b><span>10 drinks = a slice of the sakura cake 🍰</span></div>
+  </div>
+  <p class="fine" id="cardRewards"></p>
+  <p class="fine">One stamp per drink, a few minutes apart. Your card is kept with your account.</p>
+  <div class="row"><button type="button" class="btn ghost" id="cardBack">☕ Back to the menu</button></div>
 </div>
 
 <div id="eventsPanel" class="panel card hidden">
@@ -741,6 +763,7 @@
     <li>Click <b>Hana or the counter</b> (or ☕ <b>Order</b>) for a drink — or a dessert from the <b>🍡 Desserts</b> tab. A plate goes in your other hand: <b>🍡 Take a bite</b>, or set it down next to your cup.</li>
     <li>Sitting at a table? Tick <b>🛎️ Bring it to my table</b> on the menu and Hana or Yuki will carry it over. <b>☕ Take a sip</b> (<kbd>C</kbd>) and <b>🍡 Take a bite</b> (<kbd>B</kbd>) work on what's in your hands — or on your table.</li>
     <li><b>🎧 The café radio</b> plays the songs the café chose — everyone hears the same song at the same moment. ▶ to listen, ⏸ to stop just for you.</li>
+    <li>Order at the counter and Hana <b>calls your name</b> when it's ready (if there's a line, you wait your turn). Every drink earns a stamp on your <b>🎟️ stamp card</b> — ten stamps and Yuto brings you a slice of the sakura cake.</li>
     <li>The <b>menu board</b> above the counter changes every day (click it to order); the <b>A-frame</b> by the counter has the week's specials. The <b>easel by the fire</b> says what's on — story evenings and book club.</li>
     <li>The café follows the calendar: spring bunting, a summer bowl of lemons, autumn leaves, winter candles and blankets — and lanterns and later hours in <b>Ramadan</b>.</li>
     <li>The <b>photo wall</b> on the left, between the windows, holds photos from the café — click one to see it bigger.</li>
