@@ -43,8 +43,12 @@ const HAIR = ['#2a1d18', '#3b2a22', '#5a3a26', '#7a4e2e', '#1d1d22', '#9a6a3e', 
 const OUTFIT = ['#7a8fa6', '#b7a58c', '#5f7a64', '#a86b5a', '#4d5566', '#d9c8b0', '#8a6f9a', '#c9a24a', '#3f5d6e', '#e3d5c6', '#9a4f4f'];
 const ACCENT = ['#fef9f5', '#efe6da', '#2f2a28', '#d9d2c5'];
 const LINES = ['A {d}, please.', 'Could I get a {d}?', 'One {d} — thank you!', 'The {d}, like always.', 'Just a {d} today 🌸'];
+const NAMES = {
+  she: ['Nour', 'Salma', 'Laila', 'Farida', 'Malak', 'Sara', 'Aiko', 'Mei', 'Yara', 'Emma', 'Hoda', 'Jana', 'Rana', 'Sakura'],
+  he: ['Omar', 'Karim', 'Youssef', 'Ziad', 'Adam', 'Ren', 'Haruto', 'Ali', 'Hassan', 'Mostafa', 'Kenji', 'Sam', 'Tarek', 'Kai'],
+};
 
-export function createRegulars({ world, staff, sound, menu, pastries = () => [], takenBy, say, now = () => Date.now(), hour }) {
+export function createRegulars({ world, staff, sound, menu, pastries = () => [], takenBy, say, callOut = () => {}, now = () => Date.now(), hour }) {
   const main = world.floors.main;
   const group = new THREE.Group();
   main.group.add(group);
@@ -55,9 +59,13 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
 
   // the counter: where they queue to order
   const cb = new THREE.Box3().setFromObject(world.counter);
-  const counterFront = (r) => new THREE.Vector3(
-    Math.min(cb.max.x - 0.6, Math.max(cb.min.x + 0.6, (cb.min.x + cb.max.x) / 2 + (r - 0.5) * 3)), 0, cb.max.z + 0.75);
   const counterPos = { x: (cb.min.x + cb.max.x) / 2, y: 1.1, z: cb.max.z - 0.4 };
+  // An orderly line: you order at the till end of the counter, then wait for
+  // your name at the other end, where the drinks come out.
+  const queue = [];
+  const slot = i => new THREE.Vector3(cb.min.x + 2.0 + Math.sin(i * 1.7) * 0.08, 0, cb.max.z + 0.75 + i * 0.85);
+  const pickup = k => new THREE.Vector3(cb.max.x - 1.3 - (k % 3) * 0.7, 0, cb.max.z + 0.8 + Math.floor(k / 3) * 0.6);
+  let waiting = 0; // how many stand at the pick-up end
 
   const seats = () => main.seats.filter(s => s.table && s.h != null); // seats at a table or the bar
   const mine = () => new Set([...live.values()].map(g => g.seat && g.seat.id).filter(Boolean));
@@ -75,6 +83,7 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
     };
     v.look.hairStyle = v.look.gender === 'she' ? pick(r, ['long', 'bun', 'bob', 'curly', 'long']) : pick(r, ['short', 'short', 'curly', 'none', 'short']);
     v.look.bottom = v.look.gender === 'she' && r() < 0.4 ? 'skirt' : 'trousers';
+    v.name = pick(r, NAMES[v.look.gender]);
     v.look.accessory = r() < 0.25 ? pick(r, ['glasses', 'glasses', 'scarf', 'beanie', 'headphones']) : 'none';
     return v;
   }
@@ -136,8 +145,9 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
     if (e < 15e3 && seat) {
       // just arriving: walk in through the door
       g.pos.copy(DOOR_OUT);
-      g.queue = counterFront(v.counterR);
-      g.path = [DOOR_IN.clone(), ...route(DOOR_IN, g.queue)];
+      queue.push(g);
+      g.dest = slot(queue.length - 1);
+      g.path = [DOOR_IN.clone(), ...route(DOOR_IN, g.dest)];
     } else {
       // already here when you came in: sitting with their drink
       sitDown(g, true);
@@ -190,6 +200,8 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
   function leave(g) {
     if (g.phase === 'leaving') return;
     const wasSeated = g.phase === 'seated';
+    if (queue.includes(g)) queue.splice(queue.indexOf(g), 1);
+    if (g.phase === 'pickup') waiting = Math.max(0, waiting - 1);
     g.phase = 'leaving';
     // the empty cup and plate stay on the table for the team to clear (and now and then a book or the paper)
     const left = [];
@@ -249,7 +261,7 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
       spawn(v, t - v.arrive);
     }
     for (const g of live.values()) {
-      if (g.phase !== 'leaving' && (!keep.has(g.v.id) || t > g.v.arrive + g.v.stay)) leave(g);
+      if (g.phase !== 'leaving' && ((!keep.has(g.v.id) && !g.v.invited) || t > g.v.arrive + g.v.stay)) leave(g);
     }
   }
 
@@ -312,17 +324,37 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
     for (const g of [...live.values()]) {
       let moving = false;
       if (g.phase === 'enter') {
+        // in the line: shuffle forward as it moves
+        const want = slot(queue.indexOf(g));
+        if (g.dest.distanceTo(want) > 0.1) { g.dest = want; g.path = route(g.pos, want); }
         moving = walk(g, dt);
         if (!g.path.length) {
-          g.phase = 'order'; g.wait = 7 + Math.random() * 4; g.ry = Math.PI;
-          staff.attend('hana', g.pos, 9);
-          say(g.av.group, pick(() => g.v.lineR, LINES).replace('{d}', g.drink.name));
-          setTimeout(() => sound.espresso(counterPos, !/tea|juice|lemonade|smoothie|slush|float/i.test(g.drink.name)), 1200);
+          g.ry = Math.PI;
+          if (queue[0] === g) {
+            g.phase = 'order'; g.wait = 5 + Math.random() * 3;
+            staff.attend('hana', g.pos, 7);
+            say(g.av.group, pick(() => g.v.lineR, LINES).replace('{d}', g.drink.name));
+            setTimeout(() => sound.espresso(counterPos, !/tea|juice|lemonade|smoothie|slush|float/i.test(g.drink.name)), 1200);
+          }
         }
       } else if (g.phase === 'order') {
         g.wait -= dt;
         if (g.wait <= 0) {
+          // ordered: step along to the end of the counter and wait to be called
+          queue.splice(queue.indexOf(g), 1);
+          g.phase = 'pickup';
+          g.wait = 6 + Math.random() * 5;
+          g.path = route(g.pos, pickup(waiting++));
+        }
+      } else if (g.phase === 'pickup') {
+        moving = walk(g, dt);
+        if (!g.path.length) g.ry = Math.PI;
+        g.wait -= dt;
+        if (g.wait <= 0 && !g.path.length) {
+          waiting = Math.max(0, waiting - 1);
+          callOut(g.v.name, g.drink.name);
           sound.counterBell(counterPos);
+          setTimeout(() => say(g.av.group, pick(Math.random, ['Thank you!', 'That\'s me 🌸', 'Lovely, thanks!', 'Shukran!'])), 900);
           g.av.setDrink(g.drink.color, 1, tempOf(g.drink));
           if (!g.seat || takenBy(g.seat)) g.seat = freeSeat(g.v);
           if (!g.seat) leave(g);
@@ -377,6 +409,11 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
     positions: () => [...live.values()].map(g => g.pos),
     count: () => live.size,
     dirtyTables: () => dirty.length,
-    debug: () => [...live.values()].map(g => ({ phase: g.phase, seat: g.seat && g.seat.label, thing: g.v.thing, drink: g.drink.name })),
+    // the line at the counter: how many are ahead of you, and who's at the front
+    queueAhead: () => queue.length,
+    // someone walks in now (for a busy moment — and for testing)
+    invite(k = Math.floor(Math.random() * 1e9)) { const v = visit(k); v.arrive = now(); v.stay = 15 * 60e3; v.invited = true; return !!spawn(v, 0); },
+    frontName: () => (queue[0] ? queue[0].v.name : null),
+    debug: () => [...live.values()].map(g => ({ name: g.v.name, phase: g.phase, seat: g.seat && g.seat.label, thing: g.v.thing, drink: g.drink.name })),
   };
 }

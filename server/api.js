@@ -238,6 +238,36 @@ api.post('/notes/:id/heart', auth.requireUser, writeLimit, wrap(async (req, res)
   res.json({ hearted: !del.rowCount, hearts: rows[0].n });
 }));
 
+// ─────────────────────────────────────────── the stamp card
+
+const CARD_SIZE = 10;
+const STAMP_GAP = 3 * 60e3; // one stamp per drink, and not more often than every few minutes
+api.get('/loyalty', auth.requireUser, wrap(async (req, res) => {
+  const { rows } = await query('SELECT stamps, rewards FROM loyalty_cards WHERE user_id = $1', [req.user.id]);
+  res.json({ stamps: rows[0] ? rows[0].stamps : 0, rewards: rows[0] ? rows[0].rewards : 0, size: CARD_SIZE });
+}));
+api.post('/loyalty/stamp', auth.requireUser, writeLimit, wrap(async (req, res) => {
+  const { rows } = await query(
+    `INSERT INTO loyalty_cards (user_id, stamps, rewards, last_stamp) VALUES ($1, 1, 0, now())
+     ON CONFLICT (user_id) DO UPDATE SET
+       stamps = CASE WHEN loyalty_cards.last_stamp IS NULL OR loyalty_cards.last_stamp < now() - make_interval(secs => $2)
+                     THEN loyalty_cards.stamps + 1 ELSE loyalty_cards.stamps END,
+       last_stamp = CASE WHEN loyalty_cards.last_stamp IS NULL OR loyalty_cards.last_stamp < now() - make_interval(secs => $2)
+                     THEN now() ELSE loyalty_cards.last_stamp END
+     RETURNING stamps, rewards, last_stamp > now() - interval '2 seconds' AS stamped`,
+    [req.user.id, STAMP_GAP / 1000]);
+  let { stamps, rewards } = rows[0];
+  const stamped = rows[0].stamped;
+  let reward = false;
+  if (stamps >= CARD_SIZE) {
+    // a full card: the slice of sakura cake, and a fresh card
+    const r = await query('UPDATE loyalty_cards SET stamps = 0, rewards = rewards + 1 WHERE user_id = $1 RETURNING stamps, rewards', [req.user.id]);
+    ({ stamps, rewards } = r.rows[0]);
+    reward = true;
+  }
+  res.json({ stamps, rewards, size: CARD_SIZE, stamped, reward });
+}));
+
 // ─────────────────────────────────────────── quiet chat
 
 api.get('/chat', auth.requireUser, wrap(async (req, res) => {

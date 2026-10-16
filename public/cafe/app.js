@@ -1233,13 +1233,13 @@ const serveToTable = () => !$('serveRow').classList.contains('hidden') && $('ser
 const SERVED = ['Here you are.', 'Take your time with it.', 'Careful — it\'s still warm.', 'Enjoy it slowly.', 'For you. 🌸'];
 
 // Hana (or Yuki, or Yuto) carries it over and sets it down in front of you.
-function bringToTable(kind, item) {
+function bringToTable(kind, item, opts = {}) {
   const spot = spotOnTable(player.pos);
   if (!spot) return false;
-  const maker = kind === 'drink' ? (item.by || 'Hana').toLowerCase() : item.by === 'hana' ? 'hana' : 'yuki';
+  const maker = opts.reward ? 'yuto' : kind === 'drink' ? (item.by || 'Hana').toLowerCase() : item.by === 'hana' ? 'hana' : 'yuki';
   const servers = [maker, 'hana', 'yuki', 'yuto'].filter((x, i, a) => a.indexOf(x) === i);
   const who = servers.find(id => !staff.busy(id));
-  if (!who) { setTimeout(() => bringToTable(kind, item), 2500); return true; }
+  if (!who) { setTimeout(() => bringToTable(kind, item, opts), 2500); return true; }
   const npc = world.npcs.find(n => n.id === who);
   const where = player.seat ? player.seat.label : 'your table';
   if (kind === 'drink') sound.espresso(counterSpot(), !/tea|juice|lemonade|smoothie|slush|float/i.test(item.name));
@@ -1257,9 +1257,10 @@ function bringToTable(kind, item) {
     });
     sound.cue('drink');
     sound.cupDown(spot);
-    bubble(npc.av.group, SERVED[Math.floor(Math.random() * SERVED.length)], 'npc');
+    bubble(npc.av.group, opts.reward ? 'Ten stamps — this one is from all of us 🌸' : SERVED[Math.floor(Math.random() * SERVED.length)], 'npc');
     sendMove(true);
     refreshActions();
+    if (kind === 'drink') stampCard(item);
   });
   return true;
 }
@@ -1268,9 +1269,17 @@ function order(d) {
   closePanels();
   if (serveToTable() && bringToTable('drink', d)) return;
   const maker = world.npcs.find(n => n.name === d.by) || world.npcs.find(n => n.id === 'hana');
-  if (maker) bubble(maker.av.group, `One ${d.name}, coming right up.`, 'npc');
-  sound.espresso(counterSpot(), !/tea|juice|lemonade|smoothie|slush|float/i.test(d.name), true);
+  const hana = world.npcs.find(n => n.id === 'hana') || maker;
+  // a line at the counter? you wait your turn (a little)
+  const ahead = Math.min(2, regulars.queueAhead());
+  const front = regulars.frontName();
+  if (maker) bubble(maker.av.group, ahead && front ? `One ${d.name} — right after ${front}, won't be long!` : `One ${d.name}, coming right up.`, 'npc');
+  if (ahead) toast(`🧾 There's ${ahead === 1 ? 'one person' : 'a couple of people'} ahead of you — Hana will call your name.`);
+  setTimeout(() => sound.espresso(counterSpot(), !/tea|juice|lemonade|smoothie|slush|float/i.test(d.name), true), ahead * 2500);
   setTimeout(() => {
+    // your name, called out across the café
+    const name = state.me ? state.me.displayName : 'you';
+    if (hana) bubble(hana.av.group, `${d.name} for ${name}! 🌸`, 'npc');
     sound.counterBell(counterSpot());
     player.drink = d.id;
     player.sips = 0;
@@ -1278,9 +1287,63 @@ function order(d) {
     sound.cue('drink');
     sendMove(true);
     refreshActions();
-    toast(`☕ Your ${d.name} is here. ${d.by} made it.`);
-  }, 1800);
+    toast(`☕ “${d.name} for ${name}!” — ${d.by} made it.`);
+    stampCard(d);
+  }, 1800 + ahead * 3000);
 }
+
+// ── the stamp card: a stamp for every drink, ten for a slice of the sakura cake
+const card = { stamps: 0, rewards: 0, size: 10 };
+async function loadCard() {
+  try { Object.assign(card, await api('/loyalty')); } catch (e) { /* signed out */ }
+  renderCard();
+}
+async function stampCard(d) {
+  if (!state.me) return;
+  try {
+    const r = await api('/loyalty/stamp', { method: 'POST', body: { drink: d.id } });
+    Object.assign(card, r);
+    renderCard();
+    if (r.reward) giveReward();
+    else if (r.stamped) toast(`🎟️ A stamp on your card — ${r.stamps} of ${r.size}. ${r.size - r.stamps === 1 ? 'One more for a slice of the sakura cake!' : `${r.size - r.stamps} more for a slice of the sakura cake.`}`);
+  } catch (e) { /* the card can wait */ }
+}
+function sakuraSlice() {
+  const ps = pastries();
+  return ps.find(p => p.shape === 'slice') || ps.find(p => /sakura/i.test(p.name)) || ps[0] || null;
+}
+function giveReward() {
+  sound.cue('pin');
+  setTimeout(() => sound.cue('heart'), 300);
+  const slice = sakuraSlice();
+  toast('🎉 Your card is full — ten stamps! A slice of the sakura cake is on its way to you 🌸');
+  if (!slice) return;
+  if (bringToTable('dessert', slice, { reward: true })) return;
+  const yuto = world.npcs.find(n => n.id === 'yuto');
+  if (yuto) bubble(yuto.av.group, `${state.me.displayName} — ten stamps! The sakura slice is yours 🌸`, 'npc');
+  setTimeout(() => {
+    player.dessert = { id: slice.id, bites: 0 };
+    player.av.setDessert(slice.shape, 0);
+    sound.cue('drink');
+    sendMove(true);
+    refreshActions();
+  }, 1500);
+}
+function renderCard() {
+  const box = $('cardStamps');
+  if (!box) return;
+  box.replaceChildren(...Array.from({ length: card.size }, (_, i) => {
+    const d = document.createElement('div');
+    d.className = 'stamp' + (i < card.stamps ? ' on' : '') + (i === card.size - 1 ? ' last' : '');
+    d.textContent = i < card.stamps ? '🌸' : i === card.size - 1 ? '🍰' : String(i + 1);
+    return d;
+  }));
+  $('cardCount').textContent = `${card.stamps} of ${card.size}`;
+  $('cardRewards').textContent = card.rewards ? `You've had ${card.rewards} slice${card.rewards > 1 ? 's' : ''} of the sakura cake so far.` : 'Your first slice is waiting at the end of the card.';
+  $('cardBtn').textContent = `🎟️ My stamp card · ${card.stamps}/${card.size}`;
+}
+$('cardBtn').onclick = () => { renderCard(); openPanel('cardPanel'); };
+$('cardBack').onclick = () => openMenu();
 
 function orderDessert(p) {
   closePanels();
@@ -1551,7 +1614,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2503,6 +2566,7 @@ $('enterBtn').onclick = async () => {
 
   connect();
   loadNotes();
+  loadCard();
   try {
     const { messages } = await api('/chat?room=main');
     messages.forEach(addChat);
@@ -2939,6 +3003,7 @@ const regulars = createRegulars({
   world, staff, sound, menu, pastries,
   takenBy: seatHeld,
   say: (obj, text) => bubble(obj, text),
+  callOut: (name, drink) => { const hana = world.npcs.find(n => n.id === 'hana'); if (hana && world.floor === 'main') bubble(hana.av.group, `${drink} for ${name}! 🌸`, 'npc'); },
   hour: cairoHour,
 });
 let roomTick = 0;

@@ -193,3 +193,11 @@ CREATE TABLE IF NOT EXISTS moderation_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS moderation_log_created ON moderation_log (created_at DESC);
+
+-- The loyalty stamp card: a stamp for each drink, ten for a slice of the sakura cake.
+CREATE TABLE IF NOT EXISTS loyalty_cards (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  stamps INTEGER NOT NULL DEFAULT 0,
+  rewards INTEGER NOT NULL DEFAULT 0,
+  last_stamp TIMESTAMPTZ
+);
