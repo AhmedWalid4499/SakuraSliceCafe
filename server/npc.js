@@ -293,6 +293,14 @@ async function ask(npc, messages) {
 
 // ─────────────────────────────────────────── routes
 
+const kindness = require('./moderation');
+const KIND_REPLY = {
+  hana: 'Hana sets the cup down, still smiling, but quieter. “Let\'s keep it kind in here — for everyone, and for you too. Try me again?” 🌸',
+  yuki: 'Yuki blinks, then shakes her head softly. “That one\'s a bit sharp. Say it another way?”',
+  yuto: 'Yuto pauses, and his voice stays warm. “I don\'t think that\'s quite what you mean. This café runs on kindness — tell me again, gently.”',
+  me3temed: 'Me3temed ruffles his feathers and looks at you, slow and patient. (…kinder, please.) 🦉',
+};
+
 const router = express.Router();
 const talkLimit = rateLimit({ windowMs: 10 * 60e3, max: 40, message: 'Let the conversation breathe a little — try again in a few minutes.' });
 
@@ -319,6 +327,9 @@ router.post('/npc/:npc', auth.requireUser, talkLimit, wrap(async (req, res) => {
   }
   const text = cleanText(req.body.text, 600);
   if (!text) return res.status(400).json({ error: 'Say something first.' });
+  // Rude or hurtful words don't reach the team; they answer gently, in character.
+  const verdict = await kindness.check(text, 'npc', req.user);
+  if (!verdict.ok) return res.status(422).json({ error: KIND_REPLY[npc] || KIND_REPLY.hana, moderated: true });
 
   const today = await query(
     `SELECT count(*)::int AS n FROM npc_messages m JOIN npc_sessions s ON s.id = m.session_id

@@ -4,6 +4,7 @@
 
 const crypto = require('crypto');
 const express = require('express');
+const kindness = require('./moderation');
 const { query } = require('./db');
 const auth = require('./auth');
 const { rateLimit, cleanText, isHexColor, wrap } = require('./util');
@@ -49,6 +50,7 @@ router.get('/groups', auth.requireUser, wrap(async (req, res) => {
 router.post('/groups', auth.requireUser, writeLimit, wrap(async (req, res) => {
   const name = cleanText(req.body.name, 40);
   if (name.length < 2) return res.status(400).json({ error: 'Give your group a name.' });
+  if (!(await kindness.guard(res, [name, cleanText(req.body.description, 160)].filter(Boolean).join(' — '), 'group', req.user))) return;
   const owned = await query('SELECT count(*)::int AS n FROM groups WHERE owner_id = $1', [req.user.id]);
   if (owned.rows[0].n >= 10 && !req.user.is_admin) return res.status(429).json({ error: 'You already look after ten groups — that\'s plenty of tables.' });
   const color = isHexColor(req.body.color) ? req.body.color : '#d4678a';

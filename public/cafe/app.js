@@ -2220,7 +2220,7 @@ $('enterBtn').onclick = async () => {
   try { radioOff = localStorage.getItem('cafe.radio.off') === '1'; } catch (e) { /* ignore */ }
   radio.load().then(() => {
     if (!radioOff && radio.state.tracks.length && radio.state.on) radio.listen(true);
-    showMusic(!small, radio.state.tracks.length ? 'radio' : 'spotify');
+    showMusic(!small, radio.state.tracks.length || state.me.isAdmin ? 'radio' : 'spotify');
   }).catch(() => showMusic(!small, 'spotify'));
   if (small) setTimeout(() => toast('🎧 Tap 🎧 at the top for the café radio.'), 4000);
   state.started = true;

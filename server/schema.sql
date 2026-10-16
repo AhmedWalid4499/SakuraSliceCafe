@@ -180,3 +180,16 @@ CREATE TABLE IF NOT EXISTS media (
   created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- What the kindness check didn't let through (see server/moderation.js), for the owner to look over.
+CREATE TABLE IF NOT EXISTS moderation_log (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  place TEXT NOT NULL,
+  text TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  reason TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS moderation_log_created ON moderation_log (created_at DESC);

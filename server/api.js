@@ -5,6 +5,7 @@ const { query, pool } = require('./db');
 const auth = require('./auth');
 const realtime = require('./realtime');
 const { rateLimit, cleanText, isHexColor, clamp, wrap, publicContent } = require('./util');
+const kindness = require('./moderation');
 const groups = require('./groups');
 const npc = require('./npc');
 
@@ -79,6 +80,7 @@ api.post('/auth/register', authLimit, wrap(async (req, res) => {
   if (!/^[a-z0-9_.]{3,24}$/.test(username)) return res.status(400).json({ error: 'Usernames are 3–24 letters, numbers, dots or underscores.' });
   if (displayName.length < 1) return res.status(400).json({ error: 'What should we call you?' });
   if (password.length < 8 || password.length > 200) return res.status(400).json({ error: 'Passwords need at least 8 characters.' });
+  if (!(await kindness.guard(res, `${displayName} (${username})`, 'name', null))) return;
 
   const taken = await query('SELECT email, username FROM users WHERE email = $1 OR username = $2', [email, username]);
   if (taken.rows.length) {
@@ -120,6 +122,7 @@ api.patch('/me', auth.requireUser, wrap(async (req, res) => {
   const u = req.user;
   const displayName = req.body.displayName != null ? cleanText(req.body.displayName, 24) : u.display_name;
   if (!displayName) return res.status(400).json({ error: 'What should we call you?' });
+  if (displayName !== u.display_name && !(await kindness.guard(res, displayName, 'name', u))) return;
   const avatar = req.body.avatar ? cleanAvatar(req.body.avatar) : u.avatar;
   const prefs = req.body.prefs ? { ...(u.prefs || {}), ...cleanPrefs(req.body.prefs) } : u.prefs;
   const { rows } = await query(
@@ -186,6 +189,7 @@ api.post('/notes', auth.requireUser, writeLimit, wrap(async (req, res) => {
   if (!surface) return res.status(400).json({ error: 'Notes go on the board, a table, or a wall.' });
   const kind = b.kind === 'pin' ? 'pin' : 'note';
   const color = NOTE_COLORS.includes(b.color) ? b.color : NOTE_COLORS[0];
+  if (!(await kindness.guard(res, text, 'note', req.user))) return;
 
   const room = groups.roomFromQuery(req);
   if (!(await groups.canEnter(req.user.id, room))) return res.status(403).json({ error: 'That room is for its group only.' });
@@ -251,6 +255,7 @@ api.post('/chat', auth.requireUser, chatLimit, wrap(async (req, res) => {
   if (!text) return res.status(400).json({ error: 'Say something first.' });
   const room = groups.roomFromQuery(req);
   if (!(await groups.canEnter(req.user.id, room))) return res.status(403).json({ error: 'That room is for its group only.' });
+  if (!(await kindness.guard(res, text, 'chat', req.user))) return;
   const { rows } = await query(
     'INSERT INTO chat_messages (user_id, text, room) VALUES ($1, $2, $3) RETURNING id, created_at AS "createdAt"',
     [req.user.id, text, room]);
@@ -272,6 +277,8 @@ api.post('/guestbook', writeLimit, wrap(async (req, res) => {
   const text = cleanText(req.body.text, 140);
   const who = cleanText(req.body.who, 18) || 'anonymous';
   if (text.length < 2) return res.status(400).json({ ok: false, error: 'empty' });
+  const verdict = await kindness.check(`${who}: ${text}`, 'guestbook', null);
+  if (!verdict.ok) return res.status(422).json({ ok: false, error: verdict.message, moderated: true });
   await query('INSERT INTO guestbook_notes (who, text) VALUES ($1, $2)', [who, text]);
   res.status(201).json({ ok: true });
 }));
@@ -422,6 +429,14 @@ admin.get('/guestbook', wrap(async (_req, res) => {
 admin.patch('/guestbook/:id', wrap(async (req, res) => {
   await query('UPDATE guestbook_notes SET hidden = $2 WHERE id = $1', [Number(req.params.id), !!req.body.hidden]);
   res.json({ ok: true });
+}));
+
+// what the kindness check held back (server/moderation.js)
+admin.get('/moderation', wrap(async (_req, res) => {
+  const { rows } = await query(
+    `SELECT m.id, m.place, m.text, m.category, m.reason, m.source, m.created_at AS "createdAt", u.display_name AS "by"
+     FROM moderation_log m LEFT JOIN users u ON u.id = m.user_id ORDER BY m.created_at DESC LIMIT 200`);
+  res.json({ items: rows });
 }));
 
 admin.delete('/chat/:id', wrap(async (req, res) => {
