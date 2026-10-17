@@ -189,12 +189,14 @@
   .menu-tabs button.on { background: var(--sakura-dark); color: #fff; }
   .spot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
   .spot-embed { margin-top: 8px; min-height: 80px; border-radius: 14px; overflow: hidden; background: var(--field); }
-  #musicDock { left: 14px; top: 160px; width: min(340px, calc(100vw - 28px)); padding: 12px 14px; border-radius: 20px; }
+  /* top + max-height are set by fitMusicDock() so it never covers the chat */
+  #musicDock { left: 14px; top: 116px; width: min(340px, calc(100vw - 28px)); padding: 12px 14px; border-radius: 20px; overflow-y: auto; overscroll-behavior: contain; }
   #musicDock .md-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   #musicDock .md-head b { font-size: 13.5px; color: var(--text-dark); }
-  #musicDock .md-head button { width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--sakura-light); color: var(--sakura-dark); font-weight: 700; }
+  /* only the round ✕ — not the radio / Spotify tabs, which are buttons too */
+  #musicDock .md-head > button { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--sakura-light); color: var(--sakura-dark); font-weight: 700; }
   #musicDock .fine { margin-top: 6px; }
-  @media (max-width: 640px) { #musicDock { top: auto; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 21; } }
+  @media (max-width: 640px) { #musicDock { top: auto; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 21; max-height: calc(100vh - 360px); } }
   #musicBtn.on { background: var(--sakura-light); }
   .md-tabs { flex-wrap: nowrap; gap: 6px; }
   .md-tabs .chip { padding: 5px 10px; font-size: 12.5px; white-space: nowrap; }
