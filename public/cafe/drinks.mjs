@@ -15,6 +15,7 @@ export function slug(name) {
 
 // What colour is it in the cup? The first ingredient that gives it away wins.
 const COLOURS = [
+  [/pumpkin/, '#d9822b'],
   [/matcha/, '#8fbf6a'],
   [/hojicha/, '#a0714f'],
   [/taro/, '#b9a3cf'],
@@ -47,6 +48,25 @@ export function makerOf(d) {
   return 'Hana';
 }
 
+// The café's own seasonal drinks — always on the menu (on their season's
+// shelf), whatever is in site_content, so the server knows them too.
+export const SEASONAL = [
+  {
+    id: 'pumpkin-spice-latte', name: 'Pumpkin Spice Latte', by: 'Yuto', color: '#d9822b',
+    season: 'autumn', temp: 'hot', favourite: true,
+    mood: 'His favourite. He says it\'s "just a seasonal thing" — he has one every single day.',
+    note: "Yuto's favourite, back for autumn. He says it's just a seasonal thing.",
+    recipe: {
+      ingredients: ['1 cup milk (oat is lovely)', '2 tbsp pumpkin purée', '1 tbsp honey or brown sugar',
+        'A pinch each of cinnamon, ginger, nutmeg and clove', '1 shot strong coffee (or ½ cup strong brewed)'],
+      steps: ['Warm the milk with the pumpkin, honey and spices, whisking until smooth — don\'t let it boil.',
+        'Pour the coffee into a big mug.', 'Pour the spiced pumpkin milk over it.', 'Dust with a little cinnamon. Hold it with both hands.'],
+      me3temed: 'Some comforts only come once a year. That is what makes them comforts.',
+      pair: 'A cinnamon roll, or a slice of anything warm from the oven.',
+    },
+  },
+];
+
 export function fullMenu(house = [], letters = []) {
   const out = [];
   const seen = new Set();
@@ -54,6 +74,12 @@ export function fullMenu(house = [], letters = []) {
     if (!d || !d.id || !d.name) continue;
     out.push({ ...d, season: d.season || 'house' });
     seen.add(String(d.name).toLowerCase());
+    seen.add(d.id);
+  }
+  for (const d of SEASONAL) {
+    if (seen.has(d.name.toLowerCase()) || seen.has(d.id)) continue;
+    out.push({ ...d });
+    seen.add(d.name.toLowerCase());
     seen.add(d.id);
   }
   for (const d of Array.isArray(letters) ? letters : []) {

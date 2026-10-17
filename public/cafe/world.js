@@ -2625,6 +2625,61 @@ export function buildWorld(renderer) {
         decor.summer.add(l);
       }
     }
+    // autumn: pumpkins — piles by the front door and the hearth, a few on the
+    // mantel, the counter and the tables. Only floor spots off the walking paths,
+    // since they come and go with the season and have no colliders.
+    {
+      const PUMPKINS = { orange: '#e07b2a', deep: '#c8641c', cream: '#efe2c4', sage: '#9fb08a' };
+      const stemM = std('#6b5233', { roughness: 0.9 });
+      const leafM = std('#6f8f4f', { roughness: 0.8, side: THREE.DoubleSide });
+      const bodyM = {};
+      const pumpkin = (x, y, z, r, colour = 'orange', ry = 0) => {
+        const m = bodyM[colour] || (bodyM[colour] = std(PUMPKINS[colour], { roughness: 0.55 }));
+        const g = new THREE.Group();
+        const core = shadowy(new THREE.Mesh(new THREE.SphereGeometry(r * 0.8, 20, 14), m));
+        core.scale.set(1.15, 0.78, 1.15);
+        core.position.y = r * 0.62;
+        g.add(core);
+        for (let i = 0; i < 8; i++) {   // the ribs
+          const a = (i / 8) * Math.PI * 2;
+          const rib = shadowy(new THREE.Mesh(new THREE.SphereGeometry(r * 0.5, 14, 10), m));
+          rib.scale.set(0.75, 1.15, 0.75);
+          rib.position.set(Math.cos(a) * r * 0.5, r * 0.6, Math.sin(a) * r * 0.5);
+          g.add(rib);
+        }
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.07, r * 0.11, r * 0.42, 8), stemM);
+        stem.position.y = r * 1.3; stem.rotation.z = 0.25;
+        const leaf = new THREE.Mesh(new THREE.CircleGeometry(r * 0.22, 7), leafM);
+        leaf.scale.set(1.5, 0.8, 1);
+        leaf.position.set(r * 0.22, r * 1.2, 0.02); leaf.rotation.set(-1.2, 0, -0.3);
+        g.add(stem, leaf);
+        g.position.set(x, y, z);
+        g.rotation.y = ry;
+        decor.autumn.add(g);
+        return g;
+      };
+      // either side of the front door, against the wall — past the umbrella
+      // stand (x 1.75) and the "please seat yourself" sign (x -1.8)
+      const dz = ROOM.maxZ - 0.4;
+      pumpkin(-2.65, 0, dz, 0.3, 'orange', 0.4); pumpkin(-3.0, 0, dz - 0.05, 0.18, 'cream', 1); pumpkin(-2.4, 0, dz - 0.36, 0.14, 'deep');
+      pumpkin(2.6, 0, dz, 0.32, 'deep', 0.9); pumpkin(2.6, 0.44, dz, 0.14, 'orange'); pumpkin(2.95, 0, dz - 0.12, 0.17, 'sage', 2);
+      pumpkin(2.38, 0, dz - 0.32, 0.12, 'cream');
+      // the hearth: a pile at each end, and two small ones on the mantel
+      pumpkin(fire.x - 0.45, 0, fire.z - 1.3, 0.24, 'orange', 0.3); pumpkin(fire.x - 0.2, 0, fire.z - 1.6, 0.15, 'cream');
+      pumpkin(fire.x - 0.45, 0, fire.z + 1.35, 0.2, 'deep', 1.2);
+      pumpkin(fire.x - 0.15, 1.38, fire.z + 0.1, 0.12, 'orange');
+      pumpkin(fire.x - 0.15, 1.38, fire.z + 0.85, 0.09, 'cream', 1);
+      // the counter, by the lemons' spot
+      const cb = new THREE.Box3().setFromObject(counter);
+      pumpkin(cb.max.x - 1.2, 1.16, cb.max.z - 0.3, 0.1, 'orange');
+      pumpkin(cb.max.x - 1.42, 1.16, cb.max.z - 0.36, 0.075, 'cream', 1);
+      // one little pumpkin on every other café table
+      surfaces.filter(m => m.userData.surface === 'table' && m.userData.tableName && m.userData.top < 0.9).forEach((t, i) => {
+        if (i % 2) return;
+        const p = new THREE.Vector3(); t.getWorldPosition(p);
+        pumpkin(p.x - 0.24, t.userData.top, p.z + 0.14, 0.075, ['orange', 'cream', 'deep', 'sage'][(i / 2) % 4], i);
+      });
+    }
     // winter: a candle in a little glass on every table, and blankets on the armchairs
     const flameM = new THREE.MeshBasicMaterial({ color: '#ffcf7a' });
     for (const t of surfaces.filter(m => m.userData.surface === 'table' && m.userData.tableName && m.userData.top < 0.9)) {
