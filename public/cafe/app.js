@@ -2566,7 +2566,8 @@ $('enterBtn').onclick = async () => {
   $('hudTop').classList.remove('hidden');
   $('actions').classList.remove('hidden');
   // On a phone the chat starts tucked away (💬 opens it); there's more café to see.
-  showChat(!phoneLayout());
+  const small = phoneLayout();
+  showChat(!small);
   $('adminLink').classList.toggle('hidden', !state.me.isAdmin);
   $('wxOwnerBtn').classList.toggle('hidden', !state.me.isAdmin);
   // The radio comes on as you walk in (this click lets the browser play it),
