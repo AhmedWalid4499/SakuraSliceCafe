@@ -1192,7 +1192,7 @@ function menuRow(item, kind, onPick) {
 }
 
 let menuTab = 'drinks';
-let drinkShelf = 'house';
+let drinkShelf = null; // first open: the season's shelf if it has a favourite, else the house menu
 const SHELVES = [['house', '☕ House'], ['spring', '🌸 Spring'], ['summer', '☀️ Summer'], ['autumn', '🍂 Autumn'], ['winter', '❄️ Winter']];
 function openMenu(tab = menuTab) {
   menuTab = pastries().length ? tab : 'drinks';
@@ -1203,6 +1203,7 @@ function openMenu(tab = menuTab) {
   const all = menu();
   const have = SHELVES.filter(([k]) => all.some(d => d.season === k));
   shelves.classList.toggle('hidden', menuTab !== 'drinks' || have.length < 2);
+  if (drinkShelf === null) drinkShelf = featured().length ? (state.calendar || calendar()).season : 'house';
   if (!have.some(([k]) => k === drinkShelf)) drinkShelf = have[0]?.[0] || 'house';
   shelves.replaceChildren(...have.map(([k, label]) => {
     const b = document.createElement('button');
@@ -1221,7 +1222,9 @@ function openMenu(tab = menuTab) {
     : all.filter(d => have.length < 2 || d.season === drinkShelf).map(d => menuRow(d, 'drink', order))));
   $('menuNote').textContent = menuTab === 'desserts'
     ? 'Hana bakes the warm things, Yuki shapes the delicate ones. Take it on a plate.'
-    : drinkShelf === 'house' ? 'The house drinks. Nothing costs anything here.' : 'Every drink from the morning letters, by season.';
+    : drinkShelf === 'house' ? 'The house drinks. Nothing costs anything here.'
+    : featured().some(d => d.season === drinkShelf) ? `🎃 ${featured()[0].note} And every ${drinkShelf} drink from the morning letters.`
+    : 'Every drink from the morning letters, by season.';
   list.scrollTop = 0;
   openPanel('menuPanel');
   const who = world.npcs.find(n => n.id === (menuTab === 'desserts' ? 'yuki' : 'hana'));
@@ -2114,12 +2117,18 @@ function refreshBoards() {
   world.setMenuBoard({
     title: cal.ramadan ? 'Menu · Ramadan nights' : 'Menu',
     columns: [
-      { head: 'Warm', items: rotate(warm, 6, day).map(d => d.name) },
+      { head: 'Warm', items: [...new Set([...featured().map(d => d.name), ...rotate(warm, 6, day).map(d => d.name)])].slice(0, 6) },
       { head: 'Iced', items: rotate(iced, 6, day + 3).map(d => d.name) },
       { head: 'From the oven', items: rotate(bakes, 6, day + 1).map(p => p.name) },
     ],
   });
   world.setSpecials(specials());
+}
+// The season's favourites (the café's own seasonal drinks, e.g. Yuto's
+// pumpkin spice latte in autumn) — first on the boards while their season lasts.
+function featured() {
+  const cal = state.calendar || calendar();
+  return cal.ramadan ? [] : menu().filter(d => d.favourite && d.season === cal.season);
 }
 // The owner's specials (site_content 'cafe.specials'), or the week's own picks.
 function specials() {
@@ -2131,7 +2140,9 @@ function specials() {
   const pool = seasonal.length >= 2 ? seasonal : menu();
   const w = pool.filter(d => tempOf(d) === 'hot'), i = pool.filter(d => tempOf(d) === 'iced');
   const items = [];
-  if (w.length) { const d = w[(week * 3) % w.length]; items.push({ name: d.name, note: d.mood || `Made by ${d.by}, for slow mornings.` }); }
+  const fav = featured()[0];
+  if (fav) items.push({ name: fav.name, note: fav.note || fav.mood });
+  else if (w.length) { const d = w[(week * 3) % w.length]; items.push({ name: d.name, note: d.mood || `Made by ${d.by}, for slow mornings.` }); }
   if (i.length) { const d = i[(week * 5) % i.length]; items.push({ name: d.name, note: d.mood || `Made by ${d.by}, cold and bright.` }); }
   const bakes = pastries();
   if (bakes.length) { const p = bakes[(week * 7) % bakes.length]; items.push({ name: p.name, note: p.note || p.tagline || (p.drink ? `Lovely with a ${p.drink}.` : 'Fresh from the oven this morning.') }); }
