@@ -1598,7 +1598,7 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (typing || !state.started) return;
-  if (e.key === 'Enter') { e.preventDefault(); $('chat').classList.remove('hidden'); $('chatAct').classList.add('on'); $('chatInput').focus(); return; }
+  if (e.key === 'Enter') { e.preventDefault(); showChat(true); $('chatInput').focus(); return; }
   if (e.key === 'e' || e.key === 'E') { toggleSit(); return; }
   if (e.key === 'q' || e.key === 'Q') { if (player.drink || player.dessert) putDrinkDown(); else pickUpDrink(); return; }
   if (e.key === 'b' || e.key === 'B') { takeBite(); return; }
@@ -1689,6 +1689,33 @@ function showMusic(on, tab) {
   $('musicBtn').classList.toggle('on', on);
   if (tab) musicTab(tab);
   if (on) { if (state.musicTab === 'spotify') openSpotify(); else renderRadio(); }
+  if (on && phoneLayout()) showChat(false); // a phone only has room for one of them
+  fitMusicDock();
+}
+// The player and the chat both live on the left. On a computer the player
+// sits under the clock card and stops above the chat (scrolling inside if
+// it must); on a phone they share one spot, so opening one tucks the other away.
+function phoneLayout() { return matchMedia('(max-width: 640px)').matches; }
+function showChat(on) {
+  $('chat').classList.toggle('hidden', !on);
+  $('chatAct').classList.toggle('on', on);
+  if (on && phoneLayout() && !$('musicDock').classList.contains('hidden')) showMusic(false);
+  fitMusicDock();
+}
+function fitMusicDock() {
+  const dock = $('musicDock');
+  if (dock.classList.contains('hidden') || phoneLayout()) { dock.style.top = dock.style.maxHeight = ''; return; }
+  const top = Math.round(document.querySelector('#hudTop .brand').getBoundingClientRect().bottom + 12);
+  const chat = $('chat');
+  const chatOpen = !chat.classList.contains('hidden');
+  const bottom = chatOpen ? chat.getBoundingClientRect().top - 12 : $('actions').getBoundingClientRect().top - 12;
+  dock.style.top = top + 'px';
+  dock.style.maxHeight = Math.max(140, bottom - top) + 'px';
+}
+addEventListener('resize', fitMusicDock);
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(fitMusicDock);
+  ro.observe($('chat')); ro.observe(document.querySelector('#hudTop .brand'));
 }
 state.musicTab = 'radio';
 function musicTab(t) {
@@ -2290,15 +2317,8 @@ $('emoteAct').onclick = () => {
   bubble(player.av.group, e, 'emote');
   send({ t: 'emote', e });
 };
-$('chatAct').onclick = () => {
-  const c = $('chat');
-  c.classList.toggle('hidden');
-  $('chatAct').classList.toggle('on', !c.classList.contains('hidden'));
-};
-$('chatClose').onclick = () => {
-  $('chat').classList.add('hidden');
-  $('chatAct').classList.remove('on');
-};
+$('chatAct').onclick = () => showChat($('chat').classList.contains('hidden'));
+$('chatClose').onclick = () => showChat(false);
 $('outBtn').onclick = async () => {
   if (!confirm('Leave the café for now?')) return;
   await api('/auth/logout', { method: 'POST', body: {} }).catch(() => {});
@@ -2546,9 +2566,7 @@ $('enterBtn').onclick = async () => {
   $('hudTop').classList.remove('hidden');
   $('actions').classList.remove('hidden');
   // On a phone the chat starts tucked away (💬 opens it); there's more café to see.
-  const small = matchMedia('(max-width: 640px)').matches;
-  $('chat').classList.toggle('hidden', small);
-  $('chatAct').classList.toggle('on', !small);
+  showChat(!phoneLayout());
   $('adminLink').classList.toggle('hidden', !state.me.isAdmin);
   $('wxOwnerBtn').classList.toggle('hidden', !state.me.isAdmin);
   // The radio comes on as you walk in (this click lets the browser play it),
