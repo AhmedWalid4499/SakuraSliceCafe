@@ -2824,7 +2824,7 @@ export function buildWorld(renderer) {
     [...lamps, ...upLamps].forEach(l => { l.light.intensity = 3.5 * lampK2; });
     // the roof garden is open air: its lamps only really matter after dark
     gardenLamps.forEach(l => { l.light.intensity = 3.5 * lampK2 * (0.15 + night * 0.85); });
-    if (home) home.ceilingLight.intensity = 2.2 + night * 2.6;
+    if (home) { home.ceilingLight.intensity = 2.2 + night * 2.6; home.sideLights.forEach(l => { l.intensity = 1.6 + night * 1.8; }); }
     outside.setSky(hour, day, dusk, night);
     return { day, night, open };
   }
