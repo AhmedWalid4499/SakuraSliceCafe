@@ -18,7 +18,7 @@ import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
 import { createStaff } from './staff.js';
 import { fullMenu, SEASONS } from './drinks.mjs';
-import { FURNITURE, BY_KIND, CATS, MAX_ITEMS, WALLS, FLOORS, AREAS, areaAt } from './furniture.mjs';
+import { FURNITURE, BY_KIND, CATS, MAX_ITEMS, WALLS, FLOORS, AREAS, areaAt, WALLPAPERS, COATS } from './furniture.mjs';
 import { createRadio, audioDuration } from './radio.js';
 import { createRegulars } from './regulars.js';
 
@@ -907,6 +907,27 @@ function handle(m) {
         goToRoom('hall');
       }
       break;
+    case 'home:pet':
+      if (!state.home) break;
+      state.home.pet = m.pet;
+      world.home.setPet(m.pet);
+      break;
+    case 'home:snacks':
+      if (state.home) setSnackShelf(m.snacks);
+      break;
+    case 'home:gifts':
+      if (state.home && m.ownerId === state.home.ownerId) { state.home.gifts = m.gifts; world.home.setGifts(m.gifts, state.home.canEdit); }
+      break;
+    case 'home:movie':
+      if (!state.home) break;
+      setMovie(m.movie, m.now);
+      if (m.movie) sysChat(`📺 ${m.movie.by} put on “${m.movie.title}”.`);
+      else if (m.by) sysChat(`📺 ${m.by} turned the film off.`);
+      break;
+    case 'gift':
+      toast(`🎁 ${m.from} sent you a present — it's waiting by the door of your room.`);
+      sound.cue('heart');
+      break;
     case 'home:focus':
       if (!state.home) break;
       if (m.focus) offerFocus(m.focus, m.now);
@@ -1650,6 +1671,11 @@ function click(x, y) {
   if (d.kind === 'home-shower') return haveShower(d.itemId);
   if (d.kind === 'home-mirror') return walkToThing(h, () => { toast('🪞 You look in the mirror. Fancy a change?'); openCreator(false); });
   if (d.kind === 'home-frame') return openFrame(d.itemId);
+  if (d.kind === 'home-snacks') return walkToThing(h, useSnackShelf);
+  if (d.kind === 'home-tv') return openMovie();
+  if (d.kind === 'home-gift') return walkToThing(h, () => openGift(d.giftId));
+  if (d.kind === 'home-pet') return walkToThing(h, strokeCat);
+  if (d.kind === 'home-catbed') return toast(state.home?.pet ? `${d.label} — ${state.home.pet.name}'s favourite spot 🐾` : `${d.label} — waiting for a cat 🐾`);
   if (d.kind === 'home-item') return toast(d.label);
   if (d.kind === 'garden-bed') return openBed(d.bed);
   if (d.kind === 'garden-list') return openGardenList();
@@ -1708,7 +1734,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -3081,7 +3107,12 @@ async function goToRoom(room, group = null) {
   state.home = isHome ? { ...homeData, ownerId: Number(room.slice(5)) } : null;
   world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? 'hall' : up ? 'up' : 'main');
   if (isHall) await loadHallDoors();
-  if (isHome) { world.home.setRoom(homeData.room); world.home.setItems(homeData.items); }
+  if (isHome) {
+    world.home.setRoom(homeData.room); world.home.setItems(homeData.items);
+    world.home.setPet(homeData.pet); setSnackShelf(homeData.snacks);
+    world.home.setGifts(homeData.gifts, homeData.canEdit);
+    setMovie(homeData.movie, homeData.now);
+  } else setMovie(null);
   if (up) world.setUpstairsSign(group.name, group.description || 'upstairs at Sakura Slice', group.color);
 
   // arrive at the top (or the foot) of the stairs, facing into the room
@@ -3139,6 +3170,7 @@ async function loadHallDoors() {
     const r = await api('/home');
     state.myHome = r.mine;
     world.hall.setDoors(r.mine, r.doors);
+    if (r.giftsWaiting && !state.giftNudged) { state.giftNudged = true; toast(`🎁 ${r.giftsWaiting === 1 ? 'A present is' : `${r.giftsWaiting} presents are`} waiting by your door.`); }
   } catch (e) { /* signed out: the doors stay shut */ }
 }
 setInterval(() => { if (state.room === 'hall' && !document.hidden) loadHallDoors(); }, 20e3);
@@ -3568,6 +3600,14 @@ function openRoomPanel() {
     b.onclick = () => saveRoom({ floor: f });
     return b;
   }));
+  $('roomPaper').replaceChildren(...WALLPAPERS.map(w => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip' + ((r.wallpaper || 'plain') === w ? ' on' : '');
+    b.textContent = PAPER_NAMES[w] || w;
+    b.onclick = () => saveRoom({ wallpaper: w });
+    return b;
+  }));
+  renderPetForm();
   $('roomOpen').checked = !!r.open;
   renderGuests();
   const s = state.home.stats || {};
@@ -3736,6 +3776,258 @@ function leaveHome() {
   $('focusInvite').classList.add('hidden');
 }
 
+// ── wallpaper names, and the cat
+const PAPER_NAMES = { plain: 'Plain', sakura: '🌸 Sakura', stripes: 'Stripes', dots: 'Polka dots', lattice: 'Asanoha', waves: 'Seigaiha waves' };
+const COAT_NAMES = { ginger: 'Ginger', cream: 'Cream', grey: 'Grey', black: 'Black', tabby: 'Tabby', calico: 'Calico' };
+let petCoat = 'ginger';
+function renderPetForm() {
+  const pet = state.home && state.home.pet;
+  petCoat = pet ? pet.coat : petCoat;
+  $('petName').value = pet ? pet.name : '';
+  $('petGo').textContent = pet ? 'Save' : '🐾 Adopt';
+  $('petBye').classList.toggle('hidden', !pet);
+  $('petCoats').replaceChildren(...Object.entries(COATS).map(([k, c]) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = k === petCoat ? 'on' : ''; b.title = COAT_NAMES[k];
+    b.style.background = k === 'calico' ? 'linear-gradient(135deg,#f4ece0 40%,#d98a4a 40% 70%,#2b2a2e 70%)' : k === 'tabby' ? 'repeating-linear-gradient(90deg,#9c7a5a 0 4px,#6d523b 4px 7px)' : c;
+    b.onclick = () => { petCoat = k; renderPetForm(); };
+    return b;
+  }));
+}
+$('petForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('petErr').textContent = '';
+  try {
+    const had = !!state.home.pet;
+    const { pet } = await api('/home/pet', { method: 'PUT', body: { name: $('petName').value, coat: petCoat } });
+    state.home.pet = pet;
+    world.home.setPet(pet);
+    renderPetForm();
+    if (!had) { toast(`🐾 Welcome home, ${pet.name}!`); sound.cue('heart'); }
+  } catch (err) { $('petErr').textContent = err.message; }
+});
+$('petBye').onclick = async () => {
+  if (!state.home.pet || !confirm(`Find ${state.home.pet.name} a new home? (They'll be very happy there.)`)) return;
+  try { await api('/home/pet', { method: 'DELETE', body: {} }); state.home.pet = null; world.home.setPet(null); renderPetForm(); } catch (err) { $('petErr').textContent = err.message; }
+};
+// whoever's typing at a laptop in here (the cat likes to help)
+function typist() {
+  if (player.seat && player.seat.work) return player.pos;
+  for (const p of state.people.values()) {
+    const seat = p.state && p.state.seat && world.seats.find(s => s.id === p.state.seat);
+    if (seat && seat.work) return p.pos;
+  }
+  return null;
+}
+function strokeCat() {
+  const c = world.home.petCat();
+  if (!c) return;
+  sound.cue('heart');
+  const lines = ['purrs like a little engine', 'leans into your hand', 'does a slow blink at you — that means I love you', 'rolls over for a tummy rub (a trap)', 'headbutts your knee'];
+  toast(`🐾 ${c.name} ${lines[Math.floor(Math.random() * lines.length)]}.`);
+  send({ t: 'emote', e: '🐾' });
+}
+
+// ── the snack shelf: keep a pastry from downstairs, or have one later
+let snacks = [];
+function setSnackShelf(list = []) {
+  snacks = list;
+  world.home.setSnacks(list.map(id => pastryOf(id).shape));
+}
+async function useSnackShelf() {
+  if (!state.home) return;
+  if (player.dessert && player.dessert.bites === 0) {
+    try {
+      const r = await api(`/home/${state.home.ownerId}/snacks`, { method: 'POST', body: { pastry: player.dessert.id } });
+      toast(`🍡 You put the ${pastryOf(player.dessert.id).name} on the snack shelf for later.`);
+      player.dessert = null;
+      player.av.setDessert(null);
+      sendMove(true);
+      refreshActions();
+      setSnackShelf(r.snacks);
+    } catch (e) { toast(e.message); }
+    return;
+  }
+  if (player.dessert) return toast("You've started that one — finish it first 🍰");
+  openSnacks();
+}
+function openSnacks() {
+  const counts = new Map();
+  snacks.forEach(id => counts.set(id, (counts.get(id) || 0) + 1));
+  $('snackList').replaceChildren(...[...counts].map(([id, n]) => {
+    const p = pastryOf(id);
+    const row = document.createElement('div'); row.className = 'group-card';
+    const t = document.createElement('div');
+    const b = document.createElement('b'); b.textContent = p.name;
+    const sm = document.createElement('small'); sm.className = 'fine'; sm.textContent = n > 1 ? ` × ${n}` : '';
+    t.append(b, sm);
+    const go = document.createElement('button'); go.type = 'button'; go.className = 'btn ghost'; go.textContent = 'Have one';
+    go.onclick = () => takeSnack(id);
+    row.append(t, go);
+    return row;
+  }));
+  $('snackEmpty').classList.toggle('hidden', snacks.length > 0);
+  openPanel('snackPanel');
+}
+async function takeSnack(id) {
+  try {
+    const r = await api(`/home/${state.home.ownerId}/snacks/take`, { method: 'POST', body: { pastry: id } });
+    closePanels();
+    player.dessert = { id: r.pastry, bites: 0 };
+    player.av.setDessert(pastryOf(r.pastry).shape, 0);
+    sound.cue('drink');
+    sendMove(true);
+    refreshActions();
+    setSnackShelf(r.snacks);
+    toast(`🍡 A ${pastryOf(r.pastry).name} from the shelf. Still perfect.`);
+  } catch (e) { toast(e.message); }
+}
+
+// ── film night: what's on the TV, and the player that shows it
+let movie = null, movieSkew = 0;
+function setMovie(m, now) {
+  movie = m || null;
+  if (now) movieSkew = Date.now() - now;
+  world.home.setMovie(movie);
+  const box = $('cinema');
+  if (!movie) { box.classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; return; }
+  const offset = Math.max(0, Math.floor((Date.now() - movieSkew - movie.startedAt) / 1000));
+  $('cinemaTitle').textContent = movie.title;
+  $('cinemaBy').textContent = `put on by ${movie.by}`;
+  $('cinemaFrame').src = `https://www.youtube-nocookie.com/embed/${movie.videoId}?autoplay=1&start=${offset}&rel=0&playsinline=1`;
+  box.classList.remove('hidden', 'small');
+}
+function openMovie() {
+  $('movieNow').classList.toggle('hidden', !movie);
+  $('movieNowTitle').textContent = movie ? `“${movie.title}”, put on by ${movie.by}` : '';
+  $('movieErr').textContent = '';
+  openPanel('moviePanel');
+}
+$('movieForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('movieErr').textContent = '';
+  try {
+    const r = await api(`/home/${state.home.ownerId}/movie`, { method: 'POST', body: { url: $('movieUrl').value } });
+    $('movieUrl').value = '';
+    closePanels();
+    setMovie(r.movie, r.now);
+  } catch (err) { $('movieErr').textContent = err.message; }
+});
+$('movieStop').onclick = async () => { try { await api(`/home/${state.home.ownerId}/movie`, { method: 'DELETE', body: {} }); closePanels(); setMovie(null); } catch (err) { toast(err.message); } };
+$('cinemaMin').onclick = () => $('cinema').classList.toggle('small');
+$('cinemaClose').onclick = () => { $('cinema').classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; toast('📺 The film goes on without you — click the TV to watch again.'); };
+$('movieWatch').onclick = () => { closePanels(); setMovie(movie); };
+
+// ── presents
+const giftOf = id => (state.home && state.home.gifts || []).find(g => g.id === id);
+// somewhere clear for it in your room: the main room first, near the door
+function clearSpot(kind) {
+  const tries = [];
+  for (const a of [AREAS.room, AREAS.library, AREAS.kitchen, AREAS.bath]) {
+    for (let z = a.maxZ - 1.2; z > a.minZ + 0.4; z -= 0.4) for (let x = a.minX + 0.6; x < a.maxX - 0.4; x += 0.4) tries.push({ x, z, d: Math.hypot(x - 1.5, z - 3.6) + (a === AREAS.room ? 0 : 20) });
+  }
+  tries.sort((p, q) => p.d - q.d);
+  for (const ry of [0, Math.PI / 2]) for (const p of tries) {
+    const x = Math.round(p.x * 20) / 20, z = Math.round(p.z * 20) / 20;
+    if (world.home.canPlace(kind, x, z, ry)) return { x, z, ry };
+  }
+  return null;
+}
+async function openGift(id) {
+  const g = giftOf(id);
+  if (!g) return;
+  if (!state.home.canEdit) return toast(`🎁 A present for ${g.toName}, from ${g.fromName}. No peeking!`);
+  let body = {};
+  if (g.itemKind) {
+    const spot = clearSpot(g.itemKind);
+    if (!spot) return toast("🎁 There's no room for it — make a little space first.");
+    body = spot;
+  } else if (player.drink) return toast("🎁 It's a drink! Put down the one you're holding first.");
+  try {
+    const r = await api(`/home/gifts/${id}/open`, { method: 'POST', body });
+    sound.cue('heart');
+    state.home.gifts = r.gifts;
+    world.home.setGifts(r.gifts, true);
+    const what = r.item ? (BY_KIND.get(r.item.kind) || {}).name : r.gift.drink.name;
+    if (r.item) world.home.update(r.item);
+    if (r.gift.drink) {
+      player.drink = r.gift.drink.id;
+      player.sips = 0;
+      player.av.setDrink(r.gift.drink.color, 1, drinkTemp(r.gift.drink.id));
+      sendMove(true);
+      refreshActions();
+    }
+    $('giftOpenWhat').textContent = `${r.gift.fromName} sent you ${/^[aeiou]/i.test(what) ? 'an' : 'a'} ${what.toLowerCase()}!`;
+    $('giftOpenNote').textContent = r.gift.note ? `“${r.gift.note}”` : '';
+    $('giftOpenWhere').textContent = r.item ? "It's in your room now — open Decorate to move it wherever you like." : 'Enjoy it while it\'s warm ☕';
+    openPanel('giftOpenPanel');
+    sysChat(`🎁 You opened a present from ${r.gift.fromName}.`);
+  } catch (e) { toast(e.message); }
+}
+// sending one: furniture from the catalogue, or a drink from the menu
+const gift = { what: 'item', kind: null, color: null, drink: null, cat: 'cosy' };
+function openGiftSend(to = '') {
+  if (to) $('giftTo').value = to;
+  $('giftErr').textContent = '';
+  renderGiftPicker();
+  openPanel('giftPanel');
+}
+function renderGiftPicker() {
+  document.querySelectorAll('#giftWhat .chip').forEach(b => b.classList.toggle('on', b.dataset.what === gift.what));
+  const grid = $('giftGrid');
+  if (gift.what === 'item') {
+    $('giftCats').classList.remove('hidden');
+    $('giftCats').replaceChildren(...CATS.filter(([k]) => k !== 'frames').map(([k, label]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (k === gift.cat ? ' on' : ''); b.textContent = label;
+      b.onclick = () => { gift.cat = k; renderGiftPicker(); };
+      return b;
+    }));
+    grid.replaceChildren(...FURNITURE.filter(f => f.cat === gift.cat && !f.wall).map(f => {
+      const card = document.createElement('div'); card.className = 'item' + (gift.kind === f.kind ? ' on' : '');
+      const name = document.createElement('b'); name.textContent = f.name;
+      const sw = document.createElement('div'); sw.className = 'sw-row';
+      for (const c of f.colors) {
+        const s = document.createElement('button'); s.type = 'button'; s.style.background = c; s.className = gift.kind === f.kind && gift.color === c ? 'on' : '';
+        s.onclick = ev => { ev.stopPropagation(); gift.kind = f.kind; gift.color = c; renderGiftPicker(); };
+        sw.appendChild(s);
+      }
+      card.onclick = () => { gift.kind = f.kind; gift.color = gift.color && f.colors.includes(gift.color) ? gift.color : f.colors[0]; renderGiftPicker(); };
+      card.append(name, sw);
+      return card;
+    }));
+  } else {
+    $('giftCats').classList.add('hidden');
+    grid.replaceChildren(...menu().map(d => {
+      const card = document.createElement('div'); card.className = 'item' + (gift.drink && gift.drink.id === d.id ? ' on' : '');
+      const name = document.createElement('b'); name.textContent = d.name;
+      const dot = document.createElement('div'); dot.className = 'sw-row';
+      const s = document.createElement('button'); s.type = 'button'; s.style.background = d.color; s.tabIndex = -1; dot.appendChild(s);
+      card.onclick = () => { gift.drink = { id: d.id, name: d.name, color: d.color }; renderGiftPicker(); };
+      card.append(name, dot);
+      return card;
+    }));
+  }
+  const chosen = gift.what === 'item' ? (gift.kind && BY_KIND.get(gift.kind).name) : gift.drink && gift.drink.name;
+  $('giftChosen').textContent = chosen ? `🎁 ${chosen}` : 'Pick something above';
+}
+document.querySelectorAll('#giftWhat .chip').forEach(b => { b.onclick = () => { gift.what = b.dataset.what; renderGiftPicker(); }; });
+$('giftForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('giftErr').textContent = '';
+  const body = { to: $('giftTo').value, note: $('giftNote').value };
+  if (gift.what === 'item') { if (!gift.kind) return ($('giftErr').textContent = 'Pick something to send.'); body.item = { kind: gift.kind, color: gift.color }; }
+  else { if (!gift.drink) return ($('giftErr').textContent = 'Pick a drink to send.'); body.drink = gift.drink; }
+  try {
+    const r = await api('/home/gifts', { method: 'POST', body });
+    $('giftNote').value = '';
+    closePanels();
+    sound.cue('pin');
+    toast(`🎁 Wrapped and sent! It's waiting by ${r.to}'s door.`);
+  } catch (err) { $('giftErr').textContent = err.message; }
+});
+$('roomGift').onclick = () => openGiftSend();
+$('homeGift').onclick = () => openGiftSend();
+
 // ── the kitchen and the bathroom
 // Walk up to something, then do it (stopping a step short of it).
 async function walkToThing(hit, then) {
@@ -3853,6 +4145,7 @@ function frame() {
     staff.update(dt);
     regulars.update(dt);
     if (world.floor === 'main') world.updateDoors(dt, [player.pos, ...[...state.people.values()].map(p => p.pos), ...staff.positions(), ...regulars.positions()]);
+    if (world.floor === 'home') world.home.updatePet(dt, t, { typist: typist() });
     listenRoom(dt);
     updateCamera(dt);
     updateHover();
@@ -3870,7 +4163,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff, goToRoom, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
 
 // ───────────────────────────────────────── start
 

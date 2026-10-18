@@ -191,6 +191,18 @@
   .home-card { margin: 0 0 18px; padding: 14px 16px; border-radius: 18px; background: var(--sakura-light); border: 1px solid var(--line); }
   .decor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
   .decor-grid .item { border: 1.5px solid var(--line); background: var(--field); border-radius: 14px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .decor-grid .item.on { border-color: var(--sakura-dark); box-shadow: 0 0 0 2px var(--sakura) inset; }
+  #giftPanel .decor-grid { max-height: 34vh; overflow: auto; }
+  #petCoats button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.08); padding: 0; }
+  #petCoats button.on { outline: 2px solid var(--sakura-dark); outline-offset: 1px; }
+  /* the film everyone in the room is watching */
+  #cinema { position: fixed; right: 16px; bottom: 96px; width: min(480px, calc(100vw - 32px)); z-index: 30; padding: 10px; }
+  #cinema .ratio { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #111; }
+  #cinema iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  #cinema.small { width: 240px; }
+  #cinema .bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  #cinema .bar b { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #cinema .bar button { border: 0; background: none; cursor: pointer; font-size: 15px; }
   .decor-grid .item b { font-size: 13px; color: var(--text-dark); text-align: left; }
   .decor-grid .item .sw-row, .decor-sel .sw-row { display: flex; gap: 5px; flex-wrap: wrap; }
   .decor-grid .sw-row button, .decor-sel .sw-row button, #roomWalls button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.08); padding: 0; }
@@ -739,7 +751,7 @@
     <p class="eyebrow">The hallway · your room</p>
     <h3>🛏️ <span id="homeName">Your room</span></h3>
     <p class="lede" style="font-size:13.5px">A room of your own along the upstairs hallway. It starts empty — fill it with whatever you like, sleep in it, study in it, have friends over.</p>
-    <div class="row" style="gap:10px;align-items:center"><button class="btn" id="homeGo" type="button">Go to my room 🗝️</button><span class="fine" id="homeStats"></span></div>
+    <div class="row" style="gap:10px;align-items:center"><button class="btn" id="homeGo" type="button">Go to my room 🗝️</button><button class="btn ghost" id="homeGift" type="button">🎁 Send a present</button><span class="fine" id="homeStats"></span></div>
     <div id="homeDoors" class="group-list" style="margin-top:10px"></div>
   </div>
   <p class="eyebrow">The second floor</p>
@@ -850,6 +862,17 @@
   <label class="field"><span>Its name, on the plaque by the door</span><input type="text" id="roomName" maxlength="40"></label>
   <div class="opt-group" style="margin-top:12px"><span>Walls</span><div class="chips" id="roomWalls"></div></div>
   <div class="opt-group" style="margin-top:12px"><span>Floor</span><div class="chips" id="roomFloors"></div></div>
+  <div class="opt-group" style="margin-top:12px"><span>Wallpaper</span><div class="chips" id="roomPaper"></div></div>
+  <div style="margin-top:16px">
+    <p class="eyebrow">Your cat</p>
+    <form id="petForm" class="row" style="gap:6px;align-items:center;flex-wrap:wrap">
+      <input type="text" id="petName" maxlength="24" placeholder="a name — Mochi? Shiro?" autocomplete="off" style="flex:1;min-width:140px">
+      <div class="row" id="petCoats" style="gap:5px"></div>
+      <button class="btn" type="submit" id="petGo">🐾 Adopt</button>
+      <button class="btn ghost hidden" type="button" id="petBye">Rehome</button>
+    </form>
+    <div class="error" id="petErr"></div>
+  </div>
   <label class="check" style="margin-top:14px"><input type="checkbox" id="roomOpen"> Leave the door open — anyone in the café can come in</label>
   <div style="margin-top:16px">
     <p class="eyebrow">Friends who can always come in</p>
@@ -860,7 +883,62 @@
     </form>
     <div class="error" id="roomErr"></div>
   </div>
+  <button class="btn ghost" id="roomGift" type="button" style="margin-top:14px">🎁 Send a friend a present</button>
   <p class="fine" id="roomStats" style="margin-top:14px"></p>
+</div>
+
+<div id="snackPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The snack shelf</p>
+  <h3>Something sweet?</h3>
+  <p class="lede" style="font-size:13.5px">Bring a pastry up from the counter downstairs and click the shelf to keep it for later.</p>
+  <div id="snackList" class="group-list"></div>
+  <p class="fine hidden" id="snackEmpty">The shelf is empty — just crumbs and good intentions.</p>
+</div>
+
+<div id="moviePanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Film night</p>
+  <h3>Put something on 📺</h3>
+  <div id="movieNow" class="decor-sel hidden" style="margin-bottom:12px">
+    <b>Now showing</b><div class="fine" id="movieNowTitle"></div>
+    <div class="row" style="gap:6px;margin-top:8px"><button class="btn" id="movieWatch" type="button">▶ Watch</button><button class="btn ghost" id="movieStop" type="button">⏹ Turn it off</button></div>
+  </div>
+  <p class="lede" style="font-size:13.5px">Paste a YouTube link — everyone in this room watches it together, at the same moment.</p>
+  <form id="movieForm" class="row" style="gap:6px">
+    <input type="text" id="movieUrl" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" style="flex:1">
+    <button class="btn" type="submit">Play for everyone</button>
+  </form>
+  <div class="error" id="movieErr"></div>
+</div>
+
+<div id="giftPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">A present</p>
+  <h3>Send a friend something 🎁</h3>
+  <form id="giftForm">
+    <label class="field"><span>To (their username)</span><input type="text" id="giftTo" maxlength="40" placeholder="@username" autocomplete="off"></label>
+    <div class="chips" id="giftWhat" style="margin-top:10px"><button type="button" class="chip on" data-what="item">🛋️ Something for their room</button><button type="button" class="chip" data-what="drink">☕ A drink</button></div>
+    <div class="chips" id="giftCats" style="margin-top:8px"></div>
+    <div class="decor-grid" id="giftGrid"></div>
+    <p class="fine" id="giftChosen" style="margin-top:8px"></p>
+    <label class="field" style="margin-top:8px"><span>A note (they'll read it when they open it)</span><input type="text" id="giftNote" maxlength="140" placeholder="for your reading corner ♡" autocomplete="off"></label>
+    <button class="btn" type="submit" style="margin-top:10px">Wrap it and send 🎀</button>
+    <div class="error" id="giftErr"></div>
+  </form>
+</div>
+
+<div id="giftOpenPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">You opened a present</p>
+  <h3 id="giftOpenWhat"></h3>
+  <p id="giftOpenNote" style="font-family:Georgia,serif;font-style:italic;font-size:16px"></p>
+  <p class="fine" id="giftOpenWhere"></p>
+</div>
+
+<div id="cinema" class="card hidden">
+  <div class="bar"><span>📺</span><b id="cinemaTitle"></b><span class="fine" id="cinemaBy"></span><button type="button" id="cinemaMin" title="Smaller / bigger" aria-label="Smaller or bigger">↘</button><button type="button" id="cinemaClose" title="Stop watching" aria-label="Stop watching">✕</button></div>
+  <div class="ratio"><iframe id="cinemaFrame" title="The film" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen src="about:blank"></iframe></div>
 </div>
 
 <div id="studyPanel" class="panel card hidden">

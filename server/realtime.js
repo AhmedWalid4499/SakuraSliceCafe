@@ -187,4 +187,9 @@ function roomCounts() {
   return out;
 }
 
-module.exports = { attach, broadcast, updateProfile, onlineCount, roomCounts };
+// to one person, wherever they are (every tab they have open)
+function sendToUser(userId, msg) {
+  for (const [ws, c] of clients) if (c.user.id === Number(userId)) send(ws, msg);
+}
+
+module.exports = { attach, broadcast, sendToUser, updateProfile, onlineCount, roomCounts };

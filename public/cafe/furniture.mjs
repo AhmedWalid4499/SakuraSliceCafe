@@ -32,6 +32,11 @@ export const MAX_ITEMS = 80;
 
 export const WALLS = ['#efe6db', '#f3dfe3', '#dfe9dc', '#e1e7f0', '#f1e4c6', '#3b3f4a'];
 export const FLOORS = ['oak', 'walnut', 'tatami', 'tile'];
+// patterns over the wall colour (home.js draws them)
+export const WALLPAPERS = ['plain', 'sakura', 'stripes', 'dots', 'lattice', 'waves'];
+// your cat, if you've adopted one: its coat
+export const COATS = { ginger: '#d98a4a', cream: '#f1e3c8', grey: '#8f8f96', black: '#2b2a2e', tabby: '#9c7a5a', calico: '#f4ece0' };
+export const SNACKS_MAX = 12;
 
 const WOODS = ['#c9a27e', '#9a6a46', '#6e472e', '#f4ece0'];
 const FABRICS = ['#f2a7bb', '#93ab8c', '#efe0c4', '#9fb8d6', '#c7605a', '#6f5f8f'];
@@ -90,10 +95,24 @@ export const FURNITURE = [
   { kind: 'frame-portrait', name: 'Tall frame', cat: 'frames', w: 0.5, d: 0.06, colors: FRAMES, wall: true, picture: { w: 0.38, h: 0.52 } },
   { kind: 'frame-big', name: 'Big frame', cat: 'frames', w: 1.04, d: 0.06, colors: FRAMES, wall: true, picture: { w: 0.92, h: 0.62 } },
   { kind: 'frame-stand', name: 'Little standing frame', cat: 'frames', w: 0.24, d: 0.14, colors: FRAMES, onTop: true, picture: { w: 0.18, h: 0.14 } },
+  // rugs (flat: you walk on them); pattern says how home.js draws each
+  { kind: 'rug-round', name: 'Round rug', cat: 'rugs', w: 1.8, d: 1.8, colors: FABRICS.concat(['#f4ece0']), flat: true, pattern: 'round' },
+  { kind: 'rug-runner', name: 'Long runner', cat: 'rugs', w: 0.8, d: 2.6, colors: FABRICS, flat: true, pattern: 'runner' },
+  { kind: 'rug-sakura', name: 'Sakura rug', cat: 'rugs', w: 2.2, d: 1.5, colors: ['#f4ece0', '#f2c6d0', '#93ab8c'], flat: true, pattern: 'sakura' },
+  { kind: 'rug-striped', name: 'Striped rug', cat: 'rugs', w: 2.0, d: 1.4, colors: FABRICS, flat: true, pattern: 'stripes' },
+  { kind: 'rug-kilim', name: 'Kilim from Khan el-Khalili', cat: 'rugs', w: 2.4, d: 1.6, colors: ['#a8432f', '#2f5d6a', '#c9a25b'], flat: true, pattern: 'kilim' },
+  { kind: 'rug-shaggy', name: 'Fluffy rug', cat: 'rugs', w: 1.6, d: 1.1, colors: ['#fffaf4', '#f2c6d0', '#d9d4cc'], flat: true, pattern: 'shaggy' },
+  // fun: the snack shelf (keep pastries from downstairs), the TV (watch together), the cat's bed
+  { kind: 'snack-shelf', name: 'Snack shelf', cat: 'kitchen', w: 0.9, d: 0.36, colors: WOODS, snacks: true },
+  { kind: 'tv', name: 'TV on a stand', cat: 'fun', w: 1.4, d: 0.45, colors: ['#6e472e', '#f4ece0', '#3a3d44'], tv: true, top: 0.5 },
+  { kind: 'projector', name: 'Movie screen', cat: 'fun', w: 2.2, d: 0.3, colors: ['#f4ece0', '#3a3d44'], tv: true, big: true },
+  { kind: 'popcorn', name: 'Popcorn', cat: 'fun', w: 0.16, d: 0.16, colors: ['#c7605a', '#9fb8d6'], onTop: true },
+  { kind: 'cat-bed', name: "Cat's bed", cat: 'fun', w: 0.6, d: 0.6, colors: FABRICS, catBed: true },
+  { kind: 'cat-tree', name: 'Cat tree', cat: 'fun', w: 0.6, d: 0.6, colors: ['#d9b48f', '#93ab8c', '#f2c6d0'], catBed: true },
   { kind: 'book-stack', name: 'Pile of books', cat: 'cosy', w: 0.28, d: 0.2, colors: ['#c4627f', '#93ab8c', '#6a87a8'], onTop: true },
 ];
 export const BY_KIND = new Map(FURNITURE.map(f => [f.kind, f]));
-export const CATS = [['sleep', '🛏️ Sleep'], ['study', '📚 Study'], ['store', '🗄️ Storage'], ['sit', '🛋️ Sit'], ['cosy', '🪴 Cosy'], ['kitchen', '🍳 Kitchen'], ['bath', '🛁 Bathroom'], ['frames', '🖼️ Frames']];
+export const CATS = [['sleep', '🛏️ Sleep'], ['study', '📚 Study'], ['store', '🗄️ Storage'], ['sit', '🛋️ Sit'], ['cosy', '🪴 Cosy'], ['kitchen', '🍳 Kitchen'], ['bath', '🛁 Bathroom'], ['frames', '🖼️ Frames'], ['rugs', '🧶 Rugs'], ['fun', '📺 Fun']];
 
 // The axis-aligned box a piece covers once it's turned (ry in radians).
 export function footprint(def, x, z, ry) {

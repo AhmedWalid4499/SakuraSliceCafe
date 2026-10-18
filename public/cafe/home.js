@@ -7,7 +7,8 @@
 
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { ROOM_SIZE, AREAS, DOORWAYS, BY_KIND, footprint, areaAt } from './furniture.mjs';
+import { ROOM_SIZE, AREAS, DOORWAYS, BY_KIND, footprint, areaAt, COATS } from './furniture.mjs';
+import { makeDessert } from './pastries.js';
 
 const R = ROOM_SIZE;
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...o });
@@ -373,6 +374,148 @@ function cabinet(c, def) {
   }
   return g;
 }
+// ── rugs: one flat mat, its pattern drawn on a canvas
+function rugTex(c, pattern, aspect) {
+  const W = 512, H = Math.max(64, Math.round(W / aspect));
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  const light = '#' + lighten(c, 0.45).getHexString(), dark = '#' + darken(c, 0.3).getHexString();
+  g.fillStyle = c; g.fillRect(0, 0, W, H);
+  const r = rand(53);
+  if (pattern === 'round') {
+    for (let i = 0; i < 6; i++) { g.strokeStyle = i % 2 ? light : dark; g.lineWidth = 10; g.beginPath(); g.arc(W / 2, H / 2, W / 2 - 14 - i * 34, 0, Math.PI * 2); g.stroke(); }
+  } else if (pattern === 'runner') {
+    g.strokeStyle = light; g.lineWidth = 14; g.strokeRect(18, 18, W - 36, H - 36);
+    for (let y = 60; y < H - 60; y += 70) { g.fillStyle = dark; g.beginPath(); g.moveTo(W / 2, y); g.lineTo(W / 2 + 60, y + 30); g.lineTo(W / 2, y + 60); g.lineTo(W / 2 - 60, y + 30); g.fill(); }
+  } else if (pattern === 'sakura') {
+    g.strokeStyle = '#c4627f'; g.lineWidth = 10; g.strokeRect(16, 16, W - 32, H - 32);
+    for (let i = 0; i < 26; i++) blossom(g, 40 + r() * (W - 80), 40 + r() * (H - 80), 12 + r() * 14, i % 3 ? '#f2a7bb' : '#e7849f');
+  } else if (pattern === 'stripes') {
+    for (let x = 0; x < W; x += 64) { g.fillStyle = (x / 64) % 2 ? light : dark; g.fillRect(x, 0, 28, H); }
+  } else if (pattern === 'kilim') {
+    g.strokeStyle = '#f1e3c8'; g.lineWidth = 12; g.strokeRect(14, 14, W - 28, H - 28);
+    const cols = ['#f1e3c8', dark, '#c9a25b', '#2a2420'];
+    for (let row = 0; row < 3; row++) for (let i = 0; i < 5; i++) {
+      const cx = 70 + i * ((W - 140) / 4), cy = H * (0.25 + row * 0.25), s = 34;
+      g.fillStyle = cols[(row + i) % cols.length];
+      g.beginPath(); g.moveTo(cx, cy - s); g.lineTo(cx + s, cy); g.lineTo(cx, cy + s); g.lineTo(cx - s, cy); g.fill();
+      g.fillStyle = c; g.beginPath(); g.moveTo(cx, cy - s / 2.5); g.lineTo(cx + s / 2.5, cy); g.lineTo(cx, cy + s / 2.5); g.lineTo(cx - s / 2.5, cy); g.fill();
+    }
+  } else if (pattern === 'shaggy') {
+    for (let i = 0; i < 2500; i++) { g.fillStyle = r() < 0.5 ? light : dark; g.globalAlpha = 0.25; g.fillRect(r() * W, r() * H, 3, 9); }
+    g.globalAlpha = 1;
+  }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function blossom(g, x, y, s, col) {
+  g.fillStyle = col;
+  for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; g.beginPath(); g.ellipse(x + Math.cos(a) * s * 0.55, y + Math.sin(a) * s * 0.55, s * 0.5, s * 0.34, a, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = '#f7e08a'; g.beginPath(); g.arc(x, y, s * 0.18, 0, Math.PI * 2); g.fill();
+}
+function patternRug(c, def) {
+  const g = new THREE.Group();
+  const round = def.pattern === 'round';
+  const geo = round ? new THREE.CircleGeometry(def.w / 2, 48) : new THREE.PlaneGeometry(def.w, def.d);
+  const m = new THREE.Mesh(geo, std('#ffffff', { map: rugTex(c, def.pattern, def.w / def.d), roughness: 1 }));
+  m.rotation.x = -Math.PI / 2; m.position.y = def.pattern === 'shaggy' ? 0.012 : 0.007; m.receiveShadow = true;
+  g.add(m);
+  if (def.pattern === 'shaggy') { const pad = at(rbox(def.w, 0.025, def.d, 0.012, std(c, { roughness: 1 })), 0, 0.0125, 0); g.add(pad); m.position.y = 0.026; }
+  if (def.pattern === 'kilim' || def.pattern === 'runner') { // fringes at the ends
+    const fr = std('#f1e3c8', { roughness: 1 });
+    for (const s of [-1, 1]) for (let x = -def.w / 2 + 0.05; x < def.w / 2; x += 0.07) g.add(at(box(0.012, 0.004, 0.08, fr), x, 0.004, s * (def.d / 2 + 0.04)));
+  }
+  return g;
+}
+
+// the TV's screen: off, or showing what's on (setMovie below)
+function screenCanvas(movie, big) {
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 288;
+  const g = cv.getContext('2d');
+  if (!movie) { g.fillStyle = big ? '#e9e4dc' : '#14161b'; g.fillRect(0, 0, 512, 288); }
+  else {
+    const gr = g.createLinearGradient(0, 0, 512, 288); gr.addColorStop(0, '#2d2340'); gr.addColorStop(1, '#5a2a3c');
+    g.fillStyle = gr; g.fillRect(0, 0, 512, 288);
+    g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.moveTo(226, 90); g.lineTo(226, 170); g.lineTo(296, 130); g.fill();
+    g.font = 'bold 26px Georgia, serif'; g.textAlign = 'center'; g.fillStyle = '#fbe3ea';
+    g.fillText('Now showing', 256, 215);
+    g.font = 'italic 20px Georgia, serif'; g.fillStyle = '#f4ece0';
+    g.fillText((movie.title || 'a film').slice(0, 38), 256, 248);
+  }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+Object.assign(BUILD, {
+  'rug-round'(c, def) { return patternRug(c, def); },
+  'rug-runner'(c, def) { return patternRug(c, def); },
+  'rug-sakura'(c, def) { return patternRug(c, def); },
+  'rug-striped'(c, def) { return patternRug(c, def); },
+  'rug-kilim'(c, def) { return patternRug(c, def); },
+  'rug-shaggy'(c, def) { return patternRug(c, def); },
+  'snack-shelf'(c, def) {
+    // three open shelves; the pastries you've kept sit on them (home.setSnacks)
+    const g = new THREE.Group(), m = std(c, { roughness: 0.6 });
+    const H = 1.25;
+    for (const x of [-1, 1]) g.add(at(box(0.04, H, def.d, m), x * (def.w / 2 - 0.02), H / 2, 0));
+    g.add(at(box(def.w, H, 0.02, std(darken(c, 0.15))), 0, H / 2, -def.d / 2 + 0.01));
+    const slots = new THREE.Group(); slots.name = 'slots';
+    for (let i = 0; i < 4; i++) g.add(at(box(def.w - 0.04, 0.03, def.d - 0.02, m), 0, 0.03 + i * 0.4, 0.01));
+    g.add(slots);
+    const sign = at(new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.1), new THREE.MeshBasicMaterial({ map: captionTex('snacks ♡', 4) })), 0, H + 0.08, -def.d / 2 + 0.03);
+    g.add(sign);
+    return g;
+  },
+  tv(c, def) {
+    const g = new THREE.Group(), m = std(c, { roughness: 0.55 });
+    g.add(at(rbox(def.w, 0.5, def.d, 0.02, m), 0, 0.25, 0));
+    for (const x of [-0.35, 0.35]) g.add(at(box(0.6, 0.005, 0.01, std(darken(c, 0.4))), x, 0.25, def.d / 2 + 0.003));
+    const frame = at(rbox(1.18, 0.7, 0.05, 0.015, std('#1a1b1f', { roughness: 0.3 })), 0, 0.5 + 0.08 + 0.35, -0.05);
+    g.add(frame);
+    g.add(at(box(0.3, 0.08, 0.2, std('#1a1b1f')), 0, 0.54, -0.05));
+    const screen = at(new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.62), new THREE.MeshBasicMaterial({ map: screenCanvas(null) })), 0, 0.93, -0.022);
+    screen.name = 'screen';
+    g.add(screen);
+    return g;
+  },
+  projector(c, def) {
+    const g = new THREE.Group(), m = std('#2a2420', { roughness: 0.4, metalness: 0.3 });
+    for (const x of [-1, 1]) g.add(at(cyl(0.025, 0.025, 2.2, m, 10), x * (def.w / 2 - 0.05), 1.1, 0));
+    for (const x of [-1, 1]) g.add(at(box(0.3, 0.03, 0.26, m), x * (def.w / 2 - 0.05), 0.015, 0));
+    g.add(at(cyl(0.05, 0.05, def.w, m, 12), 0, 2.2, 0).rotateZ(Math.PI / 2));
+    const screen = at(new THREE.Mesh(new THREE.PlaneGeometry(def.w - 0.2, (def.w - 0.2) * 9 / 16), new THREE.MeshBasicMaterial({ map: screenCanvas(null, true) })), 0, 2.15 - (def.w - 0.2) * 9 / 32, 0.01);
+    screen.name = 'screen'; screen.userData.big = true;
+    g.add(screen);
+    return g;
+  },
+  popcorn(c) {
+    const g = new THREE.Group();
+    const tub = at(cyl(0.07, 0.05, 0.16, std('#fffaf4', { roughness: 0.8 }), 16), 0, 0.08, 0); g.add(tub);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.add(at(box(0.012, 0.16, 0.002, std(c)), Math.cos(a) * 0.062, 0.08, Math.sin(a) * 0.062).rotateY(-a + Math.PI / 2)); }
+    const r = rand(8);
+    for (let i = 0; i < 16; i++) g.add(at(ball(0.022, std(i % 5 ? '#fff4d6' : '#f0c868', { roughness: 1 }), 6), (r() - 0.5) * 0.09, 0.17 + r() * 0.04, (r() - 0.5) * 0.09));
+    return g;
+  },
+  'cat-bed'(c, def) {
+    const g = new THREE.Group();
+    const rim = at(new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.07, 12, 28), std(c, { roughness: 1 })), 0, 0.08, 0); rim.rotation.x = Math.PI / 2; shade(rim); g.add(rim);
+    g.add(at(cyl(0.24, 0.26, 0.06, std(lighten(c, 0.35), { roughness: 1 }), 28), 0, 0.04, 0));
+    void def;
+    return g;
+  },
+  'cat-tree'(c) {
+    const g = new THREE.Group(), post = std('#d9c6a8', { roughness: 1 }), pad = std(c, { roughness: 1 });
+    g.add(at(rbox(0.6, 0.06, 0.6, 0.02, pad), 0, 0.03, 0));
+    g.add(at(cyl(0.06, 0.06, 1.0, post, 12), -0.12, 0.5, -0.1));
+    g.add(at(cyl(0.05, 0.05, 0.55, post, 12), 0.16, 0.3, 0.12));
+    g.add(at(rbox(0.36, 0.05, 0.36, 0.02, pad), 0.12, 0.6, 0.08));
+    g.add(at(rbox(0.46, 0.05, 0.46, 0.02, pad), -0.08, 1.02, -0.06));
+    const toy = at(ball(0.035, std('#f2a7bb')), 0.2, 0.42, 0.22); g.add(toy);
+    g.add(at(cyl(0.002, 0.002, 0.15, std('#3a3030'), 4), 0.2, 0.52, 0.22));
+    return g;
+  },
+});
+
 Object.assign(BUILD, {
   'kitchen-counter'(c, def) { return cabinet(c, def); },
   'kitchen-sink'(c, def) {
@@ -564,6 +707,9 @@ export function buildHome({ floor, makeSign }) {
   const walls = [];
   const wall = (w, h, x, y, z, ry = 0) => {
     const m = box(w, h, 0.16, wallM);
+    // so wallpaper repeats every 0.9 m rather than stretching across the wall
+    const uv = m.geometry.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / 0.9, uv.getY(i) * h / 0.9);
     m.position.set(x, y, z); m.rotation.y = ry;
     m.userData.surface = 'wall';
     shell.add(m); walls.push(m);
@@ -780,6 +926,8 @@ export function buildHome({ floor, makeSign }) {
 
   // ── furniture
   const items = new Map(); // id -> { item, def, group, meshes, seats }
+  const giftHits = []; // the wrapped presents by the door (setGifts)
+  let cat = null;      // the cat, if there is one (setPet): { pet, model, pos, ry, state, t, path, y, perch, petted }
   const things = new THREE.Group();
   group.add(things);
   const base = { colliders: builtIns.map(b => ({ type: 'box', fixed: true, ...b.box })), interactables: [doorHit, ...builtIns.flatMap(b => b.hits)], surfaces: [...walls], seats: builtIns.flatMap(b => b.seats || []) };
@@ -812,6 +960,8 @@ export function buildHome({ floor, makeSign }) {
       if (e.top) floor.surfaces.push(e.top);
       for (const m of e.meshes) floor.interactables.push(m);
     }
+    floor.interactables.push(...giftHits);
+    if (cat) cat.model.group.traverse(o => { if (o.isMesh) floor.interactables.push(o); });
     // a seat with a laptop in reach is somewhere to work: you type there
     const laptops = [...items.values()].filter(e => e.item.kind === 'laptop').map(e => e.item);
     for (const seat of floor.seats) seat.work = !seat.lie && laptops.some(l => Math.hypot(l.x - seat.x, l.z - seat.z) < 1.3);
@@ -844,9 +994,11 @@ export function buildHome({ floor, makeSign }) {
       else e.bedTop = top;
     }
     items.set(item.id, e);
-    const kind = def.picture ? 'home-frame' : def.bath ? 'home-bath' : def.lie ? 'home-bed' : def.desk ? 'home-desk' : def.cook ? 'home-cook'
+    if (def.snacks) fillSnacks(e);
+    if (def.tv) showOnScreen(e);
+    const kind = def.snacks ? 'home-snacks' : def.tv ? 'home-tv' : def.catBed ? 'home-catbed' : def.picture ? 'home-frame' : def.bath ? 'home-bath' : def.lie ? 'home-bed' : def.desk ? 'home-desk' : def.cook ? 'home-cook'
       : def.shower ? 'home-shower' : def.mirror ? 'home-mirror' : def.seats ? 'seat' : 'home-item';
-    const label = def.picture ? (item.caption ? `“${item.caption}”` : def.name) : def.bath ? `${def.name} — take a bath` : def.lie ? `${def.name} — sleep here` : def.desk ? `${def.name} — start a study session`
+    const label = def.snacks ? `${def.name} — keep a pastry, or take one` : def.tv ? `${def.name} — put a film on for everyone here` : def.catBed ? def.name : def.picture ? (item.caption ? `“${item.caption}”` : def.name) : def.bath ? `${def.name} — take a bath` : def.lie ? `${def.name} — sleep here` : def.desk ? `${def.name} — start a study session`
       : def.cook ? `${def.name} — make yourself a drink` : def.shower ? `${def.name} — have a shower` : def.mirror ? `${def.name} — look in the mirror`
       : def.seats ? `Sit on the ${def.name.toLowerCase()}` : def.name;
     sync();
@@ -872,6 +1024,9 @@ export function buildHome({ floor, makeSign }) {
   }
   function setRoom(room) {
     wallM.color.set(room.wall || '#efe6db');
+    const wp = WALLPAPER[room.wallpaper] ? room.wallpaper : 'plain';
+    wallM.map = wp === 'plain' ? null : (wallTex[wp] || (wallTex[wp] = WALLPAPER[wp]()));
+    wallM.needsUpdate = true;
     const f = FLOOR_TEX[room.floor] ? room.floor : 'oak';
     floorMesh.material.map = floorTex[f] || (floorTex[f] = FLOOR_TEX[f]());
     floorMesh.material.needsUpdate = true;
@@ -933,6 +1088,182 @@ export function buildHome({ floor, makeSign }) {
     if (e) highlight.setFromObject(e.group);
   }
 
+  // ── the snack shelf: up to twelve pastries kept from downstairs, three to a shelf
+  let snackShapes = [];
+  function fillSnacks(e) {
+    const slots = e.group.getObjectByName('slots');
+    if (!slots) return;
+    slots.children.slice().forEach(o => { slots.remove(o); o.traverse(m => { if (m.isMesh) { m.geometry.dispose(); m.material.dispose(); } }); });
+    snackShapes.slice(0, 12).forEach((shape, i) => {
+      const d = makeDessert(shape);
+      const row = Math.floor(i / 4), col = i % 4;
+      d.position.set(-0.3 + col * 0.2, 0.045 + row * 0.4, 0.02);
+      d.scale.setScalar(0.9);
+      slots.add(d);
+    });
+    // the pastries are part of the shelf: clicking them is clicking the shelf
+    slots.traverse(o => { if (o.isMesh && e.meshes.length) { o.userData = { ...e.meshes[0].userData }; e.meshes.push(o); } });
+    sync();
+  }
+  function setSnacks(shapes = []) {
+    snackShapes = shapes;
+    for (const e of items.values()) if (e.def.snacks) fillSnacks(e);
+  }
+
+  // ── the TV: what's on (the same for everyone in the room)
+  let movie = null;
+  function showOnScreen(e) {
+    const scr = e.group.getObjectByName('screen');
+    if (!scr) return;
+    scr.material.map?.dispose();
+    scr.material.map = screenCanvas(movie, scr.userData.big);
+    scr.material.needsUpdate = true;
+  }
+  function setMovie(m) {
+    movie = m || null;
+    for (const e of items.values()) if (e.def.tv) showOnScreen(e);
+  }
+
+  // ── presents waiting by the door: a wrapped box for each
+  const giftGroup = new THREE.Group();
+  group.add(giftGroup);
+  const WRAP = [['#f2a7bb', '#fffaf4'], ['#93ab8c', '#f2c6d0'], ['#9fb8d6', '#f7e08a'], ['#c7605a', '#f4ece0']];
+  function setGifts(list = [], mine = false) {
+    giftGroup.children.slice().forEach(o => { giftGroup.remove(o); o.traverse(m => { if (m.isMesh) { m.geometry.dispose(); m.material.dispose(); } }); });
+    giftHits.length = 0;
+    list.slice(0, 8).forEach((gift, i) => {
+      const [paper, ribbon] = WRAP[gift.id % WRAP.length];
+      const s = 0.32 + (gift.id % 3) * 0.06;
+      const g = new THREE.Group();
+      g.position.set(1.3 + (i % 4) * 0.62, 0, R.maxZ - 0.45 - Math.floor(i / 4) * 0.62);
+      g.rotation.y = (gift.id % 5) * 0.3;
+      g.add(at(rbox(s, s * 0.85, s, 0.02, std(paper, { roughness: 0.7 })), 0, s * 0.425, 0));
+      const rb = std(ribbon, { roughness: 0.5 });
+      g.add(at(box(s + 0.01, s * 0.85 + 0.01, 0.05, rb), 0, s * 0.425, 0));
+      g.add(at(box(0.05, s * 0.85 + 0.01, s + 0.01, rb), 0, s * 0.425, 0));
+      for (const a of [-0.6, 0.6]) { const bow = at(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.015, 8, 16), rb), a * 0.06, s * 0.85 + 0.04, 0); bow.rotation.y = a; g.add(bow); }
+      const label = mine ? `A present from ${gift.fromName} — open it 🎁` : `A present for ${gift.toName || 'them'}, from ${gift.fromName}`;
+      g.traverse(o => { if (o.isMesh) { o.userData = { kind: 'home-gift', giftId: gift.id, label }; giftHits.push(o); } });
+      giftGroup.add(g);
+    });
+    sync();
+  }
+
+  // ── the cat. It wanders from room to room, sits and washes, naps (on its own
+  // bed if it has one, else yours), and jumps up next to a laptop someone's
+  // typing on. Each person's café runs its own cat, so it needn't be in step.
+  function setPet(pet) {
+    if (cat) { group.remove(cat.model.group); cat.model.dispose(); cat = null; }
+    if (!pet) return sync();
+    const model = makeCat(pet.coat);
+    group.add(model.group);
+    cat = { pet, model, pos: new THREE.Vector3(-2, 0, 1.5), ry: 0, y: 0, state: 'sit', t: 3, path: [], perch: null, hop: null, petted: 0 };
+    model.group.position.copy(cat.pos);
+    model.group.traverse(o => { if (o.isMesh) o.userData = { kind: 'home-pet', label: `${pet.name} — give ${pet.name} a stroke` }; });
+    sync();
+  }
+  const blocked = (x, z) => [...items.values()].some(e => {
+    if (e.def.flat || e.def.onTop || e.def.wall || e.def.walkIn) return false;
+    const f = footprint(e.def, e.item.x, e.item.z, e.item.ry);
+    return x > f.minX - 0.25 && x < f.maxX + 0.25 && z > f.minZ - 0.25 && z < f.maxZ + 0.25;
+  }) || builtIns.some(b => x > b.box.minX - 0.25 && x < b.box.maxX + 0.25 && z > b.box.minZ - 0.25 && z < b.box.maxZ + 0.25);
+  function spotNear(x, z) { // the nearest clear floor beside something
+    for (let r = 0.3; r < 1.6; r += 0.15) for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+      const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+      if (WALK.slice(0, 4).some(q => px > q.minX + 0.2 && px < q.maxX - 0.2 && pz > q.minZ + 0.2 && pz < q.maxZ - 0.2) && !blocked(px, pz)) return { x: px, z: pz };
+    }
+    return null;
+  }
+  function randomSpot() {
+    const areas = Object.values(AREAS);
+    for (let i = 0; i < 30; i++) {
+      const a = areas[Math.floor(Math.random() * areas.length)];
+      const x = a.minX + 0.6 + Math.random() * (a.maxX - a.minX - 1.2), z = a.minZ + 0.6 + Math.random() * (a.maxZ - a.minZ - 1.2);
+      if (!blocked(x, z)) return { x, z };
+    }
+    return { x: 0, z: 1 };
+  }
+  function goTo(to, perch = null) {
+    cat.path = route(cat.pos, to).map(q => ({ x: q.x, z: q.z }));
+    cat.perch = perch; // where to jump up to at the end: { x, y, z, nap }
+    cat.state = 'walk';
+  }
+  function napSpot() {
+    const own = [...items.values()].filter(e => e.def.catBed);
+    const beds = own.length ? own : [...items.values()].filter(e => e.def.lie && !e.def.bath);
+    if (!beds.length) return null;
+    const e = beds[Math.floor(Math.random() * beds.length)];
+    const y = e.item.kind === 'cat-tree' ? 1.05 : e.def.catBed ? 0.07 : e.def.top;
+    return { x: e.item.x, y, z: e.item.z, nap: true };
+  }
+  function decide(typist) {
+    // somebody typing at a laptop: up onto the desk beside it
+    if (typist && Math.random() < 0.7) {
+      const lap = [...items.values()].find(e => e.item.kind === 'laptop' && Math.hypot(e.item.x - typist.x, e.item.z - typist.z) < 1.4);
+      if (lap) {
+        const c = Math.cos(lap.item.ry), sn = Math.sin(lap.item.ry);
+        const perch = { x: lap.item.x + c * 0.34, y: lap.item.y || 0.75, z: lap.item.z - sn * 0.34, nap: false, laptop: true };
+        const floorSpot = spotNear(perch.x, perch.z);
+        if (floorSpot) return goTo(floorSpot, perch);
+      }
+    }
+    const r = Math.random();
+    if (r < 0.3) {
+      const n = napSpot();
+      const fs = n && (n.y < 0.15 ? { x: n.x, z: n.z } : spotNear(n.x, n.z));
+      if (n && fs) return goTo(fs, n.y < 0.15 ? { ...n, y: n.y } : n);
+    }
+    if (r < 0.5) { cat.state = Math.random() < 0.5 ? 'groom' : 'sit'; cat.t = 4 + Math.random() * 6; return; }
+    goTo(randomSpot());
+  }
+  function updatePet(dt, t, { typist = null } = {}) {
+    if (!cat) return;
+    const c = cat, m = c.model;
+    c.t -= dt;
+    if (c.petted > 0) c.petted -= dt;
+    if (c.hop) { // a little jump up (or down)
+      c.hop.k = Math.min(1, c.hop.k + dt / 0.45);
+      const k = c.hop.k;
+      c.pos.x = c.hop.x0 + (c.hop.x1 - c.hop.x0) * k;
+      c.pos.z = c.hop.z0 + (c.hop.z1 - c.hop.z0) * k;
+      c.y = c.hop.y0 + (c.hop.y1 - c.hop.y0) * k + Math.sin(k * Math.PI) * 0.35;
+      if (k >= 1) { const then = c.hop.then; c.hop = null; then(); }
+    } else if (c.state === 'walk') {
+      const next = c.path[0];
+      if (!next) {
+        if (c.perch) {
+          const p = c.perch;
+          c.ry = Math.atan2(p.x - c.pos.x, p.z - c.pos.z);
+          c.hop = { k: 0, x0: c.pos.x, z0: c.pos.z, y0: c.y, x1: p.x, z1: p.z, y1: p.y, then: () => { c.state = p.nap ? 'nap' : 'perch'; c.t = p.nap ? 25 + Math.random() * 25 : 12 + Math.random() * 10; } };
+        } else { c.state = 'sit'; c.t = 3 + Math.random() * 5; }
+      } else {
+        const dx = next.x - c.pos.x, dz = next.z - c.pos.z, d = Math.hypot(dx, dz);
+        if (d < 0.08) c.path.shift();
+        else {
+          const sp = 0.75 * dt;
+          c.pos.x += dx / d * Math.min(sp, d); c.pos.z += dz / d * Math.min(sp, d);
+          c.ry = lerpAng(c.ry, Math.atan2(dx, dz), Math.min(1, dt * 8));
+        }
+      }
+    } else if (c.t <= 0) {
+      if (c.y > 0.02) { // down off the furniture first
+        const fs = spotNear(c.pos.x, c.pos.z) || { x: c.pos.x, z: c.pos.z + 0.6 };
+        c.ry = Math.atan2(fs.x - c.pos.x, fs.z - c.pos.z);
+        c.state = 'walk'; c.path = [];
+        c.hop = { k: 0, x0: c.pos.x, z0: c.pos.z, y0: c.y, x1: fs.x, z1: fs.z, y1: 0, then: () => { c.perch = null; c.state = 'sit'; c.t = 0.5; } };
+      } else decide(typist);
+    }
+    m.group.position.set(c.pos.x, c.y, c.pos.z);
+    m.group.rotation.y = c.ry;
+    m.pose(c.state === 'walk' && !c.hop ? 'walk' : c.hop ? 'jump' : c.state, t, c.petted > 0);
+  }
+  function petCat() {
+    if (!cat) return null;
+    cat.petted = 3;
+    if (cat.state === 'walk' && !cat.hop) { cat.path = []; cat.perch = null; cat.state = 'sit'; cat.t = 4; }
+    return { name: cat.pet.name, pos: cat.pos.clone(), y: cat.y, group: cat.model.group };
+  }
+
   const tops = () => [...items.values()].map(e => e.top || e.bedTop).filter(Boolean);
   return {
     setRoom, setItems, add, update: add, remove, items, tops, sync,
@@ -941,5 +1272,107 @@ export function buildHome({ floor, makeSign }) {
     // squashed against the wall looking down at the top of your head
     arrival: { x: 0, z: R.maxZ - 2.2, ry: Math.PI },
     bounds: R, ceilingLight, lampShade, sideLights, route, cameraBox, walls,
+    setSnacks, setMovie, setGifts, setPet, updatePet, petCat, spotNear,
   };
+}
+
+// ── wallpaper: a light pattern, tinted by the wall colour (it multiplies)
+const wallTex = {};
+function wallCanvas(draw) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 256);
+  draw(g);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+const WALLPAPER = {
+  plain: null,
+  sakura: () => wallCanvas(g => {
+    const r = rand(77);
+    for (let i = 0; i < 9; i++) blossom(g, 20 + r() * 216, 20 + r() * 216, 10 + r() * 8, i % 2 ? '#f6dde3' : '#efd0d8');
+    g.strokeStyle = '#e6d6cf'; g.lineWidth = 2;
+    for (let i = 0; i < 4; i++) { g.beginPath(); const x = r() * 256, y = r() * 256; g.moveTo(x, y); g.quadraticCurveTo(x + 30, y - 10, x + 50, y + 20); g.stroke(); }
+  }),
+  stripes: () => wallCanvas(g => { g.fillStyle = '#ebe5df'; for (let x = 0; x < 256; x += 64) g.fillRect(x, 0, 26, 256); g.fillStyle = '#f4f0ec'; for (let x = 36; x < 256; x += 64) g.fillRect(x, 0, 4, 256); }),
+  dots: () => wallCanvas(g => { g.fillStyle = '#e6dfd8'; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.beginPath(); g.arc(32 + x * 64 + (y % 2) * 32, 32 + y * 64, 7, 0, Math.PI * 2); g.fill(); } }),
+  lattice: () => wallCanvas(g => { // asanoha, the hemp-leaf pattern
+    g.strokeStyle = '#e2dad2'; g.lineWidth = 2;
+    for (let y = 0; y <= 256; y += 64) for (let x = 0; x <= 256; x += 64) {
+      for (const [dx, dy] of [[32, 32], [-32, 32], [32, -32], [-32, -32], [0, 32], [32, 0], [0, -32], [-32, 0]]) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + dx, y + dy); g.stroke(); }
+    }
+  }),
+  waves: () => wallCanvas(g => { // seigaiha
+    g.lineWidth = 3;
+    for (let row = -1; row < 9; row++) for (let i = -1; i < 9; i++) {
+      const x = i * 32 + (row % 2) * 16, y = row * 16 + 16;
+      for (let k = 0; k < 3; k++) { g.strokeStyle = k % 2 ? '#ece6e0' : '#ddd5cd'; g.beginPath(); g.arc(x, y, 16 - k * 5, Math.PI, 0); g.stroke(); }
+    }
+  }),
+};
+
+const lerpAng = (a, b, k) => { let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI; if (d < -Math.PI) d += Math.PI * 2; return a + d * k; };
+
+// ── the cat: about 45 cm nose to tail, facing +z. pose() moves it.
+function makeCat(coat = 'ginger') {
+  const col = COATS[coat] || COATS.ginger;
+  const group = new THREE.Group();
+  const fur = std(col, { roughness: 1 }), dark = std(darken(col, 0.35), { roughness: 1 });
+  const light = std(coat === 'black' ? '#3d3b40' : '#fbf6ee', { roughness: 1 });
+  const body = new THREE.Group(); body.position.y = 0.17; group.add(body);
+  const torso = at(ball(0.1, fur, 18), 0, 0, 0); torso.scale.set(0.95, 0.85, 1.6); body.add(torso);
+  const chest = at(ball(0.07, light, 14), 0, -0.02, 0.1); chest.scale.set(1, 1, 0.9); body.add(chest);
+  if (coat === 'tabby') for (let i = 0; i < 4; i++) { const st = at(box(0.16, 0.012, 0.02, dark), 0, 0.075, -0.1 + i * 0.06); st.rotation.x = 0.2; body.add(st); }
+  if (coat === 'calico') { body.add(at(ball(0.06, std('#d98a4a', { roughness: 1 }), 12), 0.05, 0.05, -0.06)); body.add(at(ball(0.05, std('#2b2a2e', { roughness: 1 }), 12), -0.05, 0.06, 0.06)); }
+  const head = new THREE.Group(); head.position.set(0, 0.1, 0.17); body.add(head);
+  head.add(ball(0.075, fur, 18));
+  head.add(at(ball(0.04, light, 12), 0, -0.03, 0.05));
+  const ears = [];
+  for (const s of [-1, 1]) {
+    const ear = at(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.06, 4), coat === 'calico' && s < 0 ? std('#d98a4a') : fur), s * 0.045, 0.07, 0); ear.rotation.z = -s * 0.25; shade(ear); head.add(ear); ears.push(ear);
+  }
+  const eyes = [];
+  for (const s of [-1, 1]) { const e = at(ball(0.012, std('#2a3a2a', { roughness: 0.2 }), 8), s * 0.028, 0.012, 0.064); head.add(e); eyes.push(e); }
+  head.add(at(ball(0.009, std('#d98a8a'), 6), 0, -0.012, 0.077));
+  const legs = [];
+  for (const [x, z] of [[-0.05, 0.1], [0.05, 0.1], [-0.05, -0.1], [0.05, -0.1]]) {
+    const leg = new THREE.Group(); leg.position.set(x, 0.12, z); group.add(leg);
+    leg.add(at(cyl(0.022, 0.02, 0.12, fur, 8), 0, -0.06, 0));
+    leg.add(at(ball(0.022, light, 8), 0, -0.115, 0.008));
+    legs.push(leg);
+  }
+  const tail = new THREE.Group(); tail.position.set(0, 0.04, -0.15); body.add(tail);
+  const segs = [];
+  let parent = tail;
+  for (let i = 0; i < 6; i++) {
+    const sg = new THREE.Group(); sg.position.set(0, 0, i ? -0.045 : 0);
+    sg.add(at(ball(0.02 - i * 0.0015, i === 5 && coat !== 'black' ? dark : fur, 8), 0, 0, -0.02));
+    parent.add(sg); segs.push(sg); parent = sg;
+  }
+  const hearts = new THREE.Group(); group.add(hearts); hearts.position.y = 0.45; hearts.visible = false;
+  for (let i = 0; i < 3; i++) { const h = at(ball(0.018, new THREE.MeshBasicMaterial({ color: '#e7849f' }), 8), (i - 1) * 0.05, i * 0.03, 0); hearts.add(h); }
+
+  function pose(state, t, petted) {
+    const walk = state === 'walk', nap = state === 'nap', sit = state === 'sit' || state === 'perch' || state === 'groom';
+    // legs: trot when walking, tucked when lying down
+    legs.forEach((l, i) => { l.rotation.x = walk ? Math.sin(t * 11 + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI / 2 : 0)) * 0.6 : 0; l.visible = !nap; });
+    body.position.y = nap ? 0.07 : sit ? 0.15 : 0.17 + (walk ? Math.abs(Math.sin(t * 11)) * 0.008 : 0);
+    body.rotation.x = sit ? -0.45 : 0;
+    torso.scale.set(nap ? 1.2 : 0.95, nap ? 0.6 : 0.85, nap ? 1.2 : 1.6);
+    head.rotation.x = nap ? 0.5 : state === 'groom' ? 0.6 + Math.sin(t * 6) * 0.15 : petted ? -0.2 : 0;
+    head.rotation.y = nap ? 0.9 : walk ? 0 : Math.sin(t * 0.7) * 0.4;
+    head.position.set(nap ? 0.06 : 0, nap ? 0.04 : 0.1, nap ? 0.12 : 0.17);
+    eyes.forEach(e => { e.scale.y = nap || petted ? 0.15 : (Math.sin(t * 0.9) > 0.985 ? 0.15 : 1); });
+    // the tail: swishes, curls round when asleep
+    segs.forEach((sg, i) => { sg.rotation.y = nap ? 0.5 : Math.sin(t * (walk ? 6 : 2) - i * 0.6) * (walk ? 0.12 : 0.22); sg.rotation.x = nap ? 0 : -0.35 + (sit ? -0.1 : 0); });
+    ears.forEach((e, i) => { e.rotation.x = Math.sin(t * 3 + i) > 0.97 ? -0.4 : 0; });
+    hearts.visible = !!petted;
+    if (petted) hearts.position.y = 0.45 + (t % 1) * 0.1;
+  }
+  function dispose() { group.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); }
+  return { group, pose, dispose };
 }

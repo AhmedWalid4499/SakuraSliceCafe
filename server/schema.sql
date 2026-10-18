@@ -248,6 +248,36 @@ CREATE TABLE IF NOT EXISTS home_guests (
   PRIMARY KEY (owner_id, guest_id)
 );
 CREATE INDEX IF NOT EXISTS home_guests_guest_idx ON home_guests(guest_id);
+ALTER TABLE home_rooms ADD COLUMN IF NOT EXISTS wallpaper TEXT NOT NULL DEFAULT 'plain';
+-- your cat (one each)
+CREATE TABLE IF NOT EXISTS home_pets (
+  owner_id   INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  coat       TEXT NOT NULL DEFAULT 'ginger',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- pastries kept on the snack shelf (anyone in the room can leave one, or take one)
+CREATE TABLE IF NOT EXISTS home_snacks (
+  id         SERIAL PRIMARY KEY,
+  owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pastry_id  TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS home_snacks_owner_idx ON home_snacks(owner_id);
+-- presents: a piece of furniture or a drink, with a note, waiting by the door
+CREATE TABLE IF NOT EXISTS home_gifts (
+  id          SERIAL PRIMARY KEY,
+  from_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  to_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  item_kind   TEXT,
+  color       TEXT,
+  drink       JSONB,
+  note        TEXT NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  opened_at   TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS home_gifts_to_idx ON home_gifts(to_id) WHERE opened_at IS NULL;
+CREATE INDEX IF NOT EXISTS home_gifts_from_idx ON home_gifts(from_id, created_at);
 CREATE TABLE IF NOT EXISTS home_stats (
   user_id       INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   focus_minutes INTEGER NOT NULL DEFAULT 0,
