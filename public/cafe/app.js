@@ -3607,7 +3607,7 @@ function openRoomPanel() {
     b.onclick = () => saveRoom({ wallpaper: w });
     return b;
   }));
-  renderPetForm();
+  renderPetForm(true);
   $('roomOpen').checked = !!r.open;
   renderGuests();
   const s = state.home.stats || {};
@@ -3780,10 +3780,9 @@ function leaveHome() {
 const PAPER_NAMES = { plain: 'Plain', sakura: '🌸 Sakura', stripes: 'Stripes', dots: 'Polka dots', lattice: 'Asanoha', waves: 'Seigaiha waves' };
 const COAT_NAMES = { ginger: 'Ginger', cream: 'Cream', grey: 'Grey', black: 'Black', tabby: 'Tabby', calico: 'Calico' };
 let petCoat = 'ginger';
-function renderPetForm() {
+function renderPetForm(fresh = false) {
   const pet = state.home && state.home.pet;
-  petCoat = pet ? pet.coat : petCoat;
-  $('petName').value = pet ? pet.name : '';
+  if (fresh) { petCoat = pet ? pet.coat : petCoat; $('petName').value = pet ? pet.name : ''; }
   $('petGo').textContent = pet ? 'Save' : '🐾 Adopt';
   $('petBye').classList.toggle('hidden', !pet);
   $('petCoats').replaceChildren(...Object.entries(COATS).map(([k, c]) => {
@@ -3802,13 +3801,13 @@ $('petForm').addEventListener('submit', async e => {
     const { pet } = await api('/home/pet', { method: 'PUT', body: { name: $('petName').value, coat: petCoat } });
     state.home.pet = pet;
     world.home.setPet(pet);
-    renderPetForm();
+    renderPetForm(true);
     if (!had) { toast(`🐾 Welcome home, ${pet.name}!`); sound.cue('heart'); }
   } catch (err) { $('petErr').textContent = err.message; }
 });
 $('petBye').onclick = async () => {
   if (!state.home.pet || !confirm(`Find ${state.home.pet.name} a new home? (They'll be very happy there.)`)) return;
-  try { await api('/home/pet', { method: 'DELETE', body: {} }); state.home.pet = null; world.home.setPet(null); renderPetForm(); } catch (err) { $('petErr').textContent = err.message; }
+  try { await api('/home/pet', { method: 'DELETE', body: {} }); state.home.pet = null; world.home.setPet(null); renderPetForm(true); } catch (err) { $('petErr').textContent = err.message; }
 };
 // whoever's typing at a laptop in here (the cat likes to help)
 function typist() {
