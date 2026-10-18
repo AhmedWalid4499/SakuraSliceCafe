@@ -11,6 +11,7 @@ import { buildAvatar, makeLabel } from './avatar.js';
 import { makeDessert } from './pastries.js';
 import { mapX, mapZ, deltaAt, OLD } from './layout.mjs';
 import { buildHome } from './home.js';
+import { buildHall, HALL } from './hall.js';
 import { ROOM_SIZE as HOME_SIZE } from './furniture.mjs';
 
 export const ROOM = { minX: -15, maxX: 15, minZ: -11, maxZ: 11, h: 4.2 };
@@ -343,8 +344,12 @@ export function buildWorld(renderer) {
     interactables: [], // meshes that respond to hover/click (userData.kind)
     group: new THREE.Group(),
   });
-  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor() };
-  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group);
+  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor() };
+  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group);
+  // the hallway upstairs (hall.js), with everyone's doors off it
+  floors.hall.group.position.y = FLOOR2_Y;
+  floors.hall.group.visible = false;
+  let hall = null;
   // someone's own room upstairs (home.js), at the same height as the group rooms
   floors.home.group.position.y = FLOOR2_Y;
   floors.home.group.visible = false;
@@ -1252,7 +1257,7 @@ export function buildWorld(renderer) {
     root.add(fixed(sign));
     const hover = new THREE.Mesh(new THREE.CylinderGeometry(STAIRS.r + 0.2, STAIRS.r + 0.2, ROOM.h, 24), new THREE.MeshBasicMaterial({ visible: false }));
     hover.position.set(STAIRS.x, ROOM.h / 2, STAIRS.z);
-    hover.userData = { kind: 'stairs-up', label: 'Go upstairs — group rooms and the roof garden' };
+    hover.userData = { kind: 'stairs-up', label: 'Go upstairs — the hallway, your room and the roof garden' };
     interactables.push(hover);
     root.add(fixed(hover));
   }
@@ -1372,7 +1377,7 @@ export function buildWorld(renderer) {
       }
       const hover = new THREE.Mesh(new THREE.CylinderGeometry(STAIRS.r + 0.2, STAIRS.r + 0.2, 1.2, 24), new THREE.MeshBasicMaterial({ visible: false }));
       hover.position.set(STAIRS.x, 0.5, STAIRS.z);
-      hover.userData = { kind: 'stairs-down', label: 'Go back downstairs' };
+      hover.userData = { kind: 'stairs-down', label: 'Out to the hallway' };
       interactables.push(hover);
       root.add(fixed(hover));
     }
@@ -1695,7 +1700,7 @@ export function buildWorld(renderer) {
       // round the camera when you arrive and swallow every click
       const hover = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.3), new THREE.MeshBasicMaterial({ visible: false }));
       hover.position.set(hx, 1.15, hz + hd / 2 + 0.07);
-      hover.userData = { kind: 'stairs-down', label: 'Go back down to the café' };
+      hover.userData = { kind: 'stairs-down', label: 'Down the stairs to the hallway' };
       interactables.push(hover);
       root.add(hover);
     }
@@ -2825,6 +2830,7 @@ export function buildWorld(renderer) {
     // the roof garden is open air: its lamps only really matter after dark
     gardenLamps.forEach(l => { l.light.intensity = 3.5 * lampK2 * (0.15 + night * 0.85); });
     if (home) { home.ceilingLight.intensity = 2.2 + night * 2.6; home.sideLights.forEach(l => { l.intensity = 1.6 + night * 1.8; }); }
+    if (hall) hall.lights.forEach(l => { l.intensity = 2.4 + night * 2.2; });
     outside.setSky(hour, day, dusk, night);
     return { day, night, open };
   }
@@ -3401,9 +3407,11 @@ export function buildWorld(renderer) {
 
   home = buildHome({ floor: floors.home, makeSign });
   noFog(floors.home.group);
+  hall = buildHall({ floor: floors.hall, makeSign });
+  noFog(floors.hall.group);
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home,
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setBookOfWeek, setPhotos, photoFrames: PHOTO_FRAMES, setMenuBoard, setSpecials, setSeason, setEvents, setHours,
     walk, kitchen: { ...KIT, door: { x: KX, z: ROOM.minZ - 0.1 } }, updateDoors, counter,
@@ -3415,8 +3423,8 @@ export function buildWorld(renderer) {
     const f = floors[name];
     Object.assign(api, {
       floor: name,
-      floorY: name === 'up' || name === 'home' ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
-      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'garden' ? 7 : ROOM.h,
+      floorY: name === 'up' || name === 'home' || name === 'hall' ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
+      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' ? HALL.h : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
   }

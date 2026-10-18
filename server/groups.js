@@ -18,9 +18,9 @@ const newCode = () => crypto.randomBytes(5).toString('base64url').replace(/[-_]/
 const GROUP_FIELDS = `g.id, g.name, g.description, g.color, g.is_public AS "isPublic", g.created_at AS "createdAt",
   g.owner_id AS "ownerId", (SELECT count(*)::int FROM group_members gm WHERE gm.group_id = g.id) AS members`;
 
-// The rooms everyone signed in can be in: the ground floor and the roof garden.
-const PUBLIC_ROOMS = ['main', 'garden'];
-const ROOM_RE = /^(main|garden|group:\d+|home:\d+)$/;
+// The rooms everyone signed in can be in: the ground floor, the hallway upstairs and the roof garden.
+const PUBLIC_ROOMS = ['main', 'garden', 'hall'];
+const ROOM_RE = /^(main|garden|hall|group:\d+|home:\d+)$/;
 
 // Is this user allowed in this room? The public rooms are open to everyone signed in.
 async function canEnter(userId, room) {

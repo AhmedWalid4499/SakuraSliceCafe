@@ -872,23 +872,25 @@ function buildAvatarParts(avatar, extra) {
   function play(kind) { if (!isOwl) { gesture = kind; gestureT = 0; } }
   let sitDrop = 0.13;
   // sitH: how high the seat's cushion is, so you sit on it rather than in it
-  function update(dt, { moving = false, sitting = false, sitH = 0.54, waving = 0 } = {}) {
+  // asleep: eyes closed, very still. typing: hands forward on a keyboard.
+  function update(dt, { moving = false, sitting = false, sitH = 0.54, waving = 0, asleep = false, typing = false } = {}) {
     t += dt;
     sitBlend += ((sitting ? 1 : 0) - sitBlend) * Math.min(1, dt * 8);
     if (sitting) sitDrop = 0.48 - sitH;
     if (moving) walkPhase += dt * 9;
     const swing = moving ? Math.sin(walkPhase) * 0.55 : 0;
 
-    const breathe = Math.sin(t * 1.6) * 0.012;
+    const breathe = asleep ? Math.sin(t * 0.9) * 0.018 : Math.sin(t * 1.6) * 0.012;
     rig.position.y = breathe + (moving ? Math.abs(Math.sin(walkPhase)) * 0.04 : 0) - sitBlend * sitDrop;
-    head.rotation.y = moving ? 0 : Math.sin(t * 0.35) * 0.25;
-    head.rotation.z = Math.sin(t * 0.5) * 0.04;
+    head.rotation.y = moving || asleep || typing ? 0 : Math.sin(t * 0.35) * 0.25;
+    head.rotation.z = asleep ? 0 : Math.sin(t * 0.5) * 0.04;
+    if (!gesture) head.rotation.x = typing ? 0.22 : 0; // looking down at the screen
 
     // blink every few seconds (Me3temed blinks slowly, on purpose)
     nextBlink -= dt;
     const blinkLen = isOwl ? 0.45 : 0.14;
     const closed = nextBlink < 0 && nextBlink > -blinkLen;
-    const lid = closed ? Math.max(0.08, Math.abs(Math.cos((-nextBlink / blinkLen) * Math.PI))) : 1;
+    const lid = asleep ? 0.07 : closed ? Math.max(0.08, Math.abs(Math.cos((-nextBlink / blinkLen) * Math.PI))) : 1;
     for (const e of blinkers) e.scale.y = lid;
     if (nextBlink < -blinkLen) nextBlink = 2 + Math.random() * 4;
 
@@ -906,6 +908,12 @@ function buildAvatarParts(avatar, extra) {
         const holding = cup ? -0.9 : 0;
         parts.armR.rotation.x = waving > 0 ? 0 : swing * 0.8 + holding - sitBlend * (cup ? 0 : 0.5);
         parts.armR.rotation.z = waving > 0 ? 2.6 + Math.sin(t * 12) * 0.3 : -0.09;
+        if (typing && waving <= 0) {
+          // both hands out on the keys, fingers going
+          parts.armL.rotation.x = -1.2 + Math.sin(t * 15) * 0.06;
+          parts.armL.rotation.z = 0.28;
+          if (!cup) { parts.armR.rotation.x = -1.2 + Math.sin(t * 15 + 1.7) * 0.06; parts.armR.rotation.z = -0.28; }
+        } else parts.armL.rotation.z = 0;
       }
     }
     if (gesture) {

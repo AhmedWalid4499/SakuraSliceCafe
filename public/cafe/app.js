@@ -18,7 +18,7 @@ import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
 import { createStaff } from './staff.js';
 import { fullMenu, SEASONS } from './drinks.mjs';
-import { FURNITURE, BY_KIND, CATS, MAX_ITEMS, WALLS, FLOORS } from './furniture.mjs';
+import { FURNITURE, BY_KIND, CATS, MAX_ITEMS, WALLS, FLOORS, AREAS, areaAt } from './furniture.mjs';
 import { createRadio, audioDuration } from './radio.js';
 import { createRegulars } from './regulars.js';
 
@@ -735,7 +735,7 @@ function updatePlayer(dt) {
   const lying = !!player.seat?.lie;
   player.av.group.rotation.order = 'YXZ';
   player.av.group.rotation.x = lying ? -Math.PI / 2 : 0;
-  player.av.update(dt, { moving, sitting: !!player.seat && !lying, sitH: player.seat?.h ?? 0.54, waving: player.waving });
+  player.av.update(dt, { moving, sitting: !!player.seat && !lying, sitH: player.seat?.h ?? 0.54, waving: player.waving, asleep: lying, typing: !!player.seat?.work });
   if (moving) sendMove();
 }
 
@@ -759,7 +759,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
   const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
-  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : ROOM;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : ROOM;
   camPos.x = Math.min(box.maxX - 0.25, Math.max(box.minX + 0.25, camPos.x));
   camPos.z = Math.min(box.maxZ - 0.25, Math.max(box.minZ + 0.25, camPos.z));
   camPos.y = Math.min(world.floorY + (inKitchen ? 3.2 : world.floorH) - 0.3, Math.max(world.floorY + 0.4, camPos.y));
@@ -841,13 +841,13 @@ function updatePeople(dt) {
     p.av.group.rotation.order = 'YXZ';
     p.av.group.rotation.x = seat?.lie ? -Math.PI / 2 : 0;
     if (p.waving > 0) p.waving -= dt;
-    p.av.update(dt, { moving, sitting: !!seat && !seat.lie, sitH: seat?.h ?? 0.54, waving: p.waving || 0 });
+    p.av.update(dt, { moving, sitting: !!seat && !seat.lie, sitH: seat?.h ?? 0.54, waving: p.waving || 0, asleep: !!seat?.lie, typing: !!seat?.work });
   }
 }
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  const where = state.room === 'garden' ? ' · up on the roof garden' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
   $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
@@ -903,8 +903,8 @@ function handle(m) {
     case 'home:access':
       // the door closed, or they took us off the list: back down we go
       if (state.home && state.me && m.ownerId === state.home.ownerId && !m.open && !m.allowed.includes(state.me.id)) {
-        toast('🚪 The door to this room is closed now — back down to the café.');
-        goToRoom('main');
+        toast('🚪 The door to this room is closed now — back out to the hallway.');
+        goToRoom('hall');
       }
       break;
     case 'home:focus':
@@ -1628,8 +1628,15 @@ function click(x, y) {
   }
   if (d.kind === 'order') return openMenu();
   if (d.kind === 'npc') return openTalk(d.npc.id);
-  if (d.kind === 'stairs-up') return openUpstairs();
-  if (d.kind === 'stairs-down') return goToRoom('main');
+  if (d.kind === 'stairs-up') return goToRoom('hall');
+  if (d.kind === 'stairs-down') return goToRoom('hall'); // from a room, a group room or the roof: out to the hallway
+  if (d.kind === 'hall-down') return walkToThing(h, () => goToRoom('main'));
+  if (d.kind === 'hall-up') return walkToThing(h, () => goToRoom('garden'));
+  if (d.kind === 'hall-groups') return walkToThing(h, () => openUpstairs());
+  if (d.kind === 'hall-door') {
+    if (!d.ownerId) return walkToThing(h, () => { bubble(player.av.group, '🚪', 'emote'); toast("🚪 You knock softly — nobody answers. It's someone else's room."); });
+    return walkToThing(h, () => goToRoom('home:' + d.ownerId));
+  }
   if (d.kind === 'home-bed') return goToBed(d.seat);
   if (d.kind === 'home-desk') {
     // sit at a chair by the desk if there is one, then open the timer
@@ -1642,6 +1649,7 @@ function click(x, y) {
   if (d.kind === 'home-bath') return takeBath(d.seat);
   if (d.kind === 'home-shower') return haveShower(d.itemId);
   if (d.kind === 'home-mirror') return walkToThing(h, () => { toast('🪞 You look in the mirror. Fancy a change?'); openCreator(false); });
+  if (d.kind === 'home-frame') return openFrame(d.itemId);
   if (d.kind === 'home-item') return toast(d.label);
   if (d.kind === 'garden-bed') return openBed(d.bed);
   if (d.kind === 'garden-list') return openGardenList();
@@ -1700,7 +1708,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2887,7 +2895,7 @@ $('talkForm').addEventListener('submit', async e => {
   try {
     const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
       player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
-    const where = state.room === 'garden' ? 'up on the roof garden' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
@@ -3053,6 +3061,7 @@ async function goToRoom(room, group = null) {
   if (room.startsWith('home:')) {
     try { homeData = await api('/home/' + room.slice(5)); } catch (e) { toast(e.message); return; }
   }
+  const from = state.room;
   leaveHome();
   stopPlacing();
   $('fade').classList.add('on');
@@ -3065,11 +3074,13 @@ async function goToRoom(room, group = null) {
   setPlaced(null);
   const roof = room === 'garden';
   const isHome = !!homeData;
-  const up = room !== 'main' && !roof && !isHome; // a group's room upstairs
+  const isHall = room === 'hall';
+  const up = room !== 'main' && !roof && !isHome && !isHall; // a group's room upstairs
   state.room = room;
   state.roomName = up ? group.name : isHome ? homeData.room.name : null;
   state.home = isHome ? { ...homeData, ownerId: Number(room.slice(5)) } : null;
-  world.setFloor(roof ? 'garden' : isHome ? 'home' : up ? 'up' : 'main');
+  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? 'hall' : up ? 'up' : 'main');
+  if (isHall) await loadHallDoors();
   if (isHome) { world.home.setRoom(homeData.room); world.home.setItems(homeData.items); }
   if (up) world.setUpstairsSign(group.name, group.description || 'upstairs at Sakura Slice', group.color);
 
@@ -3083,6 +3094,13 @@ async function goToRoom(room, group = null) {
     player.pos.set(a.x, world.floorY, a.z);
     player.ry = a.ry;
     cam.yaw = 0; cam.pitch = 0.42; cam.dist = cam.targetDist = 2.6; // a bedroom, not a hall
+  }
+  if (isHall) { // at the top of the stairs, or just out of the room you came from
+    const h = world.hall;
+    const a = (from && from.startsWith('home:') && h.doorFront(from.slice(5))) || (from === 'garden' ? h.fromGarden : from && from.startsWith('group:') ? h.fromGroups : h.arrival);
+    player.pos.set(a.x, world.floorY, a.z);
+    player.ry = a.ry;
+    cam.yaw = a.ry + Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.0;
   }
   camTarget.copy(player.pos).add(new THREE.Vector3(0, 1.45, 0));
 
@@ -3102,7 +3120,8 @@ async function goToRoom(room, group = null) {
     const { messages } = await api('/chat?room=' + encodeURIComponent(room));
     messages.forEach(addChat);
   } catch (e) { /* fine */ }
-  sysChat(roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
+  sysChat(isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs. Your door is the first on the left.' : 'You step out into the hallway.')
+    : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
     : up ? `You climb the spiral stairs to ${group.name}'s room.` : 'You come back down into the café.');
@@ -3112,7 +3131,17 @@ async function goToRoom(room, group = null) {
   $('fade').classList.remove('on');
 }
 
-$('floorAct').onclick = () => (state.room === 'main' ? openUpstairs() : goToRoom('main'));
+$('floorAct').onclick = () => goToRoom(state.room === 'main' ? 'hall' : 'main');
+
+// ── the hallway upstairs: whose door is whose (and whose has a light on)
+async function loadHallDoors() {
+  try {
+    const r = await api('/home');
+    state.myHome = r.mine;
+    world.hall.setDoors(r.mine, r.doors);
+  } catch (e) { /* signed out: the doors stay shut */ }
+}
+setInterval(() => { if (state.room === 'hall' && !document.hidden) loadHallDoors(); }, 20e3);
 
 // ───────────────────────────────────────── the roof garden
 // Eight beds the whole café shares (server/garden.js): plant, water, weed,
@@ -3361,6 +3390,64 @@ function renderSelection() {
     sw.appendChild(s);
   }
   box.replaceChildren(title, row, sw);
+  if (e.def.picture) box.appendChild(frameEditor(e));
+}
+// a frame's picture (from your device) and the line underneath it
+function frameEditor(e) {
+  const wrap = document.createElement('div');
+  wrap.className = 'frame-edit';
+  const file = document.createElement('input');
+  file.type = 'file'; file.accept = 'image/jpeg,image/png,image/webp'; file.hidden = true;
+  const pick = document.createElement('button');
+  pick.type = 'button'; pick.className = 'btn'; pick.textContent = e.item.imageId ? '🖼️ Change the picture' : '🖼️ Choose a picture';
+  pick.onclick = () => file.click();
+  file.onchange = async () => {
+    const f = file.files[0];
+    if (!f) return;
+    pick.disabled = true; pick.textContent = 'Developing…';
+    try {
+      const blob = await shrinkPhoto(f);
+      const r = await fetch('/api/home/photo-upload', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob, credentials: 'same-origin' });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "That picture didn't upload.");
+      await saveItem(e.item.id, { imageId: j.id });
+      sound.cue('pin');
+    } catch (err) { toast(err.message); pick.disabled = false; pick.textContent = '🖼️ Choose a picture'; }
+  };
+  const cap = document.createElement('input');
+  cap.type = 'text'; cap.maxLength = 80; cap.placeholder = 'Write something under it…'; cap.value = e.item.caption || '';
+  const save = document.createElement('button');
+  save.type = 'button'; save.className = 'btn ghost'; save.textContent = '✍️ Write it';
+  save.onclick = () => saveItem(e.item.id, { caption: cap.value.trim() });
+  cap.onkeydown = ev => { ev.stopPropagation(); if (ev.key === 'Enter') save.click(); };
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.append(cap, save);
+  wrap.append(pick, file, row);
+  return wrap;
+}
+// big phone photos are shrunk to at most 1280px on the long side, as a JPEG
+async function shrinkPhoto(f) {
+  if (!/^image\//.test(f.type)) throw new Error('That needs to be a picture.');
+  const img = await createImageBitmap(f).catch(() => { throw new Error("That picture couldn't be opened."); });
+  const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return new Promise((ok, no) => c.toBlob(b => b ? ok(b) : no(new Error("That picture couldn't be opened.")), 'image/jpeg', 0.86));
+}
+// looking at a frame up close (anyone in the room)
+function openFrame(id) {
+  const e = homeItem(id);
+  if (!e) return;
+  if (decor.pick) return;
+  const pic = $('framePic');
+  pic.classList.toggle('hidden', !e.item.imageId);
+  if (e.item.imageId) pic.src = `/api/home/photo/${e.item.imageId}`;
+  pic.style.setProperty('--frame', e.item.color);
+  $('frameCaption').textContent = e.item.caption || (e.item.imageId ? '' : (inMyRoom() ? 'No picture yet — open Decorate and click the frame to choose one.' : 'An empty frame, waiting for a picture.'));
+  $('frameWhere').textContent = `${e.def.name} · ${AREAS[areaAt(e.item.x, e.item.z)].name}`;
+  openPanel('framePanel');
 }
 async function saveItem(id, change) {
   try {
@@ -3406,6 +3493,7 @@ $('decorCancel').onclick = () => stopDecorPlacing();
 // on the floor or on top of a desk, a dresser, a shelf…
 function placementAt(sx, sy) {
   const def = BY_KIND.get(decor.pick);
+  if (def.wall) return wallPlacementAt(sx, sy);
   const tops = def.onTop ? world.home.tops().filter(t => t.userData.itemId !== decor.moveId) : [];
   const hits = castAt(sx, sy, [world.floorMesh, ...tops]);
   const h = hits[0];
@@ -3413,6 +3501,23 @@ function placementAt(sx, sy) {
   const snap = v => Math.round(v * 20) / 20;
   const x = snap(h.point.x), z = snap(h.point.z);
   const y = h.object.userData.homeTop ? h.object.userData.top - world.floorY : 0;
+  const ok = world.home.canPlace(decor.pick, x, z, decor.ry, decor.moveId);
+  return { sx, sy, x, y, z, ok };
+}
+// Frames go on a wall: wherever you point, facing out of it, at that height
+// (kept between knee and just under the ceiling).
+const wallNormal = new THREE.Vector3();
+function wallPlacementAt(sx, sy) {
+  const h = castAt(sx, sy, world.home.walls)[0];
+  if (!h || !h.face) return null;
+  wallNormal.copy(h.face.normal).transformDirection(h.object.matrixWorld);
+  if (Math.abs(wallNormal.y) > 0.5) return null;
+  const snap = v => Math.round(v * 20) / 20;
+  // flush against the wall, and on the 5 cm grid along it
+  const alongX = Math.abs(wallNormal.z) > Math.abs(wallNormal.x);
+  const x = alongX ? snap(h.point.x) : h.point.x + wallNormal.x * 0.032, z = alongX ? h.point.z + wallNormal.z * 0.032 : snap(h.point.z);
+  const y = Math.min(2.5, Math.max(0.7, snap(h.point.y - world.floorY)));
+  decor.ry = Math.round(Math.atan2(wallNormal.x, wallNormal.z) / (Math.PI / 2)) * (Math.PI / 2);
   const ok = world.home.canPlace(decor.pick, x, z, decor.ry, decor.moveId);
   return { sx, sy, x, y, z, ok };
 }
