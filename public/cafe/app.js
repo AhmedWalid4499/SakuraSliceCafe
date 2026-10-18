@@ -18,6 +18,7 @@ import { makeNote, makeGhost, NOTE_COLORS } from './notes.js';
 import { Soundscape } from './audio.js';
 import { createStaff } from './staff.js';
 import { fullMenu, SEASONS } from './drinks.mjs';
+import { FURNITURE, BY_KIND, CATS, MAX_ITEMS, WALLS, FLOORS } from './furniture.mjs';
 import { createRadio, audioDuration } from './radio.js';
 import { createRegulars } from './regulars.js';
 
@@ -383,6 +384,7 @@ function collide(p, r = 0.3) {
 function standUp() {
   if (!player.seat) return;
   const s = player.seat;
+  if (s.lie) endSleep();
   player.seat = null;
   sound.chair(player.pos);
   // step out to the side of the chair, not into the table
@@ -612,6 +614,9 @@ function refreshActions() {
   }
   $('biteAct').classList.toggle('hidden', !canBite());
   $('sipAct').classList.toggle('hidden', !canSip());
+  $('decorAct').classList.toggle('hidden', !inMyRoom());
+  $('roomAct').classList.toggle('hidden', !inMyRoom());
+  $('studyAct').classList.toggle('hidden', !state.home);
 }
 
 // A sip at a time — the cup goes down; four and it's finished.
@@ -719,7 +724,11 @@ function updatePlayer(dt) {
   if (player.waving > 0) player.waving -= dt;
   player.av.group.position.copy(player.pos);
   player.av.group.rotation.y = player.ry;
-  player.av.update(dt, { moving, sitting: !!player.seat, sitH: player.seat?.h ?? 0.54, waving: player.waving });
+  // lying in bed: tip back flat (rotate about x first, then turn)
+  const lying = !!player.seat?.lie;
+  player.av.group.rotation.order = 'YXZ';
+  player.av.group.rotation.x = lying ? -Math.PI / 2 : 0;
+  player.av.update(dt, { moving, sitting: !!player.seat && !lying, sitH: player.seat?.h ?? 0.54, waving: player.waving });
   if (moving) sendMove();
 }
 
@@ -743,7 +752,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
   const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
-  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : ROOM;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.bounds : ROOM;
   camPos.x = Math.min(box.maxX - 0.25, Math.max(box.minX + 0.25, camPos.x));
   camPos.z = Math.min(box.maxZ - 0.25, Math.max(box.minZ + 0.25, camPos.z));
   camPos.y = Math.min(world.floorY + (inKitchen ? 3.2 : world.floorH) - 0.3, Math.max(world.floorY + 0.4, camPos.y));
@@ -822,14 +831,16 @@ function updatePeople(dt) {
     const moving = before.distanceTo(p.pos) > dt * 0.4;
     p.av.group.position.copy(p.pos);
     p.av.group.rotation.y = p.ry;
+    p.av.group.rotation.order = 'YXZ';
+    p.av.group.rotation.x = seat?.lie ? -Math.PI / 2 : 0;
     if (p.waving > 0) p.waving -= dt;
-    p.av.update(dt, { moving, sitting: !!seat, sitH: seat?.h ?? 0.54, waving: p.waving || 0 });
+    p.av.update(dt, { moving, sitting: !!seat && !seat.lie, sitH: seat?.h ?? 0.54, waving: p.waving || 0 });
   }
 }
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  const where = state.room === 'garden' ? ' · up on the roof garden' : state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  const where = state.room === 'garden' ? ' · up on the roof garden' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
   $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
@@ -869,6 +880,30 @@ function handle(m) {
       for (const id of [...state.people.keys()]) removePerson(id);
       m.people.forEach(addPerson);
       updateOnline();
+      break;
+    case 'home:item':
+      if (!state.home) break;
+      if (m.op === 'remove') { world.home.remove(m.item.id); if (decor.sel === m.item.id) { decor.sel = null; renderSelection(); } }
+      else world.home.update(m.item);
+      break;
+    case 'home:room':
+      if (!state.home || m.room.ownerId !== state.home.ownerId) break;
+      state.home.room = m.room;
+      state.roomName = m.room.name;
+      world.home.setRoom(m.room);
+      updateOnline();
+      break;
+    case 'home:access':
+      // the door closed, or they took us off the list: back down we go
+      if (state.home && state.me && m.ownerId === state.home.ownerId && !m.open && !m.allowed.includes(state.me.id)) {
+        toast('🚪 The door to this room is closed now — back down to the café.');
+        goToRoom('main');
+      }
+      break;
+    case 'home:focus':
+      if (!state.home) break;
+      if (m.focus) offerFocus(m.focus, m.now);
+      else { $('focusInvite').classList.add('hidden'); if (m.by) sysChat(`${m.by} ended the study session.`); }
       break;
     case 'garden':
       if (state.room !== 'garden') break;
@@ -1471,7 +1506,9 @@ canvas.addEventListener('pointermove', e => {
 });
 canvas.addEventListener('pointerup', e => {
   if (drag && drag.moved <= 6 && state.started) {
-    if (PANELS.some(p => !$(p).classList.contains('hidden'))) closePanels();
+    if (decor.pick) click(e.clientX, e.clientY);
+    else if (!$('decorPanel').classList.contains('hidden') && decorPickAt(e.clientX, e.clientY)) { /* picked something to move */ }
+    else if (PANELS.some(p => !$(p).classList.contains('hidden'))) closePanels();
     else click(e.clientX, e.clientY);
   }
   drag = null;
@@ -1511,6 +1548,13 @@ function pickInteractive(x, y) {
 function updateHover() {
   const tip = $('tip');
   if (!hoverPt || !state.started || (drag && drag.moved > 6)) { tip.classList.add('hidden'); return; }
+  if (decor.pick) {
+    decor.place = placementAt(hoverPt.x, hoverPt.y);
+    showPlace();
+    canvas.style.cursor = decor.place && decor.place.ok ? 'copy' : 'not-allowed';
+    tip.classList.add('hidden');
+    return;
+  }
   if (state.placing) {
     const hits = castAt(hoverPt.x, hoverPt.y, [...world.surfaces, ...noteMeshes()]);
     const hit = hits.find(h => h.object.userData.surface);
@@ -1540,6 +1584,7 @@ function updateHover() {
 }
 
 function click(x, y) {
+  if (decor.pick) return placeAt(x, y);
   if (state.placing) {
     const hits = castAt(x, y, [...world.surfaces, ...noteMeshes()]);
     const hit = hits.find(h => h.object.userData.surface);
@@ -1573,6 +1618,15 @@ function click(x, y) {
   if (d.kind === 'npc') return openTalk(d.npc.id);
   if (d.kind === 'stairs-up') return openUpstairs();
   if (d.kind === 'stairs-down') return goToRoom('main');
+  if (d.kind === 'home-bed') return goToBed(d.seat);
+  if (d.kind === 'home-desk') {
+    // sit at a chair by the desk if there is one, then open the timer
+    const c = new THREE.Vector3(); h.object.getWorldPosition(c);
+    const seat = nearestFreeSeat(c, { x: c.x, z: c.z, r: 1.4 });
+    if (seat && player.seat !== seat) goSit(seat);
+    return openStudy();
+  }
+  if (d.kind === 'home-item') return toast(d.label);
   if (d.kind === 'garden-bed') return openBed(d.bed);
   if (d.kind === 'garden-list') return openGardenList();
   if (d.kind === 'person') {
@@ -1606,12 +1660,14 @@ function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
 window.addEventListener('keydown', e => {
   const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
   if (e.key === 'Escape') {
+    if (decor.pick) { stopDecorPlacing(false); return; }
     if (state.placing) stopPlacing();
     closePanels();
     document.activeElement?.blur?.();
     return;
   }
   if (typing || !state.started) return;
+  if (decor.pick && (e.key === 'r' || e.key === 'R')) { turnGhost(e.shiftKey ? Math.PI / 4 : -Math.PI / 4); return; }
   if (e.key === 'Enter') { e.preventDefault(); showChat(true); $('chatInput').focus(); return; }
   if (e.key === 'e' || e.key === 'E') { toggleSit(); return; }
   if (e.key === 'q' || e.key === 'Q') { if (player.drink || player.dessert) putDrinkDown(); else pickUpDrink(); return; }
@@ -1628,7 +1684,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gardenPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2815,7 +2871,7 @@ $('talkForm').addEventListener('submit', async e => {
   try {
     const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
       player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
-    const where = state.room === 'garden' ? 'up on the roof garden' : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const where = state.room === 'garden' ? 'up on the roof garden' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
@@ -2941,6 +2997,7 @@ async function loadGroups() {
 
 function openUpstairs() {
   openPanel('upPanel');
+  loadHallway();
   loadGroups();
 }
 
@@ -2975,6 +3032,12 @@ $('upJoin').addEventListener('submit', async e => {
 async function goToRoom(room, group = null) {
   closePanels();
   if (room === state.room) return;
+  // someone's room: check we're let in (and get the furniture) before the stairs
+  let homeData = null;
+  if (room.startsWith('home:')) {
+    try { homeData = await api('/home/' + room.slice(5)); } catch (e) { toast(e.message); return; }
+  }
+  leaveHome();
   stopPlacing();
   $('fade').classList.add('on');
   sound.cue('sit');
@@ -2985,10 +3048,13 @@ async function goToRoom(room, group = null) {
   player.goingToSeat = null;
   setPlaced(null);
   const roof = room === 'garden';
-  const up = room !== 'main' && !roof; // a group's room upstairs
+  const isHome = !!homeData;
+  const up = room !== 'main' && !roof && !isHome; // a group's room upstairs
   state.room = room;
-  state.roomName = up ? group.name : null;
-  world.setFloor(roof ? 'garden' : up ? 'up' : 'main');
+  state.roomName = up ? group.name : isHome ? homeData.room.name : null;
+  state.home = isHome ? { ...homeData, ownerId: Number(room.slice(5)) } : null;
+  world.setFloor(roof ? 'garden' : isHome ? 'home' : up ? 'up' : 'main');
+  if (isHome) { world.home.setRoom(homeData.room); world.home.setItems(homeData.items); }
   if (up) world.setUpstairsSign(group.name, group.description || 'upstairs at Sakura Slice', group.color);
 
   // arrive at the top (or the foot) of the stairs, facing into the room
@@ -2996,6 +3062,12 @@ async function goToRoom(room, group = null) {
   player.pos.set(STAIRS.x - 0.3, world.floorY, STAIRS.z + (roof ? 4.4 : 2.2));
   player.ry = 0;
   cam.yaw = Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.4;
+  if (isHome) { // in through the door, facing into the room
+    const a = world.home.arrival;
+    player.pos.set(a.x, world.floorY, a.z);
+    player.ry = a.ry;
+    cam.yaw = 0; cam.pitch = 0.42; cam.dist = cam.targetDist = 2.6; // a bedroom, not a hall
+  }
   camTarget.copy(player.pos).add(new THREE.Vector3(0, 1.45, 0));
 
   for (const id of [...state.people.keys()]) removePerson(id);
@@ -3015,7 +3087,10 @@ async function goToRoom(room, group = null) {
     messages.forEach(addChat);
   } catch (e) { /* fine */ }
   sysChat(roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
+    : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
+      : `You knock, and step into ${homeData.room.ownerName}'s room.`)
     : up ? `You climb the spiral stairs to ${group.name}'s room.` : 'You come back down into the café.');
+  if (isHome && homeData.focus) offerFocus(homeData.focus, homeData.now);
   updateOnline();
   await wait(120);
   $('fade').classList.remove('on');
@@ -3172,6 +3247,377 @@ async function tendBed(id, action) {
 }
 
 $('gardenGo').onclick = () => goToRoom('garden');
+
+// ───────────────────────────────────────── your room upstairs
+// Everyone has a room along the upstairs hallway (server/homes.js). It
+// starts empty; the owner fills it from the catalogue (furniture.mjs), and
+// anyone in it can sit, sleep in a bed or start a study session at a desk.
+const decor = { cat: 'sleep', pick: null, color: null, ry: 0, moveId: null, sel: null, place: null };
+const FLOOR_NAMES = { oak: 'Light oak', walnut: 'Walnut', tatami: 'Tatami', tile: 'Tiles' };
+const inMyRoom = () => !!(state.home && state.home.canEdit);
+const homeItem = id => world.home.items.get(id);
+
+// ── the hallway (in the stairs panel)
+async function loadHallway() {
+  try {
+    const r = await api('/home');
+    state.myHome = r.mine;
+    $('homeName').textContent = r.mine.name;
+    const s = r.stats;
+    $('homeStats').textContent = state.room === 'home:' + r.mine.ownerId ? "You're in it now"
+      : s.focusMinutes || s.nights ? `📚 ${s.focusMinutes} min studied · 🌙 ${s.nights} night${s.nights === 1 ? '' : 's'}` : '';
+    $('homeGo').disabled = state.room === 'home:' + r.mine.ownerId;
+    $('homeDoors').replaceChildren(...r.doors.map(d => {
+      const card = document.createElement('div');
+      card.className = 'group-card';
+      const t = document.createElement('div');
+      const b = document.createElement('b'); b.textContent = d.name;
+      const sm = document.createElement('small'); sm.className = 'fine';
+      sm.textContent = `${d.invited ? 'you can always come in' : 'door open'}${d.here ? ` · ${d.here} in there` : ''}`;
+      t.append(b, document.createElement('br'), sm);
+      const go = document.createElement('button');
+      go.type = 'button'; go.className = 'btn ghost';
+      go.textContent = state.room === 'home:' + d.ownerId ? "You're here" : 'Knock 🚪';
+      go.disabled = state.room === 'home:' + d.ownerId;
+      go.onclick = () => goToRoom('home:' + d.ownerId);
+      card.append(t, go);
+      return card;
+    }));
+  } catch (e) { /* signed out */ }
+}
+$('homeGo').onclick = () => state.myHome && goToRoom('home:' + state.myHome.ownerId);
+
+// ── decorating (the owner only)
+function openDecor() {
+  if (!inMyRoom()) return;
+  const cats = $('decorCats');
+  cats.replaceChildren(...CATS.map(([k, label]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (k === decor.cat ? ' on' : '');
+    b.textContent = label;
+    b.onclick = () => { decor.cat = k; openDecor(); };
+    return b;
+  }));
+  $('decorGrid').replaceChildren(...FURNITURE.filter(f => f.cat === decor.cat).map(f => {
+    const card = document.createElement('div');
+    card.className = 'item';
+    const name = document.createElement('b');
+    name.textContent = f.name;
+    const sw = document.createElement('div');
+    sw.className = 'sw-row';
+    for (const c of f.colors) {
+      const s = document.createElement('button');
+      s.type = 'button'; s.style.background = c; s.title = `${f.name} in this colour`;
+      s.onclick = () => startDecorPlacing(f.kind, c);
+      sw.appendChild(s);
+    }
+    card.onclick = e => { if (e.target === card || e.target === name) startDecorPlacing(f.kind, f.colors[0]); };
+    card.append(name, sw);
+    return card;
+  }));
+  $('decorCount').textContent = `${world.home.items.size} of ${MAX_ITEMS} things in your room.`;
+  renderSelection();
+  openPanel('decorPanel');
+}
+function renderSelection() {
+  const box = $('decorSel');
+  const e = decor.sel != null && homeItem(decor.sel);
+  box.classList.toggle('hidden', !e);
+  world.home.select(e ? decor.sel : null);
+  if (!e) return;
+  const title = document.createElement('b');
+  title.textContent = e.def.name;
+  const row = document.createElement('div');
+  row.className = 'row';
+  const btn = (label, fn, cls = 'btn ghost') => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = label; b.onclick = fn; row.appendChild(b); };
+  btn('✋ Move', () => startDecorPlacing(e.item.kind, e.item.color, e.item.id, e.item.ry));
+  btn('↻ Turn', () => saveItem(e.item.id, { ry: e.item.ry - Math.PI / 4 }));
+  btn('🗑️ Take it out', () => removeItem(e.item.id));
+  btn('Done', () => { decor.sel = null; renderSelection(); });
+  const sw = document.createElement('div');
+  sw.className = 'sw-row';
+  sw.style.marginTop = '8px';
+  for (const c of e.def.colors) {
+    const s = document.createElement('button');
+    s.type = 'button'; s.style.background = c; s.className = c === e.item.color ? 'on' : '';
+    s.onclick = () => saveItem(e.item.id, { color: c });
+    sw.appendChild(s);
+  }
+  box.replaceChildren(title, row, sw);
+}
+async function saveItem(id, change) {
+  try {
+    const { item } = await api('/home/items/' + id, { method: 'PATCH', body: change });
+    world.home.update(item);
+    renderSelection();
+  } catch (e) { toast(e.message); }
+}
+async function removeItem(id) {
+  try {
+    await api('/home/items/' + id, { method: 'DELETE', body: {} });
+    world.home.remove(id);
+    decor.sel = null;
+    sound.cue('pin');
+    openDecor();
+  } catch (e) { toast(e.message); }
+}
+
+function startDecorPlacing(kind, color, moveId = null, ry = 0) {
+  closePanels();
+  decor.pick = kind; decor.color = color; decor.moveId = moveId; decor.ry = ry; decor.place = null;
+  world.home.showGhost(kind, color);
+  world.home.select(null);
+  $('decorHintText').textContent = `${BY_KIND.get(kind).name} — click where it goes`;
+  $('decorHint').classList.remove('hidden');
+}
+function stopDecorPlacing(reopen = true) {
+  if (!decor.pick) return;
+  decor.pick = null;
+  world.home.hideGhost();
+  $('decorHint').classList.add('hidden');
+  if (reopen && inMyRoom()) openDecor();
+}
+function turnGhost(by) {
+  decor.ry += by;
+  if (decor.place) { decor.place = placementAt(decor.place.sx, decor.place.sy); showPlace(); }
+}
+$('decorRotL').onclick = () => turnGhost(Math.PI / 4);
+$('decorRotR').onclick = () => turnGhost(-Math.PI / 4);
+$('decorCancel').onclick = () => stopDecorPlacing();
+
+// Where would it go if you clicked here? Big things on the floor; small things
+// on the floor or on top of a desk, a dresser, a shelf…
+function placementAt(sx, sy) {
+  const def = BY_KIND.get(decor.pick);
+  const tops = def.onTop ? world.home.tops().filter(t => t.userData.itemId !== decor.moveId) : [];
+  const hits = castAt(sx, sy, [world.floorMesh, ...tops]);
+  const h = hits[0];
+  if (!h) return null;
+  const snap = v => Math.round(v * 20) / 20;
+  const x = snap(h.point.x), z = snap(h.point.z);
+  const y = h.object.userData.homeTop ? h.object.userData.top - world.floorY : 0;
+  const ok = world.home.canPlace(decor.pick, x, z, decor.ry, decor.moveId);
+  return { sx, sy, x, y, z, ok };
+}
+function showPlace() {
+  const p = decor.place;
+  if (p) world.home.moveGhost(p.x, p.y, p.z, decor.ry, p.ok);
+}
+async function placeAt(sx, sy) {
+  const p = placementAt(sx, sy);
+  if (!p) return;
+  if (!p.ok) return toast("It won't fit there — try somewhere clear (and keep the doorway free).");
+  const body = { x: p.x, y: p.y, z: p.z, ry: decor.ry };
+  try {
+    const { item } = decor.moveId
+      ? await api('/home/items/' + decor.moveId, { method: 'PATCH', body })
+      : await api('/home/items', { method: 'POST', body: { ...body, kind: decor.pick, color: decor.color } });
+    world.home.update(item);
+    sound.cue('pin');
+    decor.sel = decor.moveId ? item.id : null;
+    stopDecorPlacing();
+  } catch (e) { toast(e.message); }
+}
+// in decorate mode, clicking something already in the room picks it
+function decorPickAt(x, y) {
+  const h = pickInteractive(x, y);
+  const id = h && h.object.userData.itemId;
+  if (!id || !homeItem(id)) return false;
+  decor.sel = id;
+  renderSelection();
+  return true;
+}
+
+// ── the room itself: name, colours, who can come in
+function openRoomPanel() {
+  if (!inMyRoom()) return;
+  const r = state.home.room;
+  $('roomName').value = r.name;
+  $('roomWalls').replaceChildren(...WALLS.map(c => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.style.background = c; b.className = c === r.wall ? 'on' : '';
+    b.onclick = () => saveRoom({ wall: c });
+    return b;
+  }));
+  $('roomFloors').replaceChildren(...FLOORS.map(f => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip' + (f === r.floor ? ' on' : '');
+    b.textContent = FLOOR_NAMES[f] || f;
+    b.onclick = () => saveRoom({ floor: f });
+    return b;
+  }));
+  $('roomOpen').checked = !!r.open;
+  renderGuests();
+  const s = state.home.stats || {};
+  $('roomStats').textContent = `📚 ${s.focusMinutes || 0} minutes studied in ${s.sessions || 0} session${s.sessions === 1 ? '' : 's'} · 🌙 ${s.nights || 0} night${s.nights === 1 ? '' : 's'} slept here`;
+  $('roomErr').textContent = '';
+  openPanel('roomPanel');
+}
+function renderGuests() {
+  const list = state.home.guests || [];
+  $('roomGuests').replaceChildren(...(list.length ? list.map(g => {
+    const row = document.createElement('div');
+    const n = document.createElement('span'); n.textContent = `${g.displayName} · @${g.username}`;
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = 'Remove';
+    x.onclick = async () => {
+      try { state.home.guests = (await api('/home/guests/' + g.id, { method: 'DELETE', body: {} })).guests; renderGuests(); } catch (e) { toast(e.message); }
+    };
+    row.append(n, x);
+    return row;
+  }) : [Object.assign(document.createElement('p'), { className: 'fine', textContent: 'Nobody yet — let a friend in by their username.' })]));
+}
+async function saveRoom(change) {
+  try {
+    const { room } = await api('/home', { method: 'PATCH', body: change });
+    state.home.room = room;
+    world.home.setRoom(room);
+    state.roomName = room.name;
+    updateOnline();
+    if (!$('roomPanel').classList.contains('hidden')) openRoomPanel();
+  } catch (e) { $('roomErr').textContent = e.message; }
+}
+$('roomName').addEventListener('change', () => saveRoom({ name: $('roomName').value }));
+$('roomOpen').addEventListener('change', () => saveRoom({ open: $('roomOpen').checked }));
+$('roomInvite').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('roomErr').textContent = '';
+  const username = new FormData(e.target).get('username');
+  try {
+    const r = await api('/home/guests', { method: 'POST', body: { username } });
+    state.home.guests = r.guests;
+    e.target.reset();
+    renderGuests();
+    toast(`🗝️ ${r.added.displayName} can come into your room now.`);
+  } catch (err) { $('roomErr').textContent = err.message; }
+});
+
+// ── study sessions
+const focus = { end: 0, minutes: 0, timer: null, skew: 0, offer: null };
+let studyLen = 25;
+function openStudy() {
+  $('studyLen').replaceChildren(...[15, 25, 50, 90].map(m => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip' + (m === studyLen ? ' on' : '');
+    b.textContent = `${m} min`;
+    b.onclick = () => { studyLen = m; openStudy(); };
+    return b;
+  }));
+  $('studyTogetherRow').classList.toggle('hidden', !(state.home && state.people.size));
+  const s = (state.home && state.home.stats) || {};
+  $('studyStats').textContent = focus.end ? 'A session is already running.' : s.sessions ? `So far: ${s.focusMinutes} minutes in ${s.sessions} session${s.sessions === 1 ? '' : 's'}.` : '';
+  $('studyStart').disabled = !!focus.end;
+  openPanel('studyPanel');
+}
+$('studyStart').onclick = async () => {
+  try {
+    const together = !!state.home && state.people.size > 0 && $('studyTogether').checked;
+    const r = await api('/home/focus/start', { method: 'POST', body: { minutes: studyLen, room: state.room, together } });
+    closePanels();
+    runFocus(r, together ? 'together' : '');
+    if (together) sysChat(`You start a ${r.minutes}-minute study session for everyone in the room.`);
+  } catch (e) { toast(e.message); }
+};
+$('studyRadio').onclick = () => { closePanels(); showMusic(true, 'radio'); };
+function runFocus(r, what) {
+  focus.skew = Date.now() - r.now; // our clock minus the server's
+  focus.end = r.end + focus.skew;
+  focus.minutes = r.minutes;
+  $('focusWhat').textContent = what === 'together' ? 'together' : '';
+  $('focusHud').classList.remove('hidden');
+  $('focusInvite').classList.add('hidden');
+  clearInterval(focus.timer);
+  const tick = () => {
+    const left = Math.max(0, focus.end - Date.now());
+    $('focusTime').textContent = fmt(left / 1000);
+    if (left <= 0) finishFocus();
+  };
+  tick();
+  focus.timer = setInterval(tick, 500);
+}
+async function finishFocus() {
+  clearInterval(focus.timer);
+  focus.end = 0;
+  $('focusHud').classList.add('hidden');
+  try {
+    const r = await api('/home/focus/finish', { method: 'POST', body: {} });
+    if (state.home) state.home.stats = r.stats;
+    sound.counterBell(player.pos);
+    toast(`📚 ${r.minutes} minutes of real focus. Stretch, drink some water — that's ${r.stats.focusMinutes} minutes in all.`);
+    sysChat(`You finished a ${r.minutes}-minute study session.`);
+  } catch (e) { toast(e.message); }
+}
+$('focusStop').onclick = async () => {
+  clearInterval(focus.timer);
+  focus.end = 0;
+  $('focusHud').classList.add('hidden');
+  try { await api('/home/focus/stop', { method: 'POST', body: {} }); } catch (e) { /* fine */ }
+  toast('Session stopped. That was still worth something.');
+};
+function offerFocus(f, now) {
+  if (!f || focus.end || (state.me && f.byId === state.me.id)) { $('focusInvite').classList.add('hidden'); focus.offer = null; return; }
+  focus.offer = f;
+  const left = Math.max(1, Math.round((f.end - now) / 60e3));
+  $('focusInviteText').textContent = `📚 ${f.by} is studying — ${left} min left. Join in?`;
+  $('focusInvite').classList.remove('hidden');
+}
+$('focusJoin').onclick = async () => {
+  try {
+    const r = await api('/home/focus/start', { method: 'POST', body: { join: true, room: state.room } });
+    runFocus(r, 'together');
+    sysChat(`You join ${focus.offer ? focus.offer.by + "'s" : 'the'} study session.`);
+  } catch (e) { toast(e.message); $('focusInvite').classList.add('hidden'); }
+};
+$('focusNo').onclick = () => $('focusInvite').classList.add('hidden');
+
+// ── sleeping
+const sleep = { on: false };
+async function goToBed(seat) {
+  if (!seat) return;
+  goSit(seat);
+  const t0 = performance.now();
+  while (player.seat !== seat && (player.goingToSeat === seat || player.target) && performance.now() - t0 < 60000) await wait(150);
+  if (player.seat !== seat) return;
+  startSleep();
+}
+async function startSleep() {
+  sleep.on = true;
+  $('sleepVeil').classList.remove('hidden');
+  bubble(player.av.group, '💤', 'emote');
+  send({ t: 'emote', e: '😴' });
+  const stories = storyList().filter(s => s.kind === 'night');
+  const s = stories.length ? stories[Math.floor(Math.random() * stories.length)] : null;
+  $('sleepTitle').textContent = s ? s.title : 'Sleep well';
+  $('sleepText').textContent = s ? s.paragraphs.slice(0, 4).join('\n\n') + (s.paragraphs.length > 4 ? '\n\n…the rest of this one is on the story shelf downstairs.' : '')
+    : 'The city is quiet now. Put the heavy things down for tonight — they will still be there tomorrow, and so will you.\n\n— Me3temed';
+  $('sleepNote').textContent = '';
+  openPanel('sleepPanel');
+  try {
+    const r = await api('/home/sleep', { method: 'POST', body: {} });
+    if (state.home) state.home.stats = r.stats;
+    $('sleepNote').textContent = r.counted ? `🌙 That's ${r.stats.nights} night${r.stats.nights === 1 ? '' : 's'} you've slept here.` : '';
+  } catch (e) { /* the night still happens */ }
+}
+function endSleep() {
+  if (!sleep.on) return;
+  sleep.on = false;
+  $('sleepVeil').classList.add('hidden');
+  if (!$('sleepPanel').classList.contains('hidden')) closePanels();
+}
+$('sleepWake').onclick = () => { endSleep(); standUp(); toast('☀️ Good morning. Take it slowly.'); };
+
+// leaving the room (or the café) puts all of this away
+function leaveHome() {
+  stopDecorPlacing(false);
+  decor.sel = null;
+  world.home.select(null);
+  endSleep();
+  $('focusInvite').classList.add('hidden');
+}
+
+$('decorAct').onclick = () => (decor.pick ? stopDecorPlacing() : openDecor());
+$('roomAct').onclick = () => openRoomPanel();
+$('studyAct').onclick = () => openStudy();
 
 // ───────────────────────────────────────── the loop
 

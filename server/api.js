@@ -477,6 +477,7 @@ admin.delete('/chat/:id', wrap(async (req, res) => {
 
 api.use(groups.router);
 api.use(require('./garden').router);
+api.use(require('./homes').router);
 api.use(require('./media').router);
 api.use(npc);
 api.use('/admin', admin);

@@ -217,3 +217,38 @@ CREATE TABLE IF NOT EXISTS garden_helpers (
   harvests   INTEGER NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Living upstairs: everyone's own room along the hallway, the furniture in
+-- it, who they've let in, and their study and sleep record. See server/homes.js.
+CREATE TABLE IF NOT EXISTS home_rooms (
+  owner_id   INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  wall       TEXT NOT NULL DEFAULT '#efe6db',
+  floor      TEXT NOT NULL DEFAULT 'oak',
+  open       BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS home_items (
+  id         SERIAL PRIMARY KEY,
+  owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL,
+  x REAL NOT NULL, y REAL NOT NULL DEFAULT 0, z REAL NOT NULL, ry REAL NOT NULL DEFAULT 0,
+  color      TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS home_items_owner_idx ON home_items(owner_id);
+CREATE TABLE IF NOT EXISTS home_guests (
+  owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  guest_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (owner_id, guest_id)
+);
+CREATE INDEX IF NOT EXISTS home_guests_guest_idx ON home_guests(guest_id);
+CREATE TABLE IF NOT EXISTS home_stats (
+  user_id       INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  focus_minutes INTEGER NOT NULL DEFAULT 0,
+  sessions      INTEGER NOT NULL DEFAULT 0,
+  nights        INTEGER NOT NULL DEFAULT 0,
+  last_slept    TIMESTAMPTZ
+);

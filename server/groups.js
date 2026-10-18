@@ -20,11 +20,13 @@ const GROUP_FIELDS = `g.id, g.name, g.description, g.color, g.is_public AS "isPu
 
 // The rooms everyone signed in can be in: the ground floor and the roof garden.
 const PUBLIC_ROOMS = ['main', 'garden'];
-const ROOM_RE = /^(main|garden|group:\d+)$/;
+const ROOM_RE = /^(main|garden|group:\d+|home:\d+)$/;
 
 // Is this user allowed in this room? The public rooms are open to everyone signed in.
 async function canEnter(userId, room) {
   if (PUBLIC_ROOMS.includes(room)) return true;
+  const h = /^home:(\d+)$/.exec(room || '');
+  if (h) return require('./homes').canEnterHome(userId, Number(h[1])); // someone's own room upstairs
   const m = /^group:(\d+)$/.exec(room || '');
   if (!m) return false;
   const { rows } = await query('SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2', [Number(m[1]), userId]);

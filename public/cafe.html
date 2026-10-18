@@ -187,6 +187,28 @@
   .menu-tabs { display: flex; gap: 6px; margin-top: 12px; background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
   .menu-tabs button { flex: 1; border: 0; background: transparent; border-radius: 999px; padding: 8px 10px; font-weight: 700; font-size: 13.5px; color: var(--text-mid); }
   .menu-tabs button.on { background: var(--sakura-dark); color: #fff; }
+  /* your room upstairs */
+  .home-card { margin: 0 0 18px; padding: 14px 16px; border-radius: 18px; background: var(--sakura-light); border: 1px solid var(--line); }
+  .decor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .decor-grid .item { border: 1.5px solid var(--line); background: var(--field); border-radius: 14px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .decor-grid .item b { font-size: 13px; color: var(--text-dark); text-align: left; }
+  .decor-grid .item .sw-row, .decor-sel .sw-row { display: flex; gap: 5px; flex-wrap: wrap; }
+  .decor-grid .sw-row button, .decor-sel .sw-row button, #roomWalls button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.08); padding: 0; }
+  .decor-grid .sw-row button:hover, .decor-sel .sw-row button.on, #roomWalls button.on { outline: 2px solid var(--sakura-dark); outline-offset: 1px; }
+  .decor-sel { margin-top: 12px; padding: 12px; border-radius: 14px; border: 1.5px solid var(--sakura); background: var(--field); }
+  .decor-sel .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .guest-list { display: grid; gap: 6px; margin-top: 6px; }
+  .guest-list div { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13.5px; padding: 6px 10px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
+  .guest-list button { border: 0; background: transparent; color: var(--sakura-dark); font-weight: 700; }
+  #decorHint, #focusInvite { left: 50%; top: 80px; transform: translateX(-50%); padding: 8px 10px 8px 16px; border-radius: 999px; display: flex; gap: 8px; align-items: center; font-size: 13.5px; font-weight: 600; color: var(--text-mid); }
+  #decorHint button, #focusHud button, #focusInvite button:not(.btn) { border: 0; background: var(--sakura-light); color: var(--sakura-dark); border-radius: 999px; padding: 6px 11px; font-weight: 700; }
+  #focusHud { right: 14px; top: 120px; padding: 8px 10px 8px 14px; border-radius: 999px; display: flex; gap: 8px; align-items: center; }
+  #focusHud b { font-variant-numeric: tabular-nums; font-size: 16px; }
+  @media (max-width: 640px) { #focusHud { top: auto; bottom: 140px; right: 10px; } #decorHint, #focusInvite { top: 64px; max-width: calc(100vw - 20px); flex-wrap: wrap; } }
+  #sleepVeil { position: fixed; inset: 0; z-index: 15; pointer-events: none; transition: opacity 1.5s;
+    background: radial-gradient(ellipse at 50% 40%, rgba(20,22,48,0.55), rgba(8,8,22,0.88)); }
+  #sleepVeil.hidden { display: block; opacity: 0; }
+  #sleepPanel { z-index: 22; }
   /* the roof garden */
   .garden-card { margin: 4px 0 18px; padding: 14px 16px; border-radius: 18px; background: var(--matcha-light); border: 1px solid var(--line); }
   .garden-card h3 { margin-top: 2px; }
@@ -440,9 +462,20 @@
   <button id="biteAct" class="hidden" title="Take a bite (B)"><span>🍡</span> <span class="t">Take a bite</span></button>
   <button id="waveAct" title="Wave"><span>👋</span> <span class="t">Wave</span></button>
   <button id="emoteAct" title="Send a little something"><span>🌸</span></button>
+  <button id="studyAct" class="hidden" title="Start a study session"><span>📚</span> <span class="t">Study</span></button>
+  <button id="decorAct" class="hidden" title="Decorate your room"><span>🛠️</span> <span class="t">Decorate</span></button>
+  <button id="roomAct" class="hidden" title="Your room: name, colours, who can come in"><span>🗝️</span> <span class="t">My room</span></button>
   <button id="chatAct" title="Chat" class="on"><span>💬</span></button>
 </div>
 
+<div id="decorHint" class="hud card hidden">
+  <span id="decorHintText">Click where it goes</span>
+  <button type="button" id="decorRotL" title="Turn it left">↺</button><button type="button" id="decorRotR" title="Turn it right (R)">↻</button>
+  <button type="button" id="decorCancel">Cancel</button>
+</div>
+<div id="focusHud" class="hud card hidden"><span>📚</span> <b id="focusTime">25:00</b> <span class="fine" id="focusWhat"></span> <button type="button" id="focusStop">Stop</button></div>
+<div id="focusInvite" class="hud card hidden"><span id="focusInviteText"></span> <button class="btn" type="button" id="focusJoin">Join</button> <button type="button" id="focusNo" aria-label="No thanks">✕</button></div>
+<div id="sleepVeil" class="hidden"></div>
 <div id="placing" class="hud card hidden">Click the board, a table, or a wall to leave your note · <b>Esc</b> to cancel</div>
 
 <div id="chat" class="hud card hidden">
@@ -698,6 +731,13 @@
     <p class="lede" style="font-size:13.5px">All the way up the stairs: tables under a sakura pergola, benches looking out over Cairo, and eight beds the whole café looks after together.</p>
     <div class="row" style="gap:10px;align-items:center"><button class="btn" id="gardenGo" type="button">Climb up to the garden 🪜</button><span class="fine" id="gardenHere"></span></div>
   </div>
+  <div class="home-card">
+    <p class="eyebrow">The hallway · your room</p>
+    <h3>🛏️ <span id="homeName">Your room</span></h3>
+    <p class="lede" style="font-size:13.5px">A room of your own along the upstairs hallway. It starts empty — fill it with whatever you like, sleep in it, study in it, have friends over.</p>
+    <div class="row" style="gap:10px;align-items:center"><button class="btn" id="homeGo" type="button">Go to my room 🗝️</button><span class="fine" id="homeStats"></span></div>
+    <div id="homeDoors" class="group-list" style="margin-top:10px"></div>
+  </div>
   <p class="eyebrow">The second floor</p>
   <h3>Rooms for groups</h3>
   <p class="lede" style="font-size:13.5px">Upstairs, every group has its own room — your own people, your own board, your own quiet chat.</p>
@@ -778,6 +818,60 @@
   <p class="lede" id="gardenText" style="font-size:13.5px"></p>
   <div id="gardenBody"></div>
   <p class="fine" id="gardenMe" style="margin-top:14px"></p>
+</div>
+
+<!-- Your room: decorating, the room itself, studying, sleeping -->
+<div id="decorPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Your room</p>
+  <h3>Decorate</h3>
+  <p class="lede" style="font-size:13.5px">Pick something (and its colour), then click where it goes — <b>R</b> turns it. Click anything already in the room to move it, turn it, recolour it or take it out.</p>
+  <div id="decorSel" class="decor-sel hidden"></div>
+  <div class="chips" id="decorCats" style="margin-top:12px"></div>
+  <div class="decor-grid" id="decorGrid"></div>
+  <p class="fine" id="decorCount" style="margin-top:10px"></p>
+</div>
+
+<div id="roomPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Your room</p>
+  <h3>Make it yours</h3>
+  <label class="field"><span>Its name, on the plaque by the door</span><input type="text" id="roomName" maxlength="40"></label>
+  <div class="opt-group" style="margin-top:12px"><span>Walls</span><div class="chips" id="roomWalls"></div></div>
+  <div class="opt-group" style="margin-top:12px"><span>Floor</span><div class="chips" id="roomFloors"></div></div>
+  <label class="check" style="margin-top:14px"><input type="checkbox" id="roomOpen"> Leave the door open — anyone in the café can come in</label>
+  <div style="margin-top:16px">
+    <p class="eyebrow">Friends who can always come in</p>
+    <div id="roomGuests" class="guest-list"></div>
+    <form id="roomInvite" class="row" style="gap:6px;margin-top:8px">
+      <input type="text" name="username" maxlength="40" placeholder="their username" autocomplete="off" style="flex:1">
+      <button class="btn" type="submit">Let them in</button>
+    </form>
+    <div class="error" id="roomErr"></div>
+  </div>
+  <p class="fine" id="roomStats" style="margin-top:14px"></p>
+</div>
+
+<div id="studyPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">At your desk</p>
+  <h3>A study session</h3>
+  <p class="lede" style="font-size:13.5px">Phone face down. One thing at a time. When the time's up, the minutes go on your record.</p>
+  <div class="chips" id="studyLen" style="margin-top:12px"></div>
+  <label class="check hidden" id="studyTogetherRow" style="margin-top:12px"><input type="checkbox" id="studyTogether" checked> Study together — invite everyone in the room</label>
+  <div class="row" style="gap:8px;margin-top:14px;flex-wrap:wrap">
+    <button class="btn" id="studyStart" type="button">Start 📚</button>
+    <button class="btn ghost" id="studyRadio" type="button">🎧 Put the café radio on</button>
+  </div>
+  <p class="fine" id="studyStats" style="margin-top:12px"></p>
+</div>
+
+<div id="sleepPanel" class="panel card hidden">
+  <p class="eyebrow">Goodnight</p>
+  <h3 id="sleepTitle">Sleep well</h3>
+  <p class="lede" id="sleepText" style="font-size:14px;white-space:pre-line"></p>
+  <p class="fine" id="sleepNote" style="margin-top:10px"></p>
+  <button class="btn" id="sleepWake" type="button" style="margin-top:14px">☀️ Wake up</button>
 </div>
 
 <div id="helpPanel" class="panel card hidden">
