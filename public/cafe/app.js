@@ -829,7 +829,7 @@ function updatePeople(dt) {
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  const where = state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  const where = state.room === 'garden' ? ' · up on the roof garden' : state.roomName ? ` · upstairs, ${state.roomName}` : '';
   $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
@@ -869,6 +869,15 @@ function handle(m) {
       for (const id of [...state.people.keys()]) removePerson(id);
       m.people.forEach(addPerson);
       updateOnline();
+      break;
+    case 'garden':
+      if (state.room !== 'garden') break;
+      setGardenBeds(m.beds);
+      if (m.by && m.by.id !== state.me?.id) {
+        const b = bedOf(m.by.bed);
+        const did = { plant: 'planted', water: 'watered', weed: 'weeded', harvest: 'picked' }[m.by.action];
+        if (b && did) sysChat(`${m.by.name} ${did} the ${b.plant.toLowerCase()}.`);
+      }
       break;
     case 'room:denied':
       toast('That room is only for its group.');
@@ -1564,6 +1573,8 @@ function click(x, y) {
   if (d.kind === 'npc') return openTalk(d.npc.id);
   if (d.kind === 'stairs-up') return openUpstairs();
   if (d.kind === 'stairs-down') return goToRoom('main');
+  if (d.kind === 'garden-bed') return openBed(d.bed);
+  if (d.kind === 'garden-list') return openGardenList();
   if (d.kind === 'person') {
     bubble(player.av.group, '👋', 'emote');
     player.waving = 2;
@@ -1617,7 +1628,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gardenPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2804,7 +2815,7 @@ $('talkForm').addEventListener('submit', async e => {
   try {
     const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
       player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
-    const where = state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const where = state.room === 'garden' ? 'up on the roof garden' : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
@@ -2911,7 +2922,9 @@ function groupCard(g, mine) {
 
 async function loadGroups() {
   try {
-    const { mine, open } = await api('/groups');
+    const { mine, open, garden: inGarden = 0 } = await api('/groups');
+    $('gardenHere').textContent = state.room === 'garden' ? "You're up there now" : inGarden ? `${inGarden} up there now` : 'nobody up there just now';
+    $('gardenGo').disabled = state.room === 'garden';
     const m = $('upMine');
     m.replaceChildren(...mine.map(g => groupCard(g, true)));
     if (!mine.length) {
@@ -2971,10 +2984,11 @@ async function goToRoom(room, group = null) {
   player.target = null;
   player.goingToSeat = null;
   setPlaced(null);
-  const up = room !== 'main';
+  const roof = room === 'garden';
+  const up = room !== 'main' && !roof; // a group's room upstairs
   state.room = room;
   state.roomName = up ? group.name : null;
-  world.setFloor(up ? 'up' : 'main');
+  world.setFloor(roof ? 'garden' : up ? 'up' : 'main');
   if (up) world.setUpstairsSign(group.name, group.description || 'upstairs at Sakura Slice', group.color);
 
   // arrive at the top (or the foot) of the stairs, facing into the room
@@ -2989,21 +3003,160 @@ async function goToRoom(room, group = null) {
   send({ t: 'room', room, state: {
     x: player.pos.x, z: player.pos.z, ry: player.ry, seat: null, drink: player.drink, placed: null, moving: false,
   } });
-  $('floorAct').querySelector('.t').textContent = up ? 'Downstairs' : 'Upstairs';
-  $('floorAct').firstElementChild.textContent = up ? '⬇️' : '🪜';
+  $('floorAct').querySelector('.t').textContent = room !== 'main' ? 'Downstairs' : 'Upstairs';
+  $('floorAct').firstElementChild.textContent = room !== 'main' ? '⬇️' : '🪜';
   refreshActions();
+  garden.open = null;
+  if (roof) await loadGarden();
   await loadNotes();
   try {
     const { messages } = await api('/chat?room=' + encodeURIComponent(room));
     messages.forEach(addChat);
   } catch (e) { /* fine */ }
-  sysChat(up ? `You climb the spiral stairs to ${group.name}'s room.` : 'You come back down into the café.');
+  sysChat(roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
+    : up ? `You climb the spiral stairs to ${group.name}'s room.` : 'You come back down into the café.');
   updateOnline();
   await wait(120);
   $('fade').classList.remove('on');
 }
 
 $('floorAct').onclick = () => (state.room === 'main' ? openUpstairs() : goToRoom('main'));
+
+// ───────────────────────────────────────── the roof garden
+// Eight beds the whole café shares (server/garden.js): plant, water, weed,
+// pick. What changes for one person changes for everyone up there.
+const garden = { beds: [], me: null, open: null, busy: false };
+const GARDEN_ACTS = {
+  plant: { icon: '🌱', label: 'Plant seeds', e: '🌱' },
+  water: { icon: '💧', label: 'Water it', e: '💧' },
+  weed: { icon: '🌿', label: 'Pull the weeds', e: '🌿' },
+  harvest: { icon: '🧺', label: 'Pick it', e: '🧺' },
+};
+const STAGES = ['Bare soil, ready for seeds', 'Seedlings, just up', 'Growing', 'Ready to pick'];
+const bedOf = id => garden.beds.find(b => b.id === id);
+
+async function loadGarden() {
+  try {
+    const r = await api('/garden');
+    garden.beds = r.beds;
+    garden.me = r.me;
+    world.setGarden(garden.beds);
+  } catch (e) { /* the garden waits */ }
+}
+function setGardenBeds(beds) {
+  garden.beds = beds;
+  world.setGarden(beds);
+  if (garden.open === 'list') openGardenList();
+  else if (garden.open && !$('gardenPanel').classList.contains('hidden')) openBed(garden.open);
+}
+function helpedLine() {
+  const m = garden.me;
+  if (!m) return '';
+  const n = m.plants + m.waters + m.weeds + m.harvests;
+  if (!n) return "You haven't helped in the garden yet — every little bit counts.";
+  return `You've helped ${n} time${n === 1 ? '' : 's'}: 🌱 ${m.plants} · 💧 ${m.waters} · 🌿 ${m.weeds} · 🧺 ${m.harvests}. Yuto says thank you.`;
+}
+
+function openBed(id) {
+  const b = bedOf(id);
+  if (!b) return;
+  garden.open = id;
+  $('gardenEyebrow').textContent = 'The roof garden';
+  $('gardenTitle').textContent = `The ${b.plant.toLowerCase()} bed`;
+  $('gardenText').textContent = b.use;
+  const body = $('gardenBody');
+  const status = document.createElement('p');
+  status.className = 'fine';
+  status.textContent = `${STAGES[b.stage]}${b.weeds ? ' · weeds coming through' : ''}`;
+  const water = document.createElement('div');
+  water.className = 'bed-meter';
+  water.title = 'How damp the soil is';
+  const fill = document.createElement('i');
+  fill.style.width = `${Math.round(b.water * 100)}%`;
+  water.appendChild(fill);
+  const wl = document.createElement('p');
+  wl.className = 'fine';
+  wl.textContent = b.stage === 0 ? '' : b.water < 0.35 ? '💧 The soil is dry — it needs water to grow.' : b.water > 0.85 ? '💧 Soaked. It has all it needs for now.' : '💧 Damp enough to keep growing.';
+  const acts = document.createElement('div');
+  acts.className = 'bed-acts';
+  for (const [k, a] of Object.entries(GARDEN_ACTS)) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn' + (b.needs.includes(k) ? '' : ' ghost');
+    btn.textContent = `${a.icon} ${a.label}`;
+    const can = k === 'plant' ? b.stage === 0 : k === 'water' ? b.water < 0.85 : k === 'weed' ? b.weeds : b.stage === 3;
+    btn.disabled = !can || garden.busy;
+    btn.onclick = () => tendBed(id, k);
+    acts.appendChild(btn);
+  }
+  body.replaceChildren(status, water, wl, acts);
+  $('gardenMe').textContent = helpedLine();
+  openPanel('gardenPanel');
+}
+
+function openGardenList() {
+  garden.open = 'list';
+  $('gardenEyebrow').textContent = 'Pinned by the beds';
+  $('gardenTitle').textContent = "Yuto's garden list";
+  const jobs = garden.beds.flatMap(b => b.needs.map(k => ({ b, k })));
+  $('gardenText').textContent = jobs.length
+    ? "\"If you have a minute — no pressure. The plants are patient, and so am I.\" — Yuto"
+    : '"Nothing needs doing right now. Sit down. Have a coffee. That is also gardening." — Yuto';
+  const order = { harvest: 0, water: 1, weed: 2, plant: 3 };
+  const words = { plant: 'needs seeds', water: 'is thirsty', weed: 'has weeds', harvest: 'is ready to pick' };
+  const list = document.createElement('div');
+  list.className = 'garden-jobs';
+  jobs.sort((x, y) => order[x.k] - order[y.k]).forEach(({ b, k }) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    const t = document.createElement('span');
+    t.textContent = `${GARDEN_ACTS[k].icon} The ${b.plant.toLowerCase()} ${words[k]}`;
+    const go = document.createElement('small');
+    go.textContent = 'go →';
+    btn.append(t, go);
+    btn.onclick = () => tendBed(b.id, k);
+    list.appendChild(btn);
+  });
+  $('gardenBody').replaceChildren(list);
+  $('gardenMe').textContent = helpedLine();
+  openPanel('gardenPanel');
+}
+
+// Walk over to the bed, then do it.
+async function tendBed(id, action) {
+  if (garden.busy) return;
+  const spot = world.gardenSpots()[id];
+  if (!spot) return;
+  garden.busy = true;
+  closePanels();
+  if (player.seat) standUp();
+  player.goingToSeat = null;
+  const target = new THREE.Vector3(spot.x, world.floorY, spot.z);
+  if (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 0.6) walkTo(target);
+  const t0 = performance.now();
+  while (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 0.7 && performance.now() - t0 < 9000) await wait(120);
+  try {
+    if (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 2.5) throw new Error("You couldn't quite reach it — walk a little closer and try again.");
+    player.target = null;
+    player.path = null;
+    const bed = bedOf(id);
+    player.ry = Math.atan2(spot.bx - player.pos.x, spot.bz - player.pos.z); // face the bed
+    bubble(player.av.group, GARDEN_ACTS[action].e, 'emote');
+    send({ t: 'emote', e: GARDEN_ACTS[action].e });
+    sound.cue('pin');
+    const r = await api(`/garden/${id}/${action}`, { method: 'POST', body: {} }); // writes must be JSON (see api.js)
+    garden.me = r.me;
+    setGardenBeds(r.beds);
+    toast(`${GARDEN_ACTS[action].icon} ${r.message}`);
+    if (bed && action === 'harvest') sysChat(`You picked the ${bed.plant.toLowerCase()} for the café kitchen.`);
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    garden.busy = false;
+  }
+}
+
+$('gardenGo').onclick = () => goToRoom('garden');
 
 // ───────────────────────────────────────── the loop
 

@@ -201,3 +201,19 @@ CREATE TABLE IF NOT EXISTS loyalty_cards (
   rewards INTEGER NOT NULL DEFAULT 0,
   last_stamp TIMESTAMPTZ
 );
+
+-- The roof garden (the third floor, open to everyone): the shared beds,
+-- and how much each person has helped in them. See server/garden.js.
+CREATE TABLE IF NOT EXISTS garden_beds (
+  id         TEXT PRIMARY KEY,
+  state      JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS garden_helpers (
+  user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  plants     INTEGER NOT NULL DEFAULT 0,
+  waters     INTEGER NOT NULL DEFAULT 0,
+  weeds      INTEGER NOT NULL DEFAULT 0,
+  harvests   INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

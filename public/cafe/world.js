@@ -14,6 +14,7 @@ import { mapX, mapZ, deltaAt, OLD } from './layout.mjs';
 export const ROOM = { minX: -15, maxX: 15, minZ: -11, maxZ: 11, h: 4.2 };
 export const FLOOR2_Y = 4.4;      // the upstairs floor
 export const FLOOR2_H = 3.6;      // upstairs ceiling height
+export const FLOOR3_Y = FLOOR2_Y + FLOOR2_H + 0.3; // the roof garden, on top of it all
 export const STAIRS = { x: mapX(1.1), z: mapZ(-6.7), r: 1.15 };
 
 const COLORS = {
@@ -340,10 +341,12 @@ export function buildWorld(renderer) {
     interactables: [], // meshes that respond to hover/click (userData.kind)
     group: new THREE.Group(),
   });
-  const floors = { main: mkFloor(), up: mkFloor() };
-  scene.add(floors.main.group, floors.up.group);
+  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor() };
+  scene.add(floors.main.group, floors.up.group, floors.garden.group);
   floors.up.group.position.y = FLOOR2_Y;
   floors.up.group.visible = false;
+  floors.garden.group.position.y = FLOOR3_Y;
+  floors.garden.group.visible = false;
   let { colliders, seats, surfaces, interactables } = floors.main;
   let root = floors.main.group;
   let FY = 0; // world height of the floor being built
@@ -1237,13 +1240,13 @@ export function buildWorld(renderer) {
     colliders.push({ type: 'circle', x: STAIRS.x, z: STAIRS.z, r: STAIRS.r - 0.1, fixed: true });
     const sign = makeSign([
       { text: 'upstairs ↑', font: 'Dancing Script, cursive', size: 150, color: COLORS.sakuraDark, weight: '700' },
-      { text: 'rooms for groups', size: 70 },
+      { text: 'group rooms · roof garden', size: 70 },
     ], 0.7, 0.32);
     sign.position.set(STAIRS.x - 0.02, 1.2, STAIRS.z + 1.3);
     root.add(fixed(sign));
     const hover = new THREE.Mesh(new THREE.CylinderGeometry(STAIRS.r + 0.2, STAIRS.r + 0.2, ROOM.h, 24), new THREE.MeshBasicMaterial({ visible: false }));
     hover.position.set(STAIRS.x, ROOM.h / 2, STAIRS.z);
-    hover.userData = { kind: 'stairs-up', label: 'Go upstairs — rooms for groups' };
+    hover.userData = { kind: 'stairs-up', label: 'Go upstairs — group rooms and the roof garden' };
     interactables.push(hover);
     root.add(fixed(hover));
   }
@@ -1582,6 +1585,555 @@ export function buildWorld(renderer) {
     obj.x += dx; obj.z += dz;
   }
   board.placed = true;
+
+  // ════════════════════════════════════════ THE ROOF GARDEN (third floor)
+  // Open to everyone, like the ground floor: café tables under a sakura
+  // pergola, benches looking out over Cairo, a coffee cart, and eight raised
+  // beds the whole café looks after together (server/garden.js). Built at its
+  // real size, after the spread-out above.
+  ({ colliders, seats, surfaces, interactables } = floors.garden);
+  root = floors.garden.group;
+  FY = FLOOR3_Y;
+  const gardenLamps = [];
+  const gardenBeds = new Map(); // id -> { soil, plants, hover, spot, label }
+  {
+    const W3 = ROOM.maxX - ROOM.minX, D3 = ROOM.maxZ - ROOM.minZ;
+    colliders.push({ type: 'room', fixed: true, minX: ROOM.minX + 0.55, maxX: ROOM.maxX - 0.55, minZ: ROOM.minZ + 0.55, maxZ: ROOM.maxZ - 0.55 });
+
+    // terracotta tiles, warm in the sun
+    const tileTex = canvasTex(512, (g, s) => {
+      g.fillStyle = '#c98f6b'; g.fillRect(0, 0, s, s);
+      const n = 4, c = s / n, r = rand(311);
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        const k = 0.9 + r() * 0.2;
+        g.fillStyle = `rgb(${Math.round(205 * k)}, ${Math.round(146 * k)}, ${Math.round(110 * k)})`;
+        g.fillRect(i * c + 3, j * c + 3, c - 6, c - 6);
+      }
+    }, { repeat: [W3 / 2.4, D3 / 2.4] });
+    const deck = new THREE.Mesh(new THREE.PlaneGeometry(W3, D3), std('#ffffff', { map: tileTex, roughness: 0.9 }));
+    deck.rotation.x = -Math.PI / 2;
+    deck.receiveShadow = true;
+    deck.userData.floor = true;
+    root.add(deck);
+    floors.garden.floorMesh = deck;
+    // a gravel path between the beds
+    const gravel = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 1.6), std('#d8cbb3', { roughness: 1 }));
+    gravel.rotation.x = -Math.PI / 2;
+    gravel.position.set(8.3, 0.004, -0.7);
+    gravel.receiveShadow = true;
+    root.add(gravel);
+
+    // the low wall round the roof (notes can go on it), and the building below
+    const parapetM = std(COLORS.plaster, { roughness: 0.95 });
+    const capM = std('#e3d4c0', { roughness: 0.8 });
+    for (const [x, z, w, d] of [[0, ROOM.minZ - 0.1, W3 + 0.4, 0.3], [0, ROOM.maxZ + 0.1, W3 + 0.4, 0.3], [ROOM.minX - 0.1, 0, 0.3, D3 + 0.4], [ROOM.maxX + 0.1, 0, 0.3, D3 + 0.4]]) {
+      const wall = shadowy(new THREE.Mesh(new THREE.BoxGeometry(w, 1.05, d), parapetM));
+      wall.position.set(x, 0.525, z);
+      wall.userData.surface = 'wall';
+      surfaces.push(wall);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, 0.07, d + 0.12), capM);
+      cap.position.set(x, 1.085, z);
+      root.add(wall, cap);
+      // the outside of the building, all the way down to the street
+      const face = new THREE.Mesh(new THREE.BoxGeometry(w, FLOOR3_Y, d), std('#e9dccb', { roughness: 1 }));
+      face.position.set(x, -FLOOR3_Y / 2, z);
+      root.add(face);
+    }
+    // windows on the outside walls, two storeys of them
+    {
+      const winM = std('#4b5a63', { roughness: 0.2, metalness: 0.3 });
+      const frameM = std('#f6efe4', { roughness: 0.7 });
+      for (const y of [-FLOOR3_Y + 1.9, -FLOOR3_Y + FLOOR2_Y + 1.7]) {
+        for (let x = ROOM.minX + 2.5; x <= ROOM.maxX - 2.4; x += 3.4) {
+          for (const z of [ROOM.minZ - 0.27, ROOM.maxZ + 0.27]) {
+            const f = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.9, 0.05), frameM); f.position.set(x, y, z);
+            const g = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.7, 0.06), winM); g.position.set(x, y, z + Math.sign(z) * 0.01);
+            root.add(f, g);
+          }
+        }
+        for (let z = ROOM.minZ + 2.4; z <= ROOM.maxZ - 2.3; z += 3.4) {
+          for (const x of [ROOM.minX - 0.27, ROOM.maxX + 0.27]) {
+            const f = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.9, 1.6), frameM); f.position.set(x, y, z);
+            const g = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.7, 1.4), winM); g.position.set(x + Math.sign(x) * 0.01, y, z);
+            root.add(f, g);
+          }
+        }
+      }
+    }
+
+    // the little stair house the spiral stairs come up into
+    {
+      const hx = STAIRS.x, hz = STAIRS.z - 0.2, hw = 3.2, hd = 2.6, hh = 2.5;
+      const body = shadowy(new THREE.Mesh(new THREE.BoxGeometry(hw, hh, hd), parapetM));
+      body.position.set(hx, hh / 2, hz);
+      body.userData.surface = 'wall';
+      surfaces.push(body);
+      const roof = shadowy(new THREE.Mesh(new THREE.BoxGeometry(hw + 0.4, 0.14, hd + 0.4), std(COLORS.forest, { roughness: 0.6 })));
+      roof.position.set(hx, hh + 0.07, hz);
+      const door = rbox(1.1, 2.1, 0.08, 0.02, std(COLORS.sage, { roughness: 0.6 }));
+      door.position.set(hx, 1.05, hz + hd / 2 + 0.02);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), M.brass);
+      knob.position.set(hx + 0.4, 1.0, hz + hd / 2 + 0.08);
+      const lampM = std('#fff1d6', { emissive: '#ffcf8f', emissiveIntensity: 0.4 });
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), lampM);
+      lamp.position.set(hx, 2.3, hz + hd / 2 + 0.12);
+      root.add(body, roof, door, knob, lamp);
+      colliders.push({ type: 'box', fixed: true, minX: hx - hw / 2, maxX: hx + hw / 2, minZ: hz - hd / 2, maxZ: hz + hd / 2 });
+      const sign = makeSign([
+        { text: 'downstairs ↓', font: 'Dancing Script, cursive', size: 140, color: COLORS.sakuraDark, weight: '700' },
+        { text: 'back to the café', size: 70 },
+      ], 0.9, 0.36);
+      sign.position.set(hx - 1.05, 1.5, hz + hd / 2 + 0.02);
+      root.add(sign);
+      const hover = new THREE.Mesh(new THREE.BoxGeometry(hw + 0.2, hh, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
+      hover.position.set(hx, hh / 2, hz + hd / 2 + 0.2);
+      hover.userData = { kind: 'stairs-down', label: 'Go back down to the café' };
+      interactables.push(hover);
+      root.add(hover);
+    }
+
+    // a garden sign over the stair house
+    {
+      const s = makeSign([
+        { text: 'The Roof Garden', size: 120, weight: '700' },
+        { text: 'sit a while · help us grow things 🌿', font: 'Dancing Script, cursive', size: 80, color: COLORS.sakuraDark },
+      ], 3.0, 0.62, { bg: COLORS.cream });
+      s.position.set(STAIRS.x, 3.1, STAIRS.z + 1.12);
+      root.add(s);
+    }
+
+    // ── the sakura pergola, with café tables under it
+    const PX0 = -12.2, PX1 = -3.2, PZ0 = -4.6, PZ1 = 3.6, PH = 2.75;
+    {
+      const postM = M.woodDark;
+      for (const x of [PX0, (PX0 + PX1) / 2, PX1]) for (const z of [PZ0, PZ1]) {
+        const p = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.16, PH, 0.16), postM));
+        p.position.set(x, PH / 2, z);
+        root.add(p);
+        colliders.push({ type: 'circle', fixed: true, x, z, r: 0.14 });
+      }
+      for (const z of [PZ0, PZ1]) {
+        const beam = shadowy(new THREE.Mesh(new THREE.BoxGeometry(PX1 - PX0 + 0.6, 0.18, 0.14), postM));
+        beam.position.set((PX0 + PX1) / 2, PH + 0.05, z);
+        root.add(beam);
+      }
+      for (let x = PX0 - 0.1; x <= PX1 + 0.1; x += 0.6) {
+        const slat = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, PZ1 - PZ0 + 0.5), M.wood));
+        slat.position.set(x, PH + 0.19, (PZ0 + PZ1) / 2);
+        root.add(slat);
+      }
+      // blossom hanging through the slats (instanced, so it stays light)
+      const r = rand(77);
+      const n = 300;
+      const blossom = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.075, 1), std(COLORS.sakura, { roughness: 0.9 }), n);
+      const blossom2 = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.06, 1), std('#f6c9d4', { roughness: 0.9 }), n);
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+      for (let i = 0; i < n; i++) {
+        for (const inst of [blossom, blossom2]) {
+          const edge = r() < 0.3;
+          pos.set(PX0 + r() * (PX1 - PX0), PH + 0.28 - (edge ? r() * 0.7 : r() * 0.15), PZ0 + r() * (PZ1 - PZ0));
+          if (edge) pos.z = r() < 0.5 ? PZ0 + r() * 0.3 : PZ1 - r() * 0.3;
+          sc.setScalar(0.6 + r() * 0.7);
+          inst.setMatrixAt(i, m4.compose(pos, q, sc));
+        }
+      }
+      blossom.castShadow = blossom2.castShadow = true;
+      root.add(blossom, blossom2);
+      // string lights along the beams
+      const bulbM = new THREE.MeshBasicMaterial({ color: '#ffe2b0' });
+      const bgeo = new THREE.SphereGeometry(0.04, 12, 12);
+      for (const z of [PZ0 + 0.05, PZ1 - 0.05, (PZ0 + PZ1) / 2]) {
+        for (let i = 0; i <= 18; i++) {
+          const k = i / 18;
+          const b = new THREE.Mesh(bgeo, bulbM);
+          b.position.set(PX0 + (PX1 - PX0) * k, PH - 0.05 - Math.sin(k * Math.PI) * 0.35, z);
+          root.add(b);
+        }
+      }
+      // café tables under it
+      const tableSpots = [[-10.4, -2.4], [-6.0, -2.6], [-10.2, 1.6], [-5.8, 1.4]];
+      tableSpots.forEach(([x, z], ti) => {
+        const t = roundTable(x, z, 0.5, 0.76, M.woodLight);
+        t.top.userData.label = 'a garden table';
+        vase(x, 0.76 + 0.026, z);
+        const chairs = [[x, z - 0.9, 0], [x, z + 0.9, Math.PI], [x - 0.9, z, Math.PI / 2], [x + 0.9, z, -Math.PI / 2]];
+        chairs.forEach(([cx, cz, ry], ci) => {
+          const c = chair(cx, cz, ry, ci % 2 ? M.cushionSage : M.cushion);
+          const seat = { id: `garden-t${ti}-${ci}`, label: 'a table under the sakura', x: cx, z: cz, y: FY, h: 0.54, ry, chair: c };
+          seats.push(seat);
+          c.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat, label: 'Sit under the sakura' }; interactables.push(o); } });
+        });
+      });
+      // two lamps for the evenings
+      for (const [x, z] of [[-8.2, -0.5], [-4.2, -0.5]]) {
+        const g = new THREE.Group();
+        const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.6, 8), std('#3a2a26'));
+        cord.position.y = -0.3;
+        const shade = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.55),
+          std('#fde8ef', { side: THREE.DoubleSide, roughness: 0.8, emissive: '#ffcf8f', emissiveIntensity: 0.25 }));
+        shade.position.y = -0.6;
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 16), new THREE.MeshBasicMaterial({ color: '#fff1d6' }));
+        bulb.position.y = -0.7;
+        g.add(cord, shade, bulb);
+        g.position.set(x, PH, z);
+        root.add(g);
+        const light = new THREE.PointLight('#ffcf94', 3, 8, 1.6);
+        light.position.set(x, PH - 0.85, z);
+        root.add(light);
+        gardenLamps.push({ light, shade, bulb });
+      }
+    }
+
+    // Me3temed, supervising from the corner of the pergola
+    {
+      const p = { id: 'me3temed', name: 'Me3temed', role: 'Co-founder · Head of the garden (self-appointed)' };
+      const av = buildAvatar({ body: 'owl', skin: '#9c8a6a', accent: '#f4ead8', gender: 'he' }, { bowtie: '#2f5d3a', scale: 0.42 });
+      av.group.position.set(PX1, PH + 0.14, PZ1);
+      av.group.rotation.y = 0.5;
+      root.add(av.group);
+      av.group.traverse(o => { if (o.isMesh) { o.userData = { kind: 'npc', npc: p, label: `${p.name} · keeping an eye on the garden` }; interactables.push(o); } });
+      animated.push(dt => { if (floors.garden.group.visible) av.update(dt, {}); });
+    }
+
+    // benches along the front wall, looking out over the street
+    for (const [x, z] of [[-9.5, ROOM.maxZ - 1.0], [-4.5, ROOM.maxZ - 1.0], [0.5, ROOM.maxZ - 1.0]]) {
+      const g = new THREE.Group();
+      const seatB = rbox(2.0, 0.08, 0.5, 0.03, M.woodLight); seatB.position.y = 0.45;
+      const back = rbox(2.0, 0.42, 0.06, 0.03, M.woodLight); back.position.set(0, 0.75, 0.24); back.rotation.x = 0.1;
+      g.add(seatB, back);
+      for (const lx of [-0.85, 0.85]) {
+        const leg = rbox(0.08, 0.45, 0.45, 0.02, M.woodDark); leg.position.set(lx, 0.225, 0);
+        g.add(leg);
+      }
+      g.position.set(x, 0, z);
+      root.add(g);
+      colliders.push({ type: 'box', fixed: true, minX: x - 1.0, maxX: x + 1.0, minZ: z - 0.3, maxZ: z + 0.3 });
+      [-0.5, 0.5].forEach((off, i) => {
+        const seat = { id: `garden-bench-${x}-${i}`, label: 'a bench looking out over Cairo', x: x + off, z: z - 0.05, y: FY, h: 0.49, ry: Math.PI, chair: g };
+        seats.push(seat);
+      });
+      g.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat: seats[seats.length - 2], label: 'Sit and look out over Cairo' }; interactables.push(o); } });
+    }
+
+    // the coffee cart
+    {
+      const x = 4.6, z = 6.6;
+      const g = new THREE.Group();
+      const body = rbox(1.8, 0.95, 0.8, 0.05, std(COLORS.forest, { roughness: 0.5 }));
+      body.position.y = 0.62;
+      const top = rbox(1.9, 0.06, 0.88, 0.02, M.woodLight);
+      top.position.y = 1.12;
+      g.add(body, top);
+      for (const sx of [-0.7, 0.7]) {
+        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 10, 24), M.woodDark);
+        wheel.position.set(sx, 0.17, 0.42);
+        g.add(wheel);
+      }
+      // the striped canopy
+      const awn = canvasTex(256, (c, s) => { for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#fffaf4' : COLORS.sakura; c.fillRect(i * s / 8, 0, s / 8, s); } });
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.05, 1.1), std('#ffffff', { map: awn, roughness: 0.9 }));
+      canopy.position.y = 2.15;
+      canopy.rotation.x = -0.12;
+      for (const sx of [-0.9, 0.9]) {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 10), M.woodDark);
+        pole.position.set(sx, 1.65, -0.35);
+        g.add(pole);
+      }
+      const machine = rbox(0.45, 0.4, 0.35, 0.04, std('#d9d2c8', { roughness: 0.3, metalness: 0.6 }));
+      machine.position.set(-0.45, 1.35, -0.1);
+      g.add(canopy, machine);
+      for (let i = 0; i < 3; i++) {
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.1, 16), M.ceramic);
+        cup.position.set(0.15 + i * 0.16, 1.2, 0.1);
+        g.add(cup);
+      }
+      const sign = makeSign([{ text: 'the garden cart', font: 'Dancing Script, cursive', size: 110, color: COLORS.sakuraDark, weight: '700' }, { text: 'order anything from the menu ☕', size: 64 }], 1.1, 0.34);
+      sign.position.set(0, 0.7, 0.41);
+      g.add(sign);
+      g.position.set(x, 0, z);
+      g.rotation.y = Math.PI;
+      root.add(g);
+      colliders.push({ type: 'box', fixed: true, minX: x - 1.0, maxX: x + 1.0, minZ: z - 0.5, maxZ: z + 0.5 });
+      g.traverse(o => { if (o.isMesh) { o.userData = { kind: 'order', label: 'The garden cart — order a drink' }; interactables.push(o); } });
+    }
+
+    // a sakura tree in a big planter, and potted lemon trees
+    {
+      const x = -0.8, z = 1.0;
+      const planter = rbox(1.8, 0.6, 1.8, 0.06, M.woodDark);
+      planter.position.set(x, 0.3, z);
+      const soil = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.04, 1.6), std('#5a3d2a', { roughness: 1 }));
+      soil.position.set(x, 0.6, z);
+      const trunk = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 2.0, 12), std('#6b4a32', { roughness: 0.9 })));
+      trunk.position.set(x, 1.6, z);
+      root.add(planter, soil, trunk);
+      const r = rand(5);
+      for (let i = 0; i < 9; i++) {
+        const c = shadowy(new THREE.Mesh(new THREE.IcosahedronGeometry(0.55 + r() * 0.3, 2), std(i % 3 ? COLORS.sakura : '#f6c9d4', { roughness: 0.9 })));
+        c.position.set(x + (r() - 0.5) * 1.6, 2.6 + r() * 0.8, z + (r() - 0.5) * 1.6);
+        root.add(c);
+      }
+      colliders.push({ type: 'box', fixed: true, minX: x - 0.95, maxX: x + 0.95, minZ: z - 0.95, maxZ: z + 0.95 });
+      // a ring seat round the planter
+      const ring = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.05, 2.1), M.woodLight);
+      ring.position.set(x, 0.62, z);
+      root.add(ring);
+    }
+    const lemonTree = (x, z) => {
+      const pot = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.3, 0.7, 24), M.pot));
+      pot.position.set(x, 0.35, z);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.9, 8), std('#6b4a32'));
+      stem.position.set(x, 1.1, z);
+      const crown = shadowy(new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 2), M.leaf));
+      crown.position.set(x, 1.85, z);
+      root.add(pot, stem, crown);
+      const r = rand(Math.round(x * 13 + z * 7));
+      for (let i = 0; i < 9; i++) {
+        const l = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), std('#f0d24a', { roughness: 0.5 }));
+        l.scale.set(1, 0.85, 1.2);
+        const a = r() * Math.PI * 2, e = (r() - 0.3) * 1.2;
+        l.position.set(x + Math.cos(a) * 0.58 * Math.cos(e), 1.85 + Math.sin(e) * 0.5, z + Math.sin(a) * 0.58 * Math.cos(e));
+        root.add(l);
+      }
+      colliders.push({ type: 'circle', fixed: true, x, z, r: 0.42 });
+    };
+    lemonTree(ROOM.minX + 1.2, ROOM.minZ + 1.2);
+    lemonTree(ROOM.minX + 1.2, ROOM.maxZ - 1.2);
+    lemonTree(ROOM.maxX - 1.2, ROOM.maxZ - 1.2);
+    lemonTree(-2.2, ROOM.minZ + 1.2);
+
+    // ── the beds: eight raised beds in two rows, a gravel path between
+    const BED_LAYOUT = ['mint', 'basil', 'chamomile', 'lavender', 'strawberries', 'tomatoes', 'sunflowers', 'jasmine'];
+    const bedX = [3.8, 6.9, 10.0, 13.1], bedZ = [-3.1, 1.7], BW = 2.5, BD = 1.1, BH = 0.5;
+    BED_LAYOUT.forEach((id, i) => {
+      const x = bedX[i % 4], z = bedZ[Math.floor(i / 4)];
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      for (const [w, d, px, pz] of [[BW, 0.1, 0, -BD / 2], [BW, 0.1, 0, BD / 2], [0.1, BD, -BW / 2, 0], [0.1, BD, BW / 2, 0]]) {
+        const plank = rbox(w, BH, d, 0.02, M.wood);
+        plank.position.set(px, BH / 2, pz);
+        g.add(plank);
+      }
+      const soil = new THREE.Mesh(new THREE.BoxGeometry(BW - 0.1, 0.06, BD - 0.1), std('#8a6a4a', { roughness: 1 }));
+      soil.position.y = BH - 0.08;
+      soil.receiveShadow = true;
+      g.add(soil);
+      const plants = new THREE.Group();
+      plants.position.y = BH - 0.05;
+      g.add(plants);
+      // a little name stake at the path end
+      const stake = makeSign([{ text: id === 'tomatoes' ? 'tomatoes' : id, font: 'Dancing Script, cursive', size: 120, color: COLORS.woodDark, weight: '700' }], 0.5, 0.16);
+      const toPath = z < -0.7 ? 1 : -1;
+      stake.position.set(-BW / 2 + 0.35, BH + 0.12, toPath * (BD / 2 + 0.02));
+      if (toPath < 0) stake.rotation.y = Math.PI;
+      g.add(stake);
+      root.add(g);
+      colliders.push({ type: 'box', fixed: true, minX: x - BW / 2, maxX: x + BW / 2, minZ: z - BD / 2, maxZ: z + BD / 2 });
+      const hover = new THREE.Mesh(new THREE.BoxGeometry(BW + 0.1, 1.4, BD + 0.1), new THREE.MeshBasicMaterial({ visible: false }));
+      hover.position.set(x, 0.7, z);
+      hover.userData = { kind: 'garden-bed', bed: id, label: `The ${id} bed` };
+      interactables.push(hover);
+      root.add(hover);
+      // where you stand to work on it: on the path side
+      gardenBeds.set(id, { soil, plants, hover, key: '', spot: { x, z: z + toPath * (BD / 2 + 0.45), bx: x, bz: z }, seed: i * 101 + 7 });
+    });
+
+    // Yuto's garden list, by the beds
+    {
+      const x = 8.4, z = -6.2;
+      const g = new THREE.Group();
+      for (const sx of [-0.55, 0.55]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.6, 0.06), M.woodDark);
+        leg.position.set(sx, 0.8, 0);
+        g.add(leg);
+      }
+      const board = rbox(1.3, 0.9, 0.05, 0.02, M.woodDark);
+      board.position.y = 1.25;
+      const face = makeSign([
+        { text: "Yuto's garden list", font: 'Dancing Script, cursive', size: 110, color: '#f8f2ea', weight: '700' },
+        { text: 'water · weed · plant · pick', size: 60, color: '#e6dccd' },
+        { text: 'tap me to see what needs doing', size: 52, color: '#cfc3b2' },
+      ], 1.18, 0.78, { bg: '#2f3b33', border: '#2f3b33' });
+      face.position.set(0, 1.25, 0.03);
+      g.add(board, face);
+      g.position.set(x, 0, z);
+      root.add(g);
+      colliders.push({ type: 'box', fixed: true, minX: x - 0.7, maxX: x + 0.7, minZ: z - 0.15, maxZ: z + 0.15 });
+      g.traverse(o => { if (o.isMesh) { o.userData = { kind: 'garden-list', label: "Yuto's garden list — what needs doing" }; interactables.push(o); } });
+    }
+
+    // the potting bench, a tap and watering cans by the back wall
+    {
+      const x = 12.2, z = ROOM.minZ + 0.95;
+      const bench = rbox(2.4, 0.08, 0.7, 0.02, M.woodLight);
+      bench.position.set(x, 0.9, z);
+      root.add(bench);
+      for (const [lx, lz] of [[-1.1, -0.28], [1.1, -0.28], [-1.1, 0.28], [1.1, 0.28]]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.9, 0.07), M.woodDark);
+        leg.position.set(x + lx, 0.45, z + lz);
+        root.add(leg);
+      }
+      for (let i = 0; i < 4; i++) {
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.16, 16), M.pot);
+        pot.position.set(x - 0.8 + i * 0.3, 1.02, z);
+        root.add(pot);
+        const sprout = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), M.leaf);
+        sprout.position.set(x - 0.8 + i * 0.3, 1.13, z);
+        sprout.scale.y = 0.7;
+        root.add(sprout);
+      }
+      const canM = std('#7aab7a', { roughness: 0.4, metalness: 0.3 });
+      for (const [cx, cz] of [[x + 0.6, z], [x - 1.6, z + 0.5]]) {
+        const can = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.28, 20), canM));
+        can.position.set(cx, cx > x ? 1.08 : 0.14, cz);
+        const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.03, 0.32, 10), canM);
+        spout.position.set(cx + 0.18, can.position.y + 0.08, cz);
+        spout.rotation.z = -0.9;
+        root.add(can, spout);
+      }
+      const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.25, 10), M.brass);
+      tap.rotation.x = Math.PI / 2;
+      tap.position.set(x - 1.7, 0.7, ROOM.minZ + 0.1);
+      root.add(tap);
+      colliders.push({ type: 'box', fixed: true, minX: x - 1.25, maxX: x + 1.25, minZ: z - 0.4, maxZ: z + 0.4 });
+    }
+
+    // planter boxes along the low wall, full of herbs and flowers
+    {
+      const r = rand(909);
+      const flowerCols = ['#f2a7bb', '#fffaf4', '#f0d24a', '#b8a6d9', '#e07b5a'];
+      const runs = [[ROOM.minX + 0.45, -8.5, ROOM.minX + 0.45, 8.5], [-12.5, ROOM.minZ + 0.45, -4.0, ROOM.minZ + 0.45], [ROOM.maxX - 0.45, 4.5, ROOM.maxX - 0.45, 9.0]];
+      for (const [x0, z0, x1, z1] of runs) {
+        const len = Math.hypot(x1 - x0, z1 - z0), along = Math.abs(x1 - x0) > 0.01;
+        const box = rbox(along ? len : 0.5, 0.45, along ? 0.5 : len, 0.03, M.wood);
+        box.position.set((x0 + x1) / 2, 0.225, (z0 + z1) / 2);
+        root.add(box);
+        colliders.push({ type: 'box', fixed: true, minX: Math.min(x0, x1) - 0.3, maxX: Math.max(x0, x1) + 0.3, minZ: Math.min(z0, z1) - 0.3, maxZ: Math.max(z0, z1) + 0.3 });
+        const n = Math.round(len / 0.35);
+        for (let i = 0; i < n; i++) {
+          const k = (i + 0.5) / n;
+          const px = x0 + (x1 - x0) * k, pz = z0 + (z1 - z0) * k;
+          const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17 + r() * 0.06, 1), M.leaf);
+          bush.position.set(px, 0.52, pz);
+          bush.scale.y = 0.8;
+          root.add(bush);
+          if (r() < 0.6) {
+            const f = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), std(flowerCols[Math.floor(r() * flowerCols.length)], { roughness: 0.8 }));
+            f.position.set(px + (r() - 0.5) * 0.15, 0.68, pz + (r() - 0.5) * 0.15);
+            root.add(f);
+          }
+        }
+      }
+    }
+
+    // butterflies, drifting over the beds in the daytime
+    {
+      const wingM = [std('#f6d36b', { side: THREE.DoubleSide }), std('#fde8ef', { side: THREE.DoubleSide }), std('#bfe3f0', { side: THREE.DoubleSide })];
+      for (let i = 0; i < 4; i++) {
+        const b = new THREE.Group();
+        const wl = new THREE.Mesh(new THREE.CircleGeometry(0.07, 10), wingM[i % 3]);
+        const wr = wl.clone();
+        wl.position.x = -0.06; wr.position.x = 0.06;
+        b.add(wl, wr);
+        root.add(b);
+        const cx = 5 + i * 2.6, cz = -0.7 + (i % 2 ? 1.5 : -1.5), ph = i * 1.7;
+        animated.push((dt, t) => {
+          if (!floors.garden.group.visible) return;
+          b.position.set(cx + Math.sin(t * 0.45 + ph) * 2.2, 1.1 + Math.sin(t * 1.3 + ph) * 0.35, cz + Math.cos(t * 0.37 + ph) * 1.6);
+          b.rotation.y = t * 0.45 + ph;
+          const f = Math.sin(t * 14 + ph) * 0.9;
+          wl.rotation.y = f; wr.rotation.y = -f;
+        });
+      }
+    }
+  }
+
+  // What's growing in a bed, drawn from its state ({ stage, water, weeds }).
+  const GROWS = {
+    mint: { leaf: '#5fae6a', flower: '#d9c8ef', kind: 'herb' },
+    basil: { leaf: '#4f9a4a', flower: '#fffaf4', kind: 'herb' },
+    chamomile: { leaf: '#8fbf6a', flower: '#fffaf4', centre: '#f0c43a', kind: 'daisy' },
+    lavender: { leaf: '#9fb08a', flower: '#9a7fd1', kind: 'spike' },
+    strawberries: { leaf: '#4e8f45', flower: '#e8384f', kind: 'berry' },
+    tomatoes: { leaf: '#4f8a3f', flower: '#e5482f', kind: 'vine' },
+    sunflowers: { leaf: '#5f9a4a', flower: '#f2c12e', centre: '#5a3a1e', kind: 'tall' },
+    jasmine: { leaf: '#3f7a45', flower: '#fffaf4', kind: 'climber' },
+  };
+  function drawBed(id, b, s) {
+    const g = GROWS[id];
+    b.plants.children.slice().forEach(c => { b.plants.remove(c); c.geometry?.dispose(); c.material?.dispose(); });
+    const r = rand(b.seed + s.stage * 13);
+    const leafM = std(g.leaf, { roughness: 0.85 }), flowerM = std(g.flower, { roughness: 0.7 });
+    const add = (geo, m, x, y, z, sx = 1, sy = 1, sz = 1) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; b.plants.add(o); return o; };
+    const spots = [];
+    for (let i = 0; i < 5; i++) for (let j = 0; j < 2; j++) spots.push([-0.96 + i * 0.48 + (r() - 0.5) * 0.08, -0.22 + j * 0.44 + (r() - 0.5) * 0.08]);
+    if (s.stage === 0) {
+      // freshly turned soil: three furrows
+      for (let k = -1; k <= 1; k++) add(new THREE.BoxGeometry(2.2, 0.03, 0.08), std('#6b4f36', { roughness: 1 }), 0, 0.01, k * 0.28);
+    } else if (s.stage === 1) {
+      const geo = new THREE.ConeGeometry(0.03, 0.12, 6);
+      spots.forEach(([x, z]) => { add(geo, leafM, x - 0.03, 0.06, z); add(geo, leafM, x + 0.03, 0.05, z + 0.02).rotation.z = -0.4; });
+    } else {
+      const big = s.stage === 3;
+      if (g.kind === 'herb' || g.kind === 'berry' || g.kind === 'daisy' || g.kind === 'spike') {
+        const geo = new THREE.IcosahedronGeometry(g.kind === 'berry' ? 0.15 : 0.14, 1);
+        spots.forEach(([x, z]) => add(geo, leafM, x, 0.1, z, 1.1, g.kind === 'spike' ? 1.2 : 0.75, 1.1));
+        if (big) spots.forEach(([x, z]) => {
+          if (g.kind === 'spike') for (let k = 0; k < 4; k++) add(new THREE.CylinderGeometry(0.012, 0.02, 0.24, 6), flowerM, x + (r() - 0.5) * 0.18, 0.32, z + (r() - 0.5) * 0.18);
+          else if (g.kind === 'daisy') for (let k = 0; k < 3; k++) { const fx = x + (r() - 0.5) * 0.2, fz = z + (r() - 0.5) * 0.2; add(new THREE.CylinderGeometry(0.035, 0.035, 0.01, 10), flowerM, fx, 0.22, fz); add(new THREE.SphereGeometry(0.014, 8, 6), std(g.centre), fx, 0.23, fz); }
+          else if (g.kind === 'berry') for (let k = 0; k < 3; k++) add(new THREE.SphereGeometry(0.03, 10, 8), flowerM, x + (r() - 0.5) * 0.22, 0.06, z + (r() - 0.5) * 0.22, 1, 1.2, 1);
+          else for (let k = 0; k < 3; k++) add(new THREE.SphereGeometry(0.022, 8, 6), flowerM, x + (r() - 0.5) * 0.16, 0.2, z + (r() - 0.5) * 0.16);
+        });
+      } else if (g.kind === 'vine' || g.kind === 'climber') {
+        const stakeM = std('#8a6a4a');
+        for (const x of [-0.8, 0, 0.8]) {
+          add(new THREE.CylinderGeometry(0.015, 0.015, big ? 1.1 : 0.8, 6), stakeM, x, big ? 0.55 : 0.4, 0);
+          for (let k = 0; k < (big ? 6 : 4); k++) add(new THREE.IcosahedronGeometry(0.13, 1), leafM, x + (r() - 0.5) * 0.3, 0.15 + k * 0.17, (r() - 0.5) * 0.3, 1, 0.8, 1);
+          if (big) for (let k = 0; k < 6; k++) add(new THREE.SphereGeometry(g.kind === 'vine' ? 0.04 : 0.025, 10, 8), flowerM, x + (r() - 0.5) * 0.35, 0.25 + r() * 0.75, (r() - 0.5) * 0.35);
+        }
+      } else if (g.kind === 'tall') {
+        const h = big ? 1.5 : 0.8;
+        for (const x of [-0.85, -0.3, 0.3, 0.85]) {
+          const zx = (r() - 0.5) * 0.2;
+          add(new THREE.CylinderGeometry(0.025, 0.03, h, 8), leafM, x, h / 2, zx);
+          for (let k = 0; k < 3; k++) add(new THREE.SphereGeometry(0.1, 10, 6), leafM, x + (k % 2 ? 0.1 : -0.1), 0.25 + k * h * 0.25, zx, 1, 0.2, 0.6);
+          if (big) {
+            const head = add(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 20), flowerM, x, h + 0.05, zx + 0.05);
+            head.rotation.x = Math.PI / 2 - 0.3;
+            const c = add(new THREE.CylinderGeometry(0.08, 0.08, 0.05, 16), std(g.centre), x, h + 0.05, zx + 0.07);
+            c.rotation.x = Math.PI / 2 - 0.3;
+          }
+        }
+      }
+    }
+    if (s.weeds) {
+      const weedM = std('#a3b04a', { roughness: 0.9 });
+      for (let k = 0; k < 7; k++) {
+        const w = add(new THREE.ConeGeometry(0.035, 0.2, 4), weedM, (r() - 0.5) * 2.2, 0.08, (r() < 0.5 ? -1 : 1) * (0.32 + r() * 0.1));
+        w.rotation.z = (r() - 0.5) * 0.8;
+      }
+    }
+  }
+  // { id: { stage, water, weeds, plant } } from the server — redraw what changed.
+  function setGarden(list = []) {
+    for (const s of list) {
+      const b = gardenBeds.get(s.id);
+      if (!b) continue;
+      // dry soil is pale and dusty; watered soil is dark
+      b.soil.material.color.set('#9a7a58').lerp(new THREE.Color('#4a3324'), Math.min(1, s.water * 1.4));
+      const key = `${s.stage}|${s.weeds ? 1 : 0}`;
+      if (key !== b.key) { b.key = key; drawBed(s.id, b, s); }
+      const what = s.stage === 0 ? 'bare soil — ready for seeds' : s.stage === 3 ? 'ready to pick' : s.stage === 1 ? 'seedlings' : 'growing';
+      const extra = [s.water < 0.35 && s.stage > 0 ? 'thirsty 💧' : '', s.weeds ? 'weedy 🌿' : ''].filter(Boolean).join(', ');
+      b.hover.userData.label = `${s.plant} · ${what}${extra ? ' · ' + extra : ''}`;
+    }
+  }
+  const gardenSpots = () => Object.fromEntries([...gardenBeds].map(([id, b]) => [id, b.spot]));
+
+  // back to the ground floor for anything built after this
+  ({ colliders, seats, surfaces, interactables } = floors.main);
+  root = floors.main.group;
+  FY = 0;
 
   // ── more tables, added after the café grew (already at their real places,
   // so built after the spread-out above). A mix of round tables, little square
@@ -2256,12 +2808,14 @@ export function buildWorld(renderer) {
     doorSigns.forEach(d => { d.sign.visible = d.state === (open ? 'open' : 'closed'); });
     // after closing the café keeps a few lamps low — still warm, never dark
     const lampK = (0.55 + night * 0.85) * (open ? 1 : 0.72);
-    [...lamps, ...upLamps].forEach(l => { l.light.intensity = 3.5 * lampK; l.shade.material.emissiveIntensity = 0.2 + night * 0.5; });
+    [...lamps, ...upLamps, ...gardenLamps].forEach(l => { l.light.intensity = 3.5 * lampK; l.shade.material.emissiveIntensity = 0.2 + night * 0.5; });
     bulbs.forEach(b => b.material.color.set(night > 0.5 ? '#ffd49a' : '#ffe9c9'));
 
     // after dark, cloud and rain make the night darker and the lamps matter more
     const lampK2 = lampK * (1 + (1 - wx.sun) * 0.2 * day);
     [...lamps, ...upLamps].forEach(l => { l.light.intensity = 3.5 * lampK2; });
+    // the roof garden is open air: its lamps only really matter after dark
+    gardenLamps.forEach(l => { l.light.intensity = 3.5 * lampK2 * (0.15 + night * 0.85); });
     outside.setSky(hour, day, dusk, night);
     return { day, night, open };
   }
@@ -2838,7 +3392,7 @@ export function buildWorld(renderer) {
 
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors,
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setBookOfWeek, setPhotos, photoFrames: PHOTO_FRAMES, setMenuBoard, setSpecials, setSeason, setEvents, setHours,
     walk, kitchen: { ...KIT, door: { x: KX, z: ROOM.minZ - 0.1 } }, updateDoors, counter,
@@ -2850,8 +3404,8 @@ export function buildWorld(renderer) {
     const f = floors[name];
     Object.assign(api, {
       floor: name,
-      floorY: name === 'up' ? FLOOR2_Y : 0,
-      floorH: name === 'up' ? FLOOR2_H : ROOM.h,
+      floorY: name === 'up' ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
+      floorH: name === 'up' ? FLOOR2_H : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
   }

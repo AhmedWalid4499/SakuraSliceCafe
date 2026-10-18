@@ -187,6 +187,17 @@
   .menu-tabs { display: flex; gap: 6px; margin-top: 12px; background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
   .menu-tabs button { flex: 1; border: 0; background: transparent; border-radius: 999px; padding: 8px 10px; font-weight: 700; font-size: 13.5px; color: var(--text-mid); }
   .menu-tabs button.on { background: var(--sakura-dark); color: #fff; }
+  /* the roof garden */
+  .garden-card { margin: 4px 0 18px; padding: 14px 16px; border-radius: 18px; background: var(--matcha-light); border: 1px solid var(--line); }
+  .garden-card h3 { margin-top: 2px; }
+  .bed-meter { height: 8px; border-radius: 999px; background: var(--field); border: 1px solid var(--line); overflow: hidden; margin: 6px 0 2px; }
+  .bed-meter i { display: block; height: 100%; background: #6fa8c9; border-radius: 999px; transition: width .4s; }
+  .bed-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .bed-acts .btn[disabled] { opacity: .45; cursor: default; }
+  .garden-jobs { display: grid; gap: 6px; margin-top: 10px; }
+  .garden-jobs button { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; border: 1.5px solid var(--line); background: var(--field); border-radius: 14px; padding: 9px 12px; color: var(--text-dark); font-size: 13.5px; }
+  .garden-jobs button:hover { border-color: var(--matcha); }
+  .garden-jobs small { color: var(--text-soft); }
   .spot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
   .spot-embed { margin-top: 8px; min-height: 80px; border-radius: 14px; overflow: hidden; background: var(--field); }
   /* top + max-height are set by fitMusicDock() so it never covers the chat */
@@ -681,6 +692,12 @@
 
 <div id="upPanel" class="panel card hidden">
   <button class="x" data-close aria-label="Close">✕</button>
+  <div class="garden-card">
+    <p class="eyebrow">The roof · open to everyone</p>
+    <h3>🌿 The roof garden</h3>
+    <p class="lede" style="font-size:13.5px">All the way up the stairs: tables under a sakura pergola, benches looking out over Cairo, and eight beds the whole café looks after together.</p>
+    <div class="row" style="gap:10px;align-items:center"><button class="btn" id="gardenGo" type="button">Climb up to the garden 🪜</button><span class="fine" id="gardenHere"></span></div>
+  </div>
   <p class="eyebrow">The second floor</p>
   <h3>Rooms for groups</h3>
   <p class="lede" style="font-size:13.5px">Upstairs, every group has its own room — your own people, your own board, your own quiet chat.</p>
@@ -751,6 +768,16 @@
   <p class="eyebrow" id="infoEyebrow">In the café</p>
   <h3 id="infoTitle"></h3>
   <p class="lede" id="infoText"></p>
+</div>
+
+<!-- The roof garden: one bed (water, weed, plant, pick), or Yuto's list of what needs doing. -->
+<div id="gardenPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow" id="gardenEyebrow">The roof garden</p>
+  <h3 id="gardenTitle"></h3>
+  <p class="lede" id="gardenText" style="font-size:13.5px"></p>
+  <div id="gardenBody"></div>
+  <p class="fine" id="gardenMe" style="margin-top:14px"></p>
 </div>
 
 <div id="helpPanel" class="panel card hidden">
