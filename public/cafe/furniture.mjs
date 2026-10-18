@@ -7,16 +7,23 @@
 // sit on a desk, a dresser or a shelf as well as on the floor. top: the height
 // of a surface you can put things on. seats / lie: where you sit or lie.
 
-// The flat: the main room, and through two doorways in its right-hand wall,
-// a kitchen (at the back) and a bathroom (at the front).
-export const ROOM_SIZE = { minX: -6, maxX: 10, minZ: -4.5, maxZ: 4.5, h: 3.2 };
+// The flat: the main room; through two doorways in its right-hand wall, a
+// kitchen (at the back) and a bathroom (at the front); and through one in its
+// left-hand wall, a reading room lined with bookshelves.
+export const ROOM_SIZE = { minX: -12, maxX: 10, minZ: -4.5, maxZ: 4.5, h: 3.2 };
 export const AREAS = {
   room: { minX: -6, maxX: 6, minZ: -4.5, maxZ: 4.5, name: 'the main room' },
   kitchen: { minX: 6.16, maxX: 10, minZ: -4.5, maxZ: -0.08, name: 'the kitchen' },
   bath: { minX: 6.16, maxX: 10, minZ: 0.08, maxZ: 4.5, name: 'the bathroom' },
+  library: { minX: -12, maxX: -6.16, minZ: -4.5, maxZ: 4.5, name: 'the reading room' },
 };
-// the gaps in the wall between the main room and the other two (centre z, half-width)
-export const DOORWAYS = { kitchen: { x: 6.08, z: -2.3, hw: 0.6 }, bath: { x: 6.08, z: 2.3, hw: 0.6 } };
+// the gaps in the walls between the main room and the others (centre, half-width,
+// and which way the other room lies: +1 to the right, −1 to the left)
+export const DOORWAYS = {
+  kitchen: { x: 6.08, z: -2.3, hw: 0.6, side: 1 },
+  bath: { x: 6.08, z: 2.3, hw: 0.6, side: 1 },
+  library: { x: -6.08, z: 2.3, hw: 0.6, side: -1 },
+};
 export function areaAt(x, z) {
   for (const [k, a] of Object.entries(AREAS)) if (x >= a.minX - 0.15 && x <= a.maxX + 0.15 && z >= a.minZ - 0.1 && z <= a.maxZ + 0.1) return k;
   return 'room';
@@ -29,6 +36,7 @@ export const FLOORS = ['oak', 'walnut', 'tatami', 'tile'];
 const WOODS = ['#c9a27e', '#9a6a46', '#6e472e', '#f4ece0'];
 const FABRICS = ['#f2a7bb', '#93ab8c', '#efe0c4', '#9fb8d6', '#c7605a', '#6f5f8f'];
 const CABINETS = ['#93ab8c', '#f4ece0', '#c9a27e', '#4f6475', '#f2c6d0'];
+const FRAMES = ['#6e472e', '#f4ece0', '#2a2420', '#c9a25b'];
 
 export const FURNITURE = [
   // sleeping
@@ -77,9 +85,15 @@ export const FURNITURE = [
   { kind: 'towel-rail', name: 'Towel rail', cat: 'bath', w: 0.6, d: 0.16, colors: ['#f2a7bb', '#93ab8c', '#fffaf4', '#9fb8d6'] },
   { kind: 'bath-mat', name: 'Bath mat', cat: 'bath', w: 0.9, d: 0.55, colors: ['#f2a7bb', '#93ab8c', '#fffaf4', '#9fb8d6'], flat: true },
   { kind: 'laundry-basket', name: 'Laundry basket', cat: 'bath', w: 0.42, d: 0.42, colors: ['#d9b48f', '#fffaf4'] },
+  // frames: your own photo, and a line underneath (wall: hangs on a wall)
+  { kind: 'frame-wall', name: 'Picture frame', cat: 'frames', w: 0.62, d: 0.06, colors: FRAMES, wall: true, picture: { w: 0.5, h: 0.38 } },
+  { kind: 'frame-portrait', name: 'Tall frame', cat: 'frames', w: 0.5, d: 0.06, colors: FRAMES, wall: true, picture: { w: 0.38, h: 0.52 } },
+  { kind: 'frame-big', name: 'Big frame', cat: 'frames', w: 1.04, d: 0.06, colors: FRAMES, wall: true, picture: { w: 0.92, h: 0.62 } },
+  { kind: 'frame-stand', name: 'Little standing frame', cat: 'frames', w: 0.24, d: 0.14, colors: FRAMES, onTop: true, picture: { w: 0.18, h: 0.14 } },
+  { kind: 'book-stack', name: 'Pile of books', cat: 'cosy', w: 0.28, d: 0.2, colors: ['#c4627f', '#93ab8c', '#6a87a8'], onTop: true },
 ];
 export const BY_KIND = new Map(FURNITURE.map(f => [f.kind, f]));
-export const CATS = [['sleep', '🛏️ Sleep'], ['study', '📚 Study'], ['store', '🗄️ Storage'], ['sit', '🛋️ Sit'], ['cosy', '🪴 Cosy'], ['kitchen', '🍳 Kitchen'], ['bath', '🛁 Bathroom']];
+export const CATS = [['sleep', '🛏️ Sleep'], ['study', '📚 Study'], ['store', '🗄️ Storage'], ['sit', '🛋️ Sit'], ['cosy', '🪴 Cosy'], ['kitchen', '🍳 Kitchen'], ['bath', '🛁 Bathroom'], ['frames', '🖼️ Frames']];
 
 // The axis-aligned box a piece covers once it's turned (ry in radians).
 export function footprint(def, x, z, ry) {

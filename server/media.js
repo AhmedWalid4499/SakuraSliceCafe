@@ -108,7 +108,8 @@ router.delete('/admin/media/:id', auth.requireAdmin, wrap(async (req, res) => {
 // the file itself, with byte ranges (browsers seek songs this way)
 router.get('/media/:id', wrap(async (req, res) => {
   const id = Number(req.params.id);
-  const { rows } = await query('SELECT mime, size FROM media WHERE id = $1', [id]);
+  // (people's own photos, in frames upstairs, are only shown by /api/home/photo)
+  const { rows } = await query("SELECT mime, size FROM media WHERE id = $1 AND kind <> 'photo'", [id]);
   if (!rows[0]) return res.status(404).end();
   const { mime, size } = rows[0];
   res.set({ 'Content-Type': mime, 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=31536000, immutable' });

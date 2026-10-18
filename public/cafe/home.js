@@ -102,7 +102,7 @@ const BUILD = {
     g.add(at(rbox(0.34, 0.015, 0.24, 0.006, m), 0, 0.008, 0.02));
     const lid = new THREE.Group(); lid.position.set(0, 0.015, -0.1); lid.rotation.x = -0.25;
     lid.add(at(rbox(0.34, 0.22, 0.012, 0.006, m), 0, 0.11, 0));
-    lid.add(at(new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.18), new THREE.MeshBasicMaterial({ color: '#cfe6f2' })), 0, 0.115, 0.007));
+    lid.add(at(new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.18), new THREE.MeshBasicMaterial({ map: screenTex() })), 0, 0.115, 0.007));
     g.add(lid);
     return g;
   },
@@ -254,7 +254,109 @@ const BUILD = {
     const h = at(new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.006, 8, 16), std(c, { roughness: 0.3 })), 0.045, 0.048, 0); h.rotation.y = Math.PI / 2; g.add(h);
     return g;
   },
+  'frame-wall'(c, def, item) { return onWall(frame(c, def, item)); },
+  'frame-portrait'(c, def, item) { return onWall(frame(c, def, item)); },
+  'frame-big'(c, def, item) { return onWall(frame(c, def, item)); },
+  'frame-stand'(c, def, item) {
+    // a little frame leaning back on its stand, for a desk or a shelf
+    const g = new THREE.Group(), f = frame(c, def, item, true);
+    f.position.set(0, def.picture.h / 2 + 0.035, 0.01); f.rotation.x = -0.18;
+    g.add(f);
+    const leg = at(box(0.02, def.picture.h * 0.9, 0.01, std(darken(c, 0.2))), 0, def.picture.h * 0.42, -0.05); leg.rotation.x = 0.4;
+    g.add(leg);
+    return g;
+  },
+  'book-stack'(c) {
+    const g = new THREE.Group(), r = rand(31), cols = [c, '#f4ece0', '#6a87a8', '#93ab8c', '#a35d4a'];
+    let y = 0;
+    for (let i = 0; i < 4; i++) {
+      const h = 0.03 + r() * 0.025, b = at(box(0.2 + r() * 0.06, h, 0.15 + r() * 0.03, std(cols[i % cols.length], { roughness: 0.8 })), (r() - 0.5) * 0.03, y + h / 2, 0);
+      b.rotation.y = (r() - 0.5) * 0.4; g.add(b); y += h;
+    }
+    return g;
+  },
 };
+
+// A frame: the moulding, the owner's photo in it (cover-fit), and what they
+// wrote underneath on a little card. The group's origin is the middle of the
+// picture, flat against the wall, facing +z. No photo yet: a soft print.
+const photoLoader = new THREE.TextureLoader();
+// hung things are placed a hair off the wall (so they count as in the room);
+// push the frame back so it sits flush
+function onWall(f) { const g = new THREE.Group(); f.position.z = -0.03; g.add(f); return g; }
+function frame(c, def, item = {}, small = false) {
+  const g = new THREE.Group(), { w, h } = def.picture, b = small ? 0.025 : 0.05, m = std(c, { roughness: 0.5 });
+  g.add(at(box(w + b * 2, b, 0.04, m), 0, h / 2 + b / 2, 0.02));
+  g.add(at(box(w + b * 2, b, 0.04, m), 0, -h / 2 - b / 2, 0.02));
+  for (const s of [-1, 1]) g.add(at(box(b, h, 0.04, m), s * (w / 2 + b / 2), 0, 0.02));
+  g.add(at(box(w, h, 0.01, std('#f8f4ee')), 0, 0, 0.005));
+  const pic = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.94, h * 0.94), new THREE.MeshStandardMaterial({ map: printTex(), roughness: 0.6 }));
+  pic.position.z = 0.012;
+  g.add(pic);
+  if (item.imageId) {
+    photoLoader.load(`/api/home/photo/${item.imageId}`, t => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      // cover-fit: crop the photo to the frame's shape rather than squash it
+      const a = (t.image.width / t.image.height) / (w / h);
+      if (a > 1) { t.repeat.set(1 / a, 1); t.offset.set((1 - 1 / a) / 2, 0); } else { t.repeat.set(1, a); t.offset.set(0, (1 - a) / 2); }
+      pic.material.map = t; pic.material.needsUpdate = true;
+    });
+  }
+  if (item.caption) {
+    const cw = Math.max(w * 0.9, small ? 0.2 : 0.42), ch = small ? 0.045 : 0.1;
+    const card = new THREE.Mesh(new THREE.PlaneGeometry(cw, ch), new THREE.MeshBasicMaterial({ map: captionTex(item.caption, cw / ch) }));
+    if (small) { card.position.set(0, -h / 2 - b - ch / 2 - 0.01, 0.03); } else { card.position.set(0, -h / 2 - b - ch / 2 - 0.05, 0.004); }
+    g.add(card);
+  }
+  return g;
+}
+let printT = null;
+function printTex() {
+  if (printT) return printT;
+  printT = canvasTex(128, (g, n) => {
+    const sky = g.createLinearGradient(0, 0, 0, n); sky.addColorStop(0, '#f6d7c3'); sky.addColorStop(1, '#f3e7d8');
+    g.fillStyle = sky; g.fillRect(0, 0, n, n);
+    g.fillStyle = '#f0b56a'; g.beginPath(); g.arc(n * 0.7, n * 0.4, n * 0.12, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#93ab8c'; g.beginPath(); g.moveTo(0, n); g.lineTo(n * 0.35, n * 0.55); g.lineTo(n * 0.6, n * 0.8); g.lineTo(n * 0.8, n * 0.62); g.lineTo(n, n); g.fill();
+    g.fillStyle = 'rgba(90,60,50,.55)'; g.font = '11px Georgia, serif'; g.textAlign = 'center'; g.fillText('choose a picture', n / 2, n - 10);
+  });
+  return printT;
+}
+// the line under a picture, in handwriting-ish ink on cream card
+function captionTex(text, aspect) {
+  const W = 512, H = Math.round(W / aspect);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fbf6ec'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#4a3a34'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  let size = Math.round(H * 0.42);
+  const fits = () => { g.font = `italic ${size}px Georgia, serif`; return g.measureText(text).width < W * 0.92; };
+  while (size > H * 0.22 && !fits()) size--;
+  if (fits()) g.fillText(text, W / 2, H / 2);
+  else { // two lines, split near the middle at a space
+    const mid = text.lastIndexOf(' ', Math.ceil(text.length / 2)) > 0 ? text.lastIndexOf(' ', Math.ceil(text.length / 2)) : Math.ceil(text.length / 2);
+    size = Math.round(H * 0.3); g.font = `italic ${size}px Georgia, serif`;
+    g.fillText(text.slice(0, mid).trim(), W / 2, H * 0.3, W * 0.94); g.fillText(text.slice(mid).trim(), W / 2, H * 0.7, W * 0.94);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+// what's on the laptop: a page of writing, mid-sentence
+let screenT = null;
+function screenTex() {
+  if (screenT) return screenT;
+  screenT = canvasTex(256, (g, n) => {
+    g.fillStyle = '#fdfbf7'; g.fillRect(0, 0, n, n);
+    g.fillStyle = '#e9eef2'; g.fillRect(0, 0, n, 22);
+    for (const [x, c] of [[10, '#f2a7bb'], [24, '#f0d27a'], [38, '#9fd0a0']]) { g.fillStyle = c; g.beginPath(); g.arc(x, 11, 4, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = '#3a3030'; g.font = 'bold 15px Georgia, serif'; g.fillText('Chapter 4', 18, 50);
+    const r = rand(9);
+    for (let y = 70; y < n - 20; y += 13) { g.fillStyle = 'rgba(58,48,48,.55)'; g.fillRect(18, y, 140 + r() * 80, 4); }
+    g.fillStyle = '#d4678a'; g.fillRect(18 + 120, n - 33, 2, 10); // the cursor
+  });
+  return screenT;
+}
+
 // the kitchen and the bathroom
 const steel = () => std('#c9ccd2', { metalness: 0.7, roughness: 0.3 });
 const stone = () => std('#ece6dc', { roughness: 0.35 });
@@ -423,7 +525,7 @@ function bed(c, def, h) {
 export function buildHome({ floor, makeSign }) {
   const { group } = floor;
   const W = R.maxX - R.minX, D = R.maxZ - R.minZ, H = R.h;
-  const M = AREAS.room, K = AREAS.kitchen, B = AREAS.bath;
+  const M = AREAS.room, K = AREAS.kitchen, B = AREAS.bath, L = AREAS.library;
   const wallM = std('#efe6db', { roughness: 0.95 });
   const trimM = std('#93ab8c', { roughness: 0.85 });
   const wood = std('#6e472e', { roughness: 0.5 });
@@ -489,9 +591,10 @@ export function buildHome({ floor, makeSign }) {
   const wy0 = 0.9, wy1 = 2.5;
   const bz = R.minZ - 0.08, fz = R.maxZ + 0.08, lx = R.minX - 0.08, rx = R.maxX + 0.08, ix = 6.08;
   const dw = 1.1, dh = 2.2;
-  const DK = DOORWAYS.kitchen, DB = DOORWAYS.bath;
-  run('x', bz, R.minX - 0.08, R.maxX + 0.08, [[-0.5, 2.5, wy0, wy1], [7.4, 8.8, 1.2, 2.3]]);   // back: big window, kitchen window
-  run('z', lx, R.minZ, R.maxZ, [[-1.1, 1.1, wy0, wy1]]);                                     // left: a window
+  const DK = DOORWAYS.kitchen, DB = DOORWAYS.bath, DL = DOORWAYS.library;
+  run('x', bz, R.minX - 0.08, R.maxX + 0.08, [[-10, -8, 1.0, 2.4], [-0.5, 2.5, wy0, wy1], [7.4, 8.8, 1.2, 2.3]]); // back: reading room, big window, kitchen
+  run('z', lx, R.minZ, R.maxZ, [[-1.5, 1.5, 0.7, 2.6]]);                                     // left: the reading room's tall window
+  run('z', -6.08, M.minZ, M.maxZ, [[DL.z - DL.hw, DL.z + DL.hw, 0, dh]]);                   // into the reading room
   run('z', rx, R.minZ, R.maxZ, [[2.0, 2.9, 1.5, 2.35]]);                                     // right: the bathroom's little window
   run('x', fz, R.minX - 0.08, R.maxX + 0.08, [[-dw / 2, dw / 2, 0, dh]]);                    // front: the way out
   run('z', ix, M.minZ, M.maxZ, [[DK.z - DK.hw, DK.z + DK.hw, 0, dh], [DB.z - DB.hw, DB.z + DB.hw, 0, dh]]); // into the kitchen and bathroom
@@ -500,7 +603,7 @@ export function buildHome({ floor, makeSign }) {
   const glassM = new THREE.MeshStandardMaterial({ color: '#dff1ff', roughness: 0.05, transparent: true, opacity: 0.12, depthWrite: false });
   const frostM = new THREE.MeshStandardMaterial({ color: '#f4f8fa', roughness: 0.6, transparent: true, opacity: 0.8 });
   for (const [w, x, z, ry, y0, y1, glass] of [
-    [3, 1, bz, 0, wy0, wy1, glassM], [2.2, lx, 0, Math.PI / 2, wy0, wy1, glassM],
+    [3, 1, bz, 0, wy0, wy1, glassM], [3, lx, 0, Math.PI / 2, 0.7, 2.6, glassM], [2, -9, bz, 0, 1.0, 2.4, glassM],
     [1.4, 8.1, bz, 0, 1.2, 2.3, glassM], [0.9, rx, 2.45, Math.PI / 2, 1.5, 2.35, frostM],
   ]) {
     const gl = new THREE.Mesh(new THREE.PlaneGeometry(w, y1 - y0), glass);
@@ -516,7 +619,7 @@ export function buildHome({ floor, makeSign }) {
     shell.add(fr);
   }
   // a sage skirting band round each room; white tiles halfway up the bathroom walls
-  for (const a of [M, K, B]) {
+  for (const a of [M, K, B, L]) {
     const w = a.maxX - a.minX, d = a.maxZ - a.minZ, cx = (a.minX + a.maxX) / 2, cz = (a.minZ + a.maxZ) / 2;
     for (const [len, x, z, ry] of [[w, cx, a.minZ + 0.005, 0], [w, cx, a.maxZ - 0.005, 0], [d, a.minX + 0.005, cz, Math.PI / 2], [d, a.maxX - 0.005, cz, Math.PI / 2]]) {
       const bnd = at(box(len, 0.12, 0.02, trimM), x, 0.06, z); bnd.rotation.y = ry; shell.add(bnd);
@@ -542,15 +645,15 @@ export function buildHome({ floor, makeSign }) {
   shell.add(door);
   shell.add(at(ball(0.035, std('#c9a25b', { metalness: 0.8, roughness: 0.3 }), 12), 0.38, 1.0, R.maxZ));
   for (const [w, h, x, y] of [[0.08, dh, -dw / 2, dh / 2], [0.08, dh, dw / 2, dh / 2], [dw + 0.16, 0.08, 0, dh]]) shell.add(at(box(w, h, 0.22, wood), x, y, R.maxZ + 0.04));
-  for (const d of [DK, DB]) {
+  for (const d of [DK, DB, DL]) {
     for (const [w, h, z, y] of [[0.22, dh, d.z - d.hw, dh / 2], [0.22, dh, d.z + d.hw, dh / 2], [0.22, 0.08, d.z, dh]]) {
-      shell.add(at(box(w, h, y === dh ? d.hw * 2 + 0.08 : 0.08, wood), ix, y, z));
+      shell.add(at(box(w, h, y === dh ? d.hw * 2 + 0.08 : 0.08, wood), d.x, y, z));
     }
   }
   const doorHit = new THREE.Mesh(new THREE.PlaneGeometry(dw, dh), new THREE.MeshBasicMaterial({ visible: false }));
   doorHit.position.set(0, dh / 2, R.maxZ - 0.05);
   doorHit.rotation.y = Math.PI;
-  doorHit.userData = { kind: 'stairs-down', label: 'Out to the hallway, and back down to the café' };
+  doorHit.userData = { kind: 'stairs-down', label: 'Out to the hallway' };
   shell.add(doorHit);
 
   // the ceiling, a paper lamp in the main room, little lights in the others
@@ -564,7 +667,7 @@ export function buildHome({ floor, makeSign }) {
   ceilingLight.position.set(0, H - 0.8, 0);
   shell.add(ceilingLight);
   const sideLights = [];
-  for (const a of [K, B]) {
+  for (const a of [K, B, L]) {
     const x = (a.minX + a.maxX) / 2, z = (a.minZ + a.maxZ) / 2;
     shell.add(at(cyl(0.22, 0.22, 0.05, std('#fffaf0', { emissive: '#ffe6bf', emissiveIntensity: 0.8 }), 28), x, H - 0.03, z));
     const l = new THREE.PointLight('#ffe2b8', 2.2, 6, 1.4);
@@ -583,23 +686,87 @@ export function buildHome({ floor, makeSign }) {
     shell.add(plaque);
   }
 
+  // ── the reading room: dark wood floor, a big rug, shelves on the walls
+  overlay(L, planks('#7a5238', 41));
+  {
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 4.6), std('#ffffff', { roughness: 1, map: canvasTex(256, (g, n) => {
+      g.fillStyle = '#8f3f45'; g.fillRect(0, 0, n, n);
+      g.strokeStyle = '#e6c27a'; g.lineWidth = 8; g.strokeRect(16, 16, n - 32, n - 32);
+      g.strokeStyle = '#f4ece0'; g.lineWidth = 3; g.strokeRect(34, 34, n - 68, n - 68);
+      g.fillStyle = '#e6c27a'; g.beginPath(); g.arc(n / 2, n / 2, 30, 0, Math.PI * 2); g.fill();
+    }) }));
+    rug.rotation.x = -Math.PI / 2; rug.position.set(-9.2, 0.006, 0.4); rug.receiveShadow = true;
+    shell.add(rug);
+  }
+  // built-in bookshelves (clicking one opens the story shelf) and a window seat
+  const builtIns = [];
+  const shelfM = std('#5e3b26', { roughness: 0.55 });
+  function builtInShelf(x0, x1, z0, z1, along) {
+    const len = along === 'x' ? x1 - x0 : z1 - z0, depth = 0.36, h = 2.6;
+    const g = new THREE.Group();
+    g.add(at(box(len, h, 0.03, shelfM), 0, h / 2, -depth / 2 + 0.015));
+    for (const e of [-1, 1]) g.add(at(box(0.04, h, depth, shelfM), e * (len / 2 - 0.02), h / 2, 0));
+    g.add(at(box(len + 0.06, 0.06, depth + 0.04, shelfM), 0, h, 0));
+    const r = rand(Math.round((x0 + z0) * 13) + 7), cols = ['#c4627f', '#93ab8c', '#f0b56a', '#6a87a8', '#f4ece0', '#a35d4a', '#7b5ea7', '#3f6b5a'];
+    for (let i = 0; i < 6; i++) {
+      const y = 0.06 + i * 0.47;
+      g.add(at(box(len - 0.06, 0.03, depth - 0.02, shelfM), 0, y, 0.01));
+      if (i === 5) continue;
+      let x = -len / 2 + 0.06;
+      while (x < len / 2 - 0.1) {
+        const w = 0.03 + r() * 0.045, bh = 0.26 + r() * 0.14;
+        if (r() < 0.05) { x += 0.12; continue; } // a little gap
+        const b = at(box(w, bh, depth - 0.1, std(cols[Math.floor(r() * cols.length)], { roughness: 0.8 })), x + w / 2, y + 0.015 + bh / 2, 0.02);
+        if (r() < 0.06) b.rotation.z = 0.22;
+        g.add(b); x += w + 0.005;
+      }
+    }
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    g.position.set(cx, 0, cz);
+    if (along === 'z') g.rotation.y = Math.PI / 2;
+    shell.add(g);
+    const hits = [];
+    g.traverse(o => { if (o.isMesh) { o.userData = { kind: 'shelf', label: 'The bookshelves — pick a story to read' }; hits.push(o); } });
+    const box3 = along === 'x' ? { minX: x0, maxX: x1, minZ: cz - depth / 2, maxZ: cz + depth / 2 } : { minX: cx - depth / 2, maxX: cx + depth / 2, minZ: z0, maxZ: z1 };
+    builtIns.push({ box: box3, hits });
+  }
+  builtInShelf(-11.8, -10.2, L.minZ + 0.19, L.minZ + 0.19, 'x');   // the back wall, either side of its window
+  builtInShelf(-7.8, -6.4, L.minZ + 0.19, L.minZ + 0.19, 'x');
+  builtInShelf(L.minX + 0.19, L.minX + 0.19, -4.3, -1.7, 'z');    // the outer wall, either side of the tall window
+  builtInShelf(L.minX + 0.19, L.minX + 0.19, 1.7, 4.3, 'z');
+  {
+    // a window seat under the tall window, with cushions
+    const g = new THREE.Group();
+    g.add(at(rbox(0.55, 0.45, 2.9, 0.03, shelfM), 0, 0.225, 0));
+    g.add(at(rbox(0.5, 0.09, 2.8, 0.04, std('#93ab8c', { roughness: 1 })), 0, 0.49, 0));
+    for (const z of [-0.95, 0, 0.95]) { const c = at(rbox(0.14, 0.34, 0.42, 0.06, std(z ? '#f2a7bb' : '#efe0c4', { roughness: 1 })), -0.2, 0.68, z); c.rotation.z = 0.15; g.add(c); }
+    const x = L.minX + 0.3;
+    g.position.set(x, 0, 0);
+    shell.add(g);
+    const hits = [];
+    const seats = [-0.9, 0, 0.9].map((z, i) => ({ id: `home-windowseat-${i}`, label: 'the window seat', x: x + 0.05, z, y: group.position.y, h: 0.54, ry: Math.PI / 2 }));
+    g.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat: seats[1], label: 'Sit on the window seat and read' }; hits.push(o); } });
+    builtIns.push({ box: { minX: L.minX, maxX: x + 0.28, minZ: -1.45, maxZ: 1.45 }, hits, seats });
+  }
+
   // ── where you can walk: each room (kept off its walls), joined by the doorways
   const IN = 0.3;
   const WALK = [
     ...Object.values(AREAS).map(a => ({ minX: a.minX + IN, maxX: a.maxX - IN, minZ: a.minZ + IN, maxZ: a.maxZ - IN })),
     // (a little wider than a straight inset, so it's easy to walk through with the keys too)
-    ...Object.values(DOORWAYS).map(d => ({ minX: M.maxX - IN - 0.05, maxX: K.minX + IN + 0.05, minZ: d.z - d.hw + 0.2, maxZ: d.z + d.hw - 0.2 })),
+    ...Object.values(DOORWAYS).map(d => ({ minX: d.x - 0.45, maxX: d.x + 0.45, minZ: d.z - d.hw + 0.2, maxZ: d.z + d.hw - 0.2 })),
   ];
   // the spaces furniture can't block
   const CLEAR = [
     { minX: -0.75, maxX: 0.75, minZ: R.maxZ - 1.0, maxZ: R.maxZ + 1 },
-    ...Object.values(DOORWAYS).map(d => ({ minX: M.maxX - 0.9, maxX: K.minX + 0.9, minZ: d.z - d.hw - 0.1, maxZ: d.z + d.hw + 0.1 })),
+    ...Object.values(DOORWAYS).map(d => ({ minX: d.x - 0.9, maxX: d.x + 0.9, minZ: d.z - d.hw - 0.1, maxZ: d.z + d.hw + 0.1 })),
+    ...builtIns.map(b => b.box),
   ];
   // Walking from one room to another goes through the doorway between them.
   function route(from, to) {
     const a = areaAt(from.x, from.z), b = areaAt(to.x, to.z);
     if (a === b) return [to];
-    const out = d => ({ x: M.maxX - 0.6, z: d.z }), inn = d => ({ x: K.minX + 0.6, z: d.z });
+    const out = d => ({ x: d.x - d.side * 0.68, z: d.z }), inn = d => ({ x: d.x + d.side * 0.68, z: d.z });
     const steps = [];
     if (a !== 'room') { const d = DOORWAYS[a]; steps.push(inn(d), out(d)); }
     if (b !== 'room') { const d = DOORWAYS[b]; steps.push(out(d), inn(d)); }
@@ -615,21 +782,22 @@ export function buildHome({ floor, makeSign }) {
   const items = new Map(); // id -> { item, def, group, meshes, seats }
   const things = new THREE.Group();
   group.add(things);
-  const base = { colliders: [], interactables: [doorHit], surfaces: [...walls] };
+  const base = { colliders: builtIns.map(b => ({ type: 'box', fixed: true, ...b.box })), interactables: [doorHit, ...builtIns.flatMap(b => b.hits)], surfaces: [...walls], seats: builtIns.flatMap(b => b.seats || []) };
 
   // Rebuild the floor's lists from the shell and the furniture.
   function sync() {
     const fy = group.position.y;
     floor.colliders.length = 0;
-    floor.colliders.push({ type: 'room', fixed: true, walk: WALK });
+    floor.colliders.push({ type: 'room', fixed: true, walk: WALK }, ...base.colliders);
     floor.seats.length = 0;
+    floor.seats.push(...base.seats);
     floor.surfaces.length = 0;
     floor.surfaces.push(...base.surfaces);
     floor.interactables.length = 0;
     floor.interactables.push(...base.interactables);
     for (const e of items.values()) {
       const { item, def } = e;
-      if (!def.flat && !def.onTop && !def.walkIn) {
+      if (!def.flat && !def.onTop && !def.walkIn && !def.wall) {
         const f = footprint(def, item.x, item.z, item.ry);
         floor.colliders.push({ type: 'box', fixed: true, minX: f.minX + 0.04, maxX: f.maxX - 0.04, minZ: f.minZ + 0.04, maxZ: f.maxZ - 0.04 });
       }
@@ -644,12 +812,15 @@ export function buildHome({ floor, makeSign }) {
       if (e.top) floor.surfaces.push(e.top);
       for (const m of e.meshes) floor.interactables.push(m);
     }
+    // a seat with a laptop in reach is somewhere to work: you type there
+    const laptops = [...items.values()].filter(e => e.item.kind === 'laptop').map(e => e.item);
+    for (const seat of floor.seats) seat.work = !seat.lie && laptops.some(l => Math.hypot(l.x - seat.x, l.z - seat.z) < 1.3);
   }
 
   function makeThing(item) {
     const def = BY_KIND.get(item.kind);
     if (!def) return null;
-    const g = BUILD[item.kind](item.color, def);
+    const g = BUILD[item.kind](item.color, def, item);
     g.position.set(item.x, item.y || 0, item.z);
     g.rotation.y = item.ry;
     return { g, def };
@@ -673,9 +844,9 @@ export function buildHome({ floor, makeSign }) {
       else e.bedTop = top;
     }
     items.set(item.id, e);
-    const kind = def.bath ? 'home-bath' : def.lie ? 'home-bed' : def.desk ? 'home-desk' : def.cook ? 'home-cook'
+    const kind = def.picture ? 'home-frame' : def.bath ? 'home-bath' : def.lie ? 'home-bed' : def.desk ? 'home-desk' : def.cook ? 'home-cook'
       : def.shower ? 'home-shower' : def.mirror ? 'home-mirror' : def.seats ? 'seat' : 'home-item';
-    const label = def.bath ? `${def.name} — take a bath` : def.lie ? `${def.name} — sleep here` : def.desk ? `${def.name} — start a study session`
+    const label = def.picture ? (item.caption ? `“${item.caption}”` : def.name) : def.bath ? `${def.name} — take a bath` : def.lie ? `${def.name} — sleep here` : def.desk ? `${def.name} — start a study session`
       : def.cook ? `${def.name} — make yourself a drink` : def.shower ? `${def.name} — have a shower` : def.mirror ? `${def.name} — look in the mirror`
       : def.seats ? `Sit on the ${def.name.toLowerCase()}` : def.name;
     sync();
@@ -740,12 +911,12 @@ export function buildHome({ floor, makeSign }) {
     // wholly inside one of the rooms (not through a wall)…
     const inside = a => f.minX >= a.minX - 0.01 && f.maxX <= a.maxX + 0.01 && f.minZ >= a.minZ - 0.01 && f.maxZ <= a.maxZ + 0.01;
     if (!Object.values(AREAS).some(inside)) return false;
-    if (def.flat || def.onTop) return true;
+    if (def.flat || def.onTop || def.wall) return true;
     // …and keeping the doorways clear: the way out, and into the kitchen and bathroom
     const hits = q => f.minX < q.maxX && f.maxX > q.minX && f.minZ < q.maxZ && f.maxZ > q.minZ;
     if (CLEAR.some(hits)) return false;
     for (const e of items.values()) {
-      if (e.item.id === ignoreId || e.def.flat || e.def.onTop) continue;
+      if (e.item.id === ignoreId || e.def.flat || e.def.onTop || e.def.wall) continue;
       const o = footprint(e.def, e.item.x, e.item.z, e.item.ry);
       if (f.minX < o.maxX - 0.03 && f.maxX > o.minX + 0.03 && f.minZ < o.maxZ - 0.03 && f.maxZ > o.minZ + 0.03) return false;
     }
@@ -769,6 +940,6 @@ export function buildHome({ floor, makeSign }) {
     // a couple of steps in from the door, so the camera behind you isn't
     // squashed against the wall looking down at the top of your head
     arrival: { x: 0, z: R.maxZ - 2.2, ry: Math.PI },
-    bounds: R, ceilingLight, lampShade, sideLights, route, cameraBox,
+    bounds: R, ceilingLight, lampShade, sideLights, route, cameraBox, walls,
   };
 }

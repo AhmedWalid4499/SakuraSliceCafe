@@ -40,7 +40,7 @@ async function roomRow(ownerId) {
   const { rows } = await query(`SELECT ${ROOM_FIELDS} FROM home_rooms r JOIN users u ON u.id = r.owner_id WHERE r.owner_id = $1`, [ownerId]);
   return rows[0] || null;
 }
-const ITEM_FIELDS = 'id, kind, x, y, z, ry, color';
+const ITEM_FIELDS = 'id, kind, x, y, z, ry, color, image_id AS "imageId", caption';
 async function guestsOf(ownerId) {
   const { rows } = await query(
     `SELECT u.id, u.display_name AS "displayName", u.username FROM home_guests g JOIN users u ON u.id = g.guest_id
@@ -124,30 +124,44 @@ router.patch('/home', auth.requireUser, smallLimit, wrap(async (req, res) => {
 }));
 
 // Furniture: only the owner moves things in their own room.
-async function cleanItem(b, prev = {}) {
+async function cleanItem(b, userId, prev = {}) {
   const { BY_KIND, ROOM_SIZE } = await catalogue();
   const kind = b.kind ?? prev.kind;
   const def = BY_KIND.get(kind);
   if (!def) return { error: "We don't have that one." };
   const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
-  const x = num(b.x ?? prev.x, ROOM_SIZE.minX + 0.05, ROOM_SIZE.maxX - 0.05, 0);
-  const z = num(b.z ?? prev.z, ROOM_SIZE.minZ + 0.05, ROOM_SIZE.maxZ - 0.05, 0);
-  const y = def.onTop ? num(b.y ?? prev.y, 0, 2.2, 0) : 0;
+  const m = def.wall ? 0.02 : 0.05; // frames hang right against the wall
+  const x = num(b.x ?? prev.x, ROOM_SIZE.minX + m, ROOM_SIZE.maxX - m, 0);
+  const z = num(b.z ?? prev.z, ROOM_SIZE.minZ + m, ROOM_SIZE.maxZ - m, 0);
+  const y = def.onTop ? num(b.y ?? prev.y, 0, 2.2, 0) : def.wall ? num(b.y ?? prev.y, 0.6, 2.6, 1.5) : 0;
   let ry = num(b.ry ?? prev.ry, -100, 100, 0) % (Math.PI * 2);
   const color = def.colors.includes(b.color) ? b.color : def.colors.includes(prev.color) ? prev.color : def.colors[0];
-  return { kind, x, y, z, ry, color };
+  // a frame's photo has to be one this person uploaded
+  let imageId = prev.imageId ?? null;
+  let caption = prev.caption || '';
+  if (def.picture && b.imageId !== undefined) {
+    if (b.imageId === null) imageId = null;
+    else {
+      const { rows } = await query("SELECT id FROM media WHERE id = $1 AND kind = 'photo' AND created_by = $2", [Number(b.imageId) || 0, userId]);
+      if (!rows[0]) return { error: "That picture isn't one of yours." };
+      imageId = rows[0].id;
+    }
+  }
+  if (def.picture && b.caption !== undefined) caption = cleanText(b.caption, 80);
+  return { kind, x, y, z, ry, color, imageId: def.picture ? imageId : null, caption: def.picture ? caption : '', captionChanged: caption !== (prev.caption || '') };
 }
 
 router.post('/home/items', auth.requireUser, editLimit, wrap(async (req, res) => {
   const { MAX_ITEMS } = await catalogue();
   await ensureRoom(req.user);
-  const it = await cleanItem(req.body || {});
+  const it = await cleanItem(req.body || {}, req.user.id);
   if (it.error) return res.status(400).json({ error: it.error });
+  if (it.caption && !(await kindness.guard(res, it.caption, 'frame', req.user))) return;
   const { rows: c } = await query('SELECT count(*)::int AS n FROM home_items WHERE owner_id = $1', [req.user.id]);
   if (c[0].n >= MAX_ITEMS) return res.status(409).json({ error: `Your room is full (${MAX_ITEMS} things). Take something out first.` });
   const { rows } = await query(
-    `INSERT INTO home_items (owner_id, kind, x, y, z, ry, color) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${ITEM_FIELDS}`,
-    [req.user.id, it.kind, it.x, it.y, it.z, it.ry, it.color]);
+    `INSERT INTO home_items (owner_id, kind, x, y, z, ry, color, image_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${ITEM_FIELDS}`,
+    [req.user.id, it.kind, it.x, it.y, it.z, it.ry, it.color, it.imageId, it.caption]);
   await query('UPDATE home_rooms SET updated_at = now() WHERE owner_id = $1', [req.user.id]);
   realtime.broadcast({ t: 'home:item', op: 'add', item: rows[0] }, null, roomOf(req.user.id));
   res.json({ item: rows[0] });
@@ -156,11 +170,12 @@ router.post('/home/items', auth.requireUser, editLimit, wrap(async (req, res) =>
 router.patch('/home/items/:id(\\d+)', auth.requireUser, editLimit, wrap(async (req, res) => {
   const { rows: prev } = await query(`SELECT ${ITEM_FIELDS} FROM home_items WHERE id = $1 AND owner_id = $2`, [Number(req.params.id), req.user.id]);
   if (!prev[0]) return res.status(404).json({ error: "That isn't in your room." });
-  const it = await cleanItem({ ...(req.body || {}), kind: prev[0].kind }, prev[0]);
+  const it = await cleanItem({ ...(req.body || {}), kind: prev[0].kind }, req.user.id, prev[0]);
   if (it.error) return res.status(400).json({ error: it.error });
+  if (it.captionChanged && it.caption && !(await kindness.guard(res, it.caption, 'frame', req.user))) return;
   const { rows } = await query(
-    `UPDATE home_items SET x = $3, y = $4, z = $5, ry = $6, color = $7 WHERE id = $1 AND owner_id = $2 RETURNING ${ITEM_FIELDS}`,
-    [prev[0].id, req.user.id, it.x, it.y, it.z, it.ry, it.color]);
+    `UPDATE home_items SET x = $3, y = $4, z = $5, ry = $6, color = $7, image_id = $8, caption = $9 WHERE id = $1 AND owner_id = $2 RETURNING ${ITEM_FIELDS}`,
+    [prev[0].id, req.user.id, it.x, it.y, it.z, it.ry, it.color, it.imageId, it.caption]);
   realtime.broadcast({ t: 'home:item', op: 'update', item: rows[0] }, null, roomOf(req.user.id));
   res.json({ item: rows[0] });
 }));
@@ -170,6 +185,31 @@ router.delete('/home/items/:id(\\d+)', auth.requireUser, editLimit, wrap(async (
   if (!rows[0]) return res.status(404).json({ error: "That isn't in your room." });
   realtime.broadcast({ t: 'home:item', op: 'remove', item: { id: rows[0].id } }, null, roomOf(req.user.id));
   res.json({ ok: true });
+}));
+
+// Photos for frames. The upload is the raw picture (mounted before the
+// JSON-only API, like the admin uploads); anyone who may come into the room
+// may see the pictures on its walls, and nobody else.
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const PHOTO_MAX = 4 * 1024 * 1024;
+const photoLimit = rateLimit({ windowMs: 10 * 60e3, max: 20, message: 'That is a lot of pictures — give it a few minutes.' });
+const photoUpload = express.Router();
+photoUpload.use(auth.loadUser, auth.requireUser, photoLimit);
+photoUpload.post('/', express.raw({ type: () => true, limit: PHOTO_MAX }), wrap(async (req, res) => {
+  const mime = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  if (!PHOTO_TYPES.includes(mime)) return res.status(415).json({ error: 'That needs to be a picture (jpg, png or webp).' });
+  if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'The picture was empty.' });
+  const { rows } = await query(
+    `INSERT INTO media (kind, mime, name, size, bytes, created_by) VALUES ('photo', $1, 'frame', $2, $3, $4) RETURNING id`,
+    [mime, req.body.length, req.body, req.user.id]);
+  res.json({ id: rows[0].id });
+}));
+
+router.get('/home/photo/:id(\\d+)', auth.requireUser, wrap(async (req, res) => {
+  const { rows } = await query("SELECT mime, created_by, bytes FROM media WHERE id = $1 AND kind = 'photo'", [Number(req.params.id)]);
+  if (!rows[0] || !(await canEnterHome(req.user.id, rows[0].created_by))) return res.status(404).end();
+  res.set({ 'Content-Type': rows[0].mime, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+  res.end(rows[0].bytes);
 }));
 
 // Letting friends in (by username), and taking them off the list.
@@ -253,4 +293,4 @@ router.post('/home/sleep', auth.requireUser, smallLimit, wrap(async (req, res) =
   res.json({ counted, stats: await statsOf(req.user.id) });
 }));
 
-module.exports = { router, canEnterHome, roomOf };
+module.exports = { router, photoUpload, canEnterHome, roomOf };

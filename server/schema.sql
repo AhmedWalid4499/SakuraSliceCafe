@@ -169,7 +169,7 @@ CREATE INDEX IF NOT EXISTS chat_room_idx ON chat_messages(room, created_at DESC)
 -- cover. Kept in Postgres so everything lives in one place on Railway.
 CREATE TABLE IF NOT EXISTS media (
   id          SERIAL PRIMARY KEY,
-  kind        TEXT NOT NULL,                          -- 'audio' | 'image'
+  kind        TEXT NOT NULL,                          -- 'audio' | 'image' | 'photo' (someone's own, for a frame)
   mime        TEXT NOT NULL,
   name        TEXT NOT NULL DEFAULT '',
   title       TEXT NOT NULL DEFAULT '',
@@ -238,6 +238,9 @@ CREATE TABLE IF NOT EXISTS home_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS home_items_owner_idx ON home_items(owner_id);
+-- frames: the owner's own photo (a 'photo' row in media) and a line under it
+ALTER TABLE home_items ADD COLUMN IF NOT EXISTS image_id INTEGER;
+ALTER TABLE home_items ADD COLUMN IF NOT EXISTS caption TEXT NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS home_guests (
   owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   guest_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
