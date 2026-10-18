@@ -1685,8 +1685,10 @@ export function buildWorld(renderer) {
       ], 0.9, 0.36);
       sign.position.set(hx - 1.05, 1.5, hz + hd / 2 + 0.02);
       root.add(sign);
-      const hover = new THREE.Mesh(new THREE.BoxGeometry(hw + 0.2, hh, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
-      hover.position.set(hx, hh / 2, hz + hd / 2 + 0.2);
+      // just the door (a flat target facing out): a big box here would sit
+      // round the camera when you arrive and swallow every click
+      const hover = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.3), new THREE.MeshBasicMaterial({ visible: false }));
+      hover.position.set(hx, 1.15, hz + hd / 2 + 0.07);
       hover.userData = { kind: 'stairs-down', label: 'Go back down to the café' };
       interactables.push(hover);
       root.add(hover);

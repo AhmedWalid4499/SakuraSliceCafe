@@ -2992,7 +2992,8 @@ async function goToRoom(room, group = null) {
   if (up) world.setUpstairsSign(group.name, group.description || 'upstairs at Sakura Slice', group.color);
 
   // arrive at the top (or the foot) of the stairs, facing into the room
-  player.pos.set(STAIRS.x - 0.3, world.floorY, STAIRS.z + 2.2);
+  // (on the roof, a few steps clear of the stair house, so the camera isn't inside it)
+  player.pos.set(STAIRS.x - 0.3, world.floorY, STAIRS.z + (roof ? 4.4 : 2.2));
   player.ry = 0;
   cam.yaw = Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.4;
   camTarget.copy(player.pos).add(new THREE.Vector3(0, 1.45, 0));
