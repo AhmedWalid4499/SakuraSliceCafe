@@ -587,7 +587,8 @@ export function buildHome({ floor, makeSign }) {
   const IN = 0.3;
   const WALK = [
     ...Object.values(AREAS).map(a => ({ minX: a.minX + IN, maxX: a.maxX - IN, minZ: a.minZ + IN, maxZ: a.maxZ - IN })),
-    ...Object.values(DOORWAYS).map(d => ({ minX: M.maxX - IN - 0.05, maxX: K.minX + IN + 0.05, minZ: d.z - d.hw + IN, maxZ: d.z + d.hw - IN })),
+    // (a little wider than a straight inset, so it's easy to walk through with the keys too)
+    ...Object.values(DOORWAYS).map(d => ({ minX: M.maxX - IN - 0.05, maxX: K.minX + IN + 0.05, minZ: d.z - d.hw + 0.2, maxZ: d.z + d.hw - 0.2 })),
   ];
   // the spaces furniture can't block
   const CLEAR = [

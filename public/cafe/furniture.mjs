@@ -16,7 +16,7 @@ export const AREAS = {
   bath: { minX: 6.16, maxX: 10, minZ: 0.08, maxZ: 4.5, name: 'the bathroom' },
 };
 // the gaps in the wall between the main room and the other two (centre z, half-width)
-export const DOORWAYS = { kitchen: { x: 6.08, z: -2.3, hw: 0.5 }, bath: { x: 6.08, z: 2.3, hw: 0.5 } };
+export const DOORWAYS = { kitchen: { x: 6.08, z: -2.3, hw: 0.6 }, bath: { x: 6.08, z: 2.3, hw: 0.6 } };
 export function areaAt(x, z) {
   for (const [k, a] of Object.entries(AREAS)) if (x >= a.minX - 0.15 && x <= a.maxX + 0.15 && z >= a.minZ - 0.1 && z <= a.maxZ + 0.1) return k;
   return 'room';
