@@ -18,9 +18,13 @@ const newCode = () => crypto.randomBytes(5).toString('base64url').replace(/[-_]/
 const GROUP_FIELDS = `g.id, g.name, g.description, g.color, g.is_public AS "isPublic", g.created_at AS "createdAt",
   g.owner_id AS "ownerId", (SELECT count(*)::int FROM group_members gm WHERE gm.group_id = g.id) AS members`;
 
-// Is this user allowed in this room? 'main' is open to everyone signed in.
+// The rooms everyone signed in can be in: the ground floor and the roof garden.
+const PUBLIC_ROOMS = ['main', 'garden'];
+const ROOM_RE = /^(main|garden|group:\d+)$/;
+
+// Is this user allowed in this room? The public rooms are open to everyone signed in.
 async function canEnter(userId, room) {
-  if (room === 'main') return true;
+  if (PUBLIC_ROOMS.includes(room)) return true;
   const m = /^group:(\d+)$/.exec(room || '');
   if (!m) return false;
   const { rows } = await query('SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2', [Number(m[1]), userId]);
@@ -29,7 +33,7 @@ async function canEnter(userId, room) {
 
 function roomFromQuery(req) {
   const r = String(req.query.room || req.body?.room || 'main');
-  return /^(main|group:\d+)$/.test(r) ? r : 'main';
+  return ROOM_RE.test(r) ? r : 'main';
 }
 
 // My groups (with the invite code, since I'm in them) + public ones to browse.
@@ -44,7 +48,7 @@ router.get('/groups', auth.requireUser, wrap(async (req, res) => {
      ORDER BY g.created_at DESC LIMIT 40`, [req.user.id]);
   const counts = realtime.roomCounts();
   const here = g => ({ ...g, here: counts['group:' + g.id] || 0 });
-  res.json({ mine: mine.rows.map(here), open: open.rows.map(here) });
+  res.json({ mine: mine.rows.map(here), open: open.rows.map(here), garden: counts.garden || 0 });
 }));
 
 router.post('/groups', auth.requireUser, writeLimit, wrap(async (req, res) => {
@@ -114,4 +118,4 @@ router.get('/groups/:id/members', auth.requireUser, wrap(async (req, res) => {
   res.json({ members: rows });
 }));
 
-module.exports = { router, canEnter, roomFromQuery };
+module.exports = { router, canEnter, roomFromQuery, PUBLIC_ROOMS, ROOM_RE };

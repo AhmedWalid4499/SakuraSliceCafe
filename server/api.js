@@ -169,7 +169,7 @@ async function noteWithMine(id, userId) {
 
 api.get('/notes', wrap(async (req, res) => {
   const room = groups.roomFromQuery(req);
-  if (room !== 'main' && !(req.user && await groups.canEnter(req.user.id, room))) {
+  if (!groups.PUBLIC_ROOMS.includes(room) && !(req.user && await groups.canEnter(req.user.id, room))) {
     return res.status(403).json({ error: 'That room is for its group only.' });
   }
   const { rows } = await query(NOTE_SELECT + ' WHERE n.room = $1 ORDER BY n.created_at DESC LIMIT 400', [room]);
@@ -476,6 +476,7 @@ admin.delete('/chat/:id', wrap(async (req, res) => {
 }));
 
 api.use(groups.router);
+api.use(require('./garden').router);
 api.use(require('./media').router);
 api.use(npc);
 api.use('/admin', admin);
