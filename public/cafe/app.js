@@ -3133,9 +3133,15 @@ async function tendBed(id, action) {
   if (player.seat) standUp();
   player.goingToSeat = null;
   const target = new THREE.Vector3(spot.x, world.floorY, spot.z);
-  if (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 0.6) walkTo(target);
+  // every bed is worked from the gravel path between the two rows; from
+  // anywhere else, come in at the path's end so you don't walk into a bed
+  const onPath = player.pos.x > 2.3 && player.pos.z > -2.5 && player.pos.z < 1.1;
+  if (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 0.6) {
+    if (onPath) walkTo(target);
+    else { player.path = [new THREE.Vector3(spot.x, world.floorY, -0.7), target]; player.target = new THREE.Vector3(2.0, world.floorY, -0.7); }
+  }
   const t0 = performance.now();
-  while (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 0.7 && performance.now() - t0 < 9000) await wait(120);
+  while (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 0.7 && performance.now() - t0 < 15000) await wait(120);
   try {
     if (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 2.5) throw new Error("You couldn't quite reach it — walk a little closer and try again.");
     player.target = null;
