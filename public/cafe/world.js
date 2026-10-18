@@ -10,6 +10,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { buildAvatar, makeLabel } from './avatar.js';
 import { makeDessert } from './pastries.js';
 import { mapX, mapZ, deltaAt, OLD } from './layout.mjs';
+import { buildHome } from './home.js';
+import { ROOM_SIZE as HOME_SIZE } from './furniture.mjs';
 
 export const ROOM = { minX: -15, maxX: 15, minZ: -11, maxZ: 11, h: 4.2 };
 export const FLOOR2_Y = 4.4;      // the upstairs floor
@@ -341,8 +343,12 @@ export function buildWorld(renderer) {
     interactables: [], // meshes that respond to hover/click (userData.kind)
     group: new THREE.Group(),
   });
-  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor() };
-  scene.add(floors.main.group, floors.up.group, floors.garden.group);
+  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor() };
+  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group);
+  // someone's own room upstairs (home.js), at the same height as the group rooms
+  floors.home.group.position.y = FLOOR2_Y;
+  floors.home.group.visible = false;
+  let home = null;
   floors.up.group.position.y = FLOOR2_Y;
   floors.up.group.visible = false;
   floors.garden.group.position.y = FLOOR3_Y;
@@ -2818,6 +2824,7 @@ export function buildWorld(renderer) {
     [...lamps, ...upLamps].forEach(l => { l.light.intensity = 3.5 * lampK2; });
     // the roof garden is open air: its lamps only really matter after dark
     gardenLamps.forEach(l => { l.light.intensity = 3.5 * lampK2 * (0.15 + night * 0.85); });
+    if (home) home.ceilingLight.intensity = 2.2 + night * 2.6;
     outside.setSky(hour, day, dusk, night);
     return { day, night, open };
   }
@@ -3392,9 +3399,11 @@ export function buildWorld(renderer) {
     }
   }
 
+  home = buildHome({ floor: floors.home, makeSign });
+  noFog(floors.home.group);
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots,
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setBookOfWeek, setPhotos, photoFrames: PHOTO_FRAMES, setMenuBoard, setSpecials, setSeason, setEvents, setHours,
     walk, kitchen: { ...KIT, door: { x: KX, z: ROOM.minZ - 0.1 } }, updateDoors, counter,
@@ -3406,8 +3415,8 @@ export function buildWorld(renderer) {
     const f = floors[name];
     Object.assign(api, {
       floor: name,
-      floorY: name === 'up' ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
-      floorH: name === 'up' ? FLOOR2_H : name === 'garden' ? 7 : ROOM.h,
+      floorY: name === 'up' || name === 'home' ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
+      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
   }

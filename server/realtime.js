@@ -3,7 +3,8 @@
 // and then broadcast from here so everyone sees them straight away.
 //
 // Every connection is in one room: 'main' (the ground floor), 'garden'
-// (the roof garden, open to everyone) or 'group:<id>' (that group's room upstairs). Presence and room-scoped
+// (the roof garden, open to everyone), 'group:<id>' (that group's room upstairs)
+// or 'home:<userId>' (someone's own room upstairs). Presence and room-scoped
 // broadcasts only reach people in the same room.
 
 const { WebSocketServer } = require('ws');
@@ -103,7 +104,7 @@ function attach(server, opts = {}) {
       if (m.t === 'room') {
         const room = typeof m.room === 'string' ? m.room : '';
         let ok = false;
-        try { ok = /^(main|garden|group:\d+)$/.test(room) && await canEnter(entry.user.id, room); } catch (e) { ok = false; }
+        try { ok = /^(main|garden|group:\d+|home:\d+)$/.test(room) && await canEnter(entry.user.id, room); } catch (e) { ok = false; }
         if (!ok) return send(ws, { t: 'room:denied', room });
         const from = entry.room;
         if (m.state) entry.state = cleanState(m.state);
