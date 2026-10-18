@@ -397,6 +397,13 @@ function standUp() {
 // Walk somewhere: round the furniture, and through the kitchen doors if that's the way.
 function walkTo(point) {
   player.path = null;
+  // at home, from one room to the next goes through the doorway between them
+  if (world.floor === 'home') {
+    const steps = world.home.route(player.pos, point).map(q => (q === point ? point : new THREE.Vector3(q.x, world.floorY, q.z)));
+    player.target = steps.shift();
+    player.path = steps.length ? steps : null;
+    return;
+  }
   const path = world.floor === 'main' ? staff.findPath(player.pos, point, { guest: true }) : null;
   if (path && path.length > 1) {
     player.path = path.slice(1);
@@ -752,7 +759,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
   const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
-  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.bounds : ROOM;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : ROOM;
   camPos.x = Math.min(box.maxX - 0.25, Math.max(box.minX + 0.25, camPos.x));
   camPos.z = Math.min(box.maxZ - 0.25, Math.max(box.minZ + 0.25, camPos.z));
   camPos.y = Math.min(world.floorY + (inKitchen ? 3.2 : world.floorH) - 0.3, Math.max(world.floorY + 0.4, camPos.y));
@@ -1238,9 +1245,12 @@ function menuRow(item, kind, onPick) {
 let menuTab = 'drinks';
 let drinkShelf = null; // first open: the season's shelf if it has a favourite, else the house menu
 const SHELVES = [['house', '☕ House'], ['spring', '🌸 Spring'], ['summer', '☀️ Summer'], ['autumn', '🍂 Autumn'], ['winter', '❄️ Winter']];
-function openMenu(tab = menuTab) {
-  menuTab = pastries().length ? tab : 'drinks';
-  $('menuTabs').classList.toggle('hidden', !pastries().length);
+// cook: in your own kitchen — anything from the menu, made by you, right away
+let menuCook = false;
+function openMenu(tab = menuTab, { cook = false } = {}) {
+  menuCook = cook;
+  menuTab = pastries().length && !cook ? tab : 'drinks';
+  $('menuTabs').classList.toggle('hidden', !pastries().length || cook);
   document.querySelectorAll('#menuTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === menuTab));
   // drinks come on shelves: the house menu and the four seasons of the letters
   const shelves = $('menuShelves');
@@ -1254,27 +1264,29 @@ function openMenu(tab = menuTab) {
     b.type = 'button';
     b.className = 'chip' + (k === drinkShelf ? ' on' : '');
     b.textContent = `${label} · ${all.filter(d => d.season === k).length}`;
-    b.onclick = () => { drinkShelf = k; openMenu('drinks'); };
+    b.onclick = () => { drinkShelf = k; openMenu('drinks', { cook: menuCook }); };
     return b;
   }));
   // sitting at a table? the team can bring it to you
-  const spot = player.seat && world.floor === 'main' ? spotOnTable(player.pos) : null;
+  const spot = player.seat && world.floor === 'main' && !cook ? spotOnTable(player.pos) : null;
   $('serveRow').classList.toggle('hidden', !spot);
   const list = $('menuList');
   list.replaceChildren(...(menuTab === 'desserts'
     ? pastries().map(p => menuRow(p, 'dessert', orderDessert))
-    : all.filter(d => have.length < 2 || d.season === drinkShelf).map(d => menuRow(d, 'drink', order))));
-  $('menuNote').textContent = menuTab === 'desserts'
+    : all.filter(d => have.length < 2 || d.season === drinkShelf).map(d => menuRow(d, 'drink', cook ? makeAtHome : order))));
+  $('menuNote').textContent = cook ? 'Your own kitchen. Make yourself anything — the recipes are the same as downstairs.'
+    : menuTab === 'desserts'
     ? 'Hana bakes the warm things, Yuki shapes the delicate ones. Take it on a plate.'
     : drinkShelf === 'house' ? 'The house drinks. Nothing costs anything here.'
     : featured().some(d => d.season === drinkShelf) ? `🎃 ${featured()[0].note} And every ${drinkShelf} drink from the morning letters.`
     : 'Every drink from the morning letters, by season.';
   list.scrollTop = 0;
   openPanel('menuPanel');
+  if (cook) return;
   const who = world.npcs.find(n => n.id === (menuTab === 'desserts' ? 'yuki' : 'hana'));
   if (who) bubble(who.av.group, menuTab === 'desserts' ? 'They\'re all fresh this morning.' : 'What can I make you?', 'npc');
 }
-document.querySelectorAll('#menuTabs button').forEach(b => { b.onclick = () => openMenu(b.dataset.tab); });
+document.querySelectorAll('#menuTabs button').forEach(b => { b.onclick = () => openMenu(b.dataset.tab, { cook: menuCook }); });
 
 const serveToTable = () => !$('serveRow').classList.contains('hidden') && $('serveToggle').checked;
 const SERVED = ['Here you are.', 'Take your time with it.', 'Careful — it\'s still warm.', 'Enjoy it slowly.', 'For you. 🌸'];
@@ -1626,6 +1638,10 @@ function click(x, y) {
     if (seat && player.seat !== seat) goSit(seat);
     return openStudy();
   }
+  if (d.kind === 'home-cook') return walkToThing(h, () => openMenu('drinks', { cook: true }));
+  if (d.kind === 'home-bath') return takeBath(d.seat);
+  if (d.kind === 'home-shower') return haveShower(d.itemId);
+  if (d.kind === 'home-mirror') return walkToThing(h, () => { toast('🪞 You look in the mirror. Fancy a change?'); openCreator(false); });
   if (d.kind === 'home-item') return toast(d.label);
   if (d.kind === 'garden-bed') return openBed(d.bed);
   if (d.kind === 'garden-list') return openGardenList();
@@ -2377,7 +2393,7 @@ $('photoRemove').onclick = async () => {
 // ───────────────────────────────────────── actions
 
 $('noteAct').onclick = () => (state.placing ? stopPlacing() : startPlacing());
-$('orderAct').onclick = () => openMenu();
+$('orderAct').onclick = () => openMenu(undefined, { cook: false });
 $('sitAct').onclick = toggleSit;
 $('drinkAct').onclick = () => (player.drink || player.dessert ? putDrinkDown() : pickUpDrink());
 $('biteAct').onclick = takeBite;
@@ -3613,6 +3629,60 @@ function leaveHome() {
   world.home.select(null);
   endSleep();
   $('focusInvite').classList.add('hidden');
+}
+
+// ── the kitchen and the bathroom
+// Walk up to something, then do it (stopping a step short of it).
+async function walkToThing(hit, then) {
+  const c = new THREE.Vector3();
+  hit.object.getWorldPosition(c);
+  const d = Math.hypot(c.x - player.pos.x, c.z - player.pos.z);
+  if (d > 1.2) {
+    if (player.seat) standUp();
+    const k = (d - 0.9) / d;
+    walkTo(new THREE.Vector3(player.pos.x + (c.x - player.pos.x) * k, world.floorY, player.pos.z + (c.z - player.pos.z) * k));
+    const t0 = performance.now();
+    while ((player.target || (player.path && player.path.length)) && performance.now() - t0 < 30000) await wait(120);
+  }
+  player.ry = Math.atan2(c.x - player.pos.x, c.z - player.pos.z);
+  then();
+}
+function makeAtHome(d) {
+  closePanels();
+  bubble(player.av.group, '☕', 'emote');
+  sound.espresso(player.pos, !/tea|juice|lemonade|smoothie|slush|float/i.test(d.name), true);
+  setTimeout(() => {
+    player.drink = d.id;
+    player.sips = 0;
+    player.av.setDrink(d.color, 1, tempOf(d));
+    sound.cue('drink');
+    sendMove(true);
+    refreshActions();
+    toast(`☕ You make yourself a ${d.name}. ${d.recipe && d.recipe.me3temed ? '“' + d.recipe.me3temed + '”' : 'Just how you like it.'}`);
+  }, 1600);
+}
+async function takeBath(seat) {
+  if (!seat) return;
+  goSit(seat);
+  const t0 = performance.now();
+  while (player.seat !== seat && (player.goingToSeat === seat || player.target) && performance.now() - t0 < 60000) await wait(150);
+  if (player.seat !== seat) return;
+  bubble(player.av.group, '🫧', 'emote');
+  send({ t: 'emote', e: '✨' });
+  toast('🛁 You sink into a warm bath. Everything can wait. (Stand up when you\'re ready.)');
+}
+async function haveShower(itemId) {
+  const e = world.home.items.get(itemId);
+  if (!e) return;
+  if (player.seat) standUp();
+  walkTo(new THREE.Vector3(e.item.x, world.floorY, e.item.z));
+  const t0 = performance.now();
+  while ((player.target || (player.path && player.path.length)) && performance.now() - t0 < 30000) await wait(120);
+  if (Math.hypot(player.pos.x - e.item.x, player.pos.z - e.item.z) > 0.9) return toast('Walk a little closer to the shower.');
+  bubble(player.av.group, '🚿', 'emote');
+  send({ t: 'emote', e: '✨' });
+  await wait(2500);
+  toast('🚿 Warm water, steam on the glass. You feel like a new person.');
 }
 
 $('decorAct').onclick = () => (decor.pick ? stopDecorPlacing() : openDecor());
