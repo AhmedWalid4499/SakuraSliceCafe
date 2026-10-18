@@ -509,7 +509,9 @@ export function buildHome({ floor, makeSign }) {
   return {
     setRoom, setItems, add, update: add, remove, items, tops, sync,
     showGhost, moveGhost, hideGhost, canPlace, select, ghostKind: () => ghost && ghost.kind,
-    arrival: { x: 0, z: R.maxZ - 0.9, ry: Math.PI },
+    // a couple of steps in from the door, so the camera behind you isn't
+    // squashed against the wall looking down at the top of your head
+    arrival: { x: 0, z: R.maxZ - 2.2, ry: Math.PI },
     bounds: R, ceilingLight, lampShade,
   };
 }

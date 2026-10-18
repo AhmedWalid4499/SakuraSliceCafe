@@ -3066,7 +3066,7 @@ async function goToRoom(room, group = null) {
     const a = world.home.arrival;
     player.pos.set(a.x, world.floorY, a.z);
     player.ry = a.ry;
-    cam.yaw = 0; cam.pitch = 0.35;
+    cam.yaw = 0; cam.pitch = 0.42; cam.dist = cam.targetDist = 2.6; // a bedroom, not a hall
   }
   camTarget.copy(player.pos).add(new THREE.Vector3(0, 1.45, 0));
 
