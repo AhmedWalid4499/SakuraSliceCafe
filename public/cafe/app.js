@@ -3140,8 +3140,16 @@ async function tendBed(id, action) {
     if (onPath) walkTo(target);
     else { player.path = [new THREE.Vector3(spot.x, world.floorY, -0.7), target]; player.target = new THREE.Vector3(2.0, world.floorY, -0.7); }
   }
+  // wait while they're still on their way (however slow the computer is);
+  // stop if they arrive or stop walking — or give up quietly if they head
+  // off somewhere else themselves (a new target that isn't one of ours)
+  const ours = new Set([player.target, ...(player.path || [])].filter(Boolean));
   const t0 = performance.now();
-  while (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 0.7 && performance.now() - t0 < 15000) await wait(120);
+  while (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 0.7 && performance.now() - t0 < 120000) {
+    if (!player.target && !(player.path && player.path.length)) break;
+    if (player.target && !ours.has(player.target)) { garden.busy = false; return; }
+    await wait(120);
+  }
   try {
     if (Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 2.5) throw new Error("You couldn't quite reach it — walk a little closer and try again.");
     player.target = null;
