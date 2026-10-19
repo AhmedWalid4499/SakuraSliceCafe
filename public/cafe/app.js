@@ -781,7 +781,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
   const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
-  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : ROOM;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'common' ? world.common.bounds : ROOM;
   camPos.x = Math.min(box.maxX - 0.25, Math.max(box.minX + 0.25, camPos.x));
   camPos.z = Math.min(box.maxZ - 0.25, Math.max(box.minZ + 0.25, camPos.z));
   camPos.y = Math.min(world.floorY + (inKitchen ? 3.2 : world.floorH) - 0.3, Math.max(world.floorY + 0.4, camPos.y));
@@ -869,7 +869,7 @@ function updatePeople(dt) {
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'common' ? ' · in the Common room' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
   $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
@@ -1681,6 +1681,9 @@ function click(x, y) {
   if (d.kind === 'hall-down') return walkToThing(h, () => goToRoom('main'));
   if (d.kind === 'hall-up') return walkToThing(h, () => goToRoom('garden'));
   if (d.kind === 'hall-groups') return walkToThing(h, () => openUpstairs());
+  if (d.kind === 'hall-common') return walkToThing(h, () => goToRoom('common'));
+  if (d.kind === 'common-out') return walkToThing(h, () => goToRoom('hall'));
+  if (d.kind === 'common-tv') return openCommonTV();
   if (d.kind === 'hall-door') {
     if (!d.ownerId) return walkToThing(h, () => { bubble(player.av.group, '🚪', 'emote'); toast("🚪 You knock softly — nobody answers. It's someone else's room."); });
     return walkToThing(h, () => goToRoom('home:' + d.ownerId));
@@ -1762,7 +1765,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2488,6 +2491,7 @@ function applyContent(key) {
   const c = state.content;
   if (key === 'cafe.spotify' && spotify.controller) openSpotify();
   if (key === 'cafe.radio') radio.load().catch(() => {});
+  if (key === 'common.tv' && state.room === 'common') commonTV(true);
   if (!key || key === 'cafe.photos') world.setPhotos(c['cafe.photos'] || {});
   if (!key || key === 'cafe.season') { applyCalendar(); if (key) refreshBoards(); }
   if (!key || ['cafe.menu', 'menu.drinks', 'counter.pastries', 'cafe.specials'].includes(key)) refreshBoards();
@@ -2959,7 +2963,7 @@ $('talkForm').addEventListener('submit', async e => {
   try {
     const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
       player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
-    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
@@ -3139,11 +3143,12 @@ async function goToRoom(room, group = null) {
   const roof = room === 'garden';
   const isHome = !!homeData;
   const isHall = room === 'hall';
-  const up = room !== 'main' && !roof && !isHome && !isHall; // a group's room upstairs
+  const isCommon = room === 'common';
+  const up = room !== 'main' && !roof && !isHome && !isHall && !isCommon; // a group's room upstairs
   state.room = room;
   state.roomName = up ? group.name : isHome ? homeData.room.name : null;
   state.home = isHome ? { ...homeData, ownerId: Number(room.slice(5)) } : null;
-  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? 'hall' : up ? 'up' : 'main');
+  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? 'hall' : isCommon ? 'common' : up ? 'up' : 'main');
   if (isHall) await loadHallDoors();
   if (isHome) {
     world.home.setRoom(homeData.room); world.home.setItems(homeData.items);
@@ -3166,10 +3171,16 @@ async function goToRoom(room, group = null) {
   }
   if (isHall) { // at the top of the stairs, or just out of the room you came from
     const h = world.hall;
-    const a = (from && from.startsWith('home:') && h.doorFront(from.slice(5))) || (from === 'garden' ? h.fromGarden : from && from.startsWith('group:') ? h.fromGroups : h.arrival);
+    const a = (from && from.startsWith('home:') && h.doorFront(from.slice(5))) || (from === 'garden' ? h.fromGarden : from === 'common' ? h.fromCommon : from && from.startsWith('group:') ? h.fromGroups : h.arrival);
     player.pos.set(a.x, world.floorY, a.z);
     player.ry = a.ry;
     cam.yaw = a.ry + Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.0;
+  }
+  if (isCommon) { // just in through the door, the big TV ahead
+    const a = world.common.arrival;
+    player.pos.set(a.x, world.floorY, a.z);
+    player.ry = a.ry;
+    cam.yaw = 0; cam.pitch = 0.32; cam.dist = cam.targetDist = 3.4;
   }
   camTarget.copy(player.pos).add(new THREE.Vector3(0, 1.45, 0));
 
@@ -3189,7 +3200,8 @@ async function goToRoom(room, group = null) {
     const { messages } = await api('/chat?room=' + encodeURIComponent(room));
     messages.forEach(addChat);
   } catch (e) { /* fine */ }
-  sysChat(isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs. Your door is the first on the left.' : 'You step out into the hallway.')
+  if (isCommon) { world.common.setTV(state.content['common.tv']); setTimeout(() => commonTV(true), 900); }
+  sysChat(isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.' : isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs. Your door is the first on the left.' : 'You step out into the hallway.')
     : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
@@ -3925,9 +3937,17 @@ let movie = null, movieSkew = 0;
 function setMovie(m, now) {
   movie = m || null;
   if (now) movieSkew = Date.now() - now;
-  world.home.setMovie(movie);
+  if (state.room !== 'common') world.home.setMovie(movie);
   const box = $('cinema');
+  stopPlaylist();
   if (!movie) { box.classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; return; }
+  if (movie.list) { // a playlist: played in order, everyone in step (see playPlaylist)
+    $('cinemaTitle').textContent = movie.title;
+    $('cinemaBy').textContent = movie.by ? `put on by ${movie.by}` : 'on the Common room TV';
+    box.classList.remove('hidden', 'small');
+    playPlaylist(movie.list, state.room);
+    return;
+  }
   const offset = Math.max(0, Math.floor((Date.now() - movieSkew - movie.startedAt) / 1000));
   $('cinemaTitle').textContent = movie.title;
   $('cinemaBy').textContent = `put on by ${movie.by}`;
@@ -3952,7 +3972,92 @@ $('movieForm').addEventListener('submit', async e => {
 });
 $('movieStop').onclick = async () => { try { await api(`/home/${state.home.ownerId}/movie`, { method: 'DELETE', body: {} }); closePanels(); setMovie(null); } catch (err) { toast(err.message); } };
 $('cinemaMin').onclick = () => $('cinema').classList.toggle('small');
-$('cinemaClose').onclick = () => { $('cinema').classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; toast('📺 The film goes on without you — click the TV to watch again.'); };
+$('cinemaClose').onclick = () => { $('cinema').classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; stopPlaylist(); toast('📺 It goes on without you — click the TV to watch again.'); };
+
+// ── playlists: YouTube's own player, so we can tell which video it's on and
+// how far in. Whoever's watching tells the café every few seconds; anyone
+// who comes in later starts from the same video, at the same moment.
+let ytApi = null, ytPlayer = null, ytReport = null;
+function loadYouTube() {
+  if (ytApi) return ytApi;
+  ytApi = new Promise(resolve => {
+    if (window.YT && window.YT.Player) return resolve(window.YT);
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(window.YT); };
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    s.onerror = () => { ytApi = null; toast("📺 YouTube didn't load — check your connection and click the TV again."); };
+    document.head.appendChild(s);
+  });
+  return ytApi;
+}
+function stopPlaylist() {
+  clearInterval(ytReport); ytReport = null;
+  if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) { /* gone already */ } ytPlayer = null; }
+  const holder = $('cinemaYT');
+  if (holder) holder.remove();
+  $('cinemaFrame').classList.remove('hidden');
+}
+async function playPlaylist(list, room) {
+  let index = 0, start = 0;
+  try {
+    const r = await api('/tv/' + encodeURIComponent(room));
+    if (r.pos && r.pos.list === list) {
+      const skew = Date.now() - r.now;
+      index = r.pos.index;
+      start = Math.max(0, r.pos.t + (Date.now() - skew - r.pos.at) / 1000);
+    }
+  } catch (e) { /* start from the top */ }
+  const YT = await loadYouTube();
+  if (state.room !== room || $('cinema').classList.contains('hidden')) return;
+  $('cinemaFrame').classList.add('hidden');
+  $('cinemaFrame').src = 'about:blank';
+  const holder = document.createElement('div');
+  holder.id = 'cinemaYT';
+  $('cinemaFrame').parentNode.appendChild(holder);
+  ytPlayer = new YT.Player(holder, {
+    width: '100%', height: '100%',
+    playerVars: { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1 },
+    events: {
+      onReady: e => e.target.loadPlaylist({ list, listType: 'playlist', index, startSeconds: Math.floor(start) }),
+      onError: () => toast("📺 That one won't play here — it skips to the next."),
+    },
+  });
+  ytReport = setInterval(() => {
+    if (!ytPlayer || !ytPlayer.getPlayerState || ytPlayer.getPlayerState() !== 1) return; // only while it's playing
+    api('/tv/pos', { method: 'POST', body: { room, list, index: ytPlayer.getPlaylistIndex(), t: ytPlayer.getCurrentTime() } }).catch(() => {});
+  }, 10000);
+}
+
+// ── the Common room TV: the café's playlist (site_content 'common.tv'), on for everyone
+function commonTV(autoplay) {
+  const tv = state.content['common.tv'] || {};
+  world.common.setTV(tv);
+  if (state.room !== 'common') return;
+  if (!(tv.list || tv.videoId)) { if (!autoplay) openCommonTV(); return; }
+  setMovie({ ...tv, by: null, startedAt: Date.now() }, Date.now()); // (a single video starts from the top for each of us)
+}
+function openCommonTV() {
+  const tv = state.content['common.tv'] || {};
+  const admin = !!(state.me && state.me.isAdmin);
+  $('ctvNow').textContent = tv.list || tv.videoId ? `${tv.list ? '📼 Playlist' : '🎞️ Video'}: “${tv.title}”` : 'Nothing on just yet — the café will put something on soon.';
+  $('ctvWatch').classList.toggle('hidden', !(tv.list || tv.videoId));
+  $('ctvOwner').classList.toggle('hidden', !admin);
+  if (admin) $('ctvUrl').value = tv.url || '';
+  $('ctvErr').textContent = '';
+  openPanel('ctvPanel');
+}
+$('ctvWatch').onclick = () => { closePanels(); commonTV(false); };
+$('ctvSave').onclick = async () => {
+  $('ctvErr').textContent = '';
+  try {
+    const r = await api('/admin/common/tv', { method: 'PUT', body: { url: $('ctvUrl').value } });
+    state.content['common.tv'] = r.tv;
+    closePanels();
+    commonTV(false);
+    toast(r.tv.title ? `📺 “${r.tv.title}” is on in the Common room — for everyone.` : '📺 The Common room TV is off.');
+  } catch (e) { $('ctvErr').textContent = e.message; }
+};
 $('movieWatch').onclick = () => { closePanels(); setMovie(movie); };
 
 // ── presents
@@ -4220,7 +4325,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
 
 // ───────────────────────────────────────── start
 

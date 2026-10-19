@@ -978,6 +978,21 @@
   <p class="fine hidden" id="snackEmpty">The shelf is empty — just crumbs and good intentions.</p>
 </div>
 
+<div id="ctvPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Common room</p>
+  <h3>The big TV 📺</h3>
+  <p class="lede" id="ctvNow" style="font-size:13.5px"></p>
+  <p class="fine">Everyone in the Common room watches together — if someone's already watching, you come in at the same video, at the same moment.</p>
+  <div class="row" style="margin-top:8px"><button class="btn" id="ctvWatch" type="button">▶ Watch</button></div>
+  <div id="ctvOwner" class="hidden up-more" style="margin-top:14px">
+    <p class="eyebrow">🗝️ What's on</p>
+    <p class="fine" style="margin:4px 0 8px">Paste a YouTube <b>playlist</b> (youtube.com/playlist?list=…) — or a single video. It plays for everyone who comes in. Leave it empty to turn the TV off.</p>
+    <div class="row" style="gap:6px"><input type="text" id="ctvUrl" placeholder="https://www.youtube.com/playlist?list=…" autocomplete="off" style="flex:1"><button class="btn" id="ctvSave" type="button">Put it on</button></div>
+    <div class="error" id="ctvErr"></div>
+  </div>
+</div>
+
 <div id="moviePanel" class="panel card hidden">
   <button class="x" data-close aria-label="Close">✕</button>
   <p class="eyebrow">Film night</p>
@@ -986,9 +1001,9 @@
     <b>Now showing</b><div class="fine" id="movieNowTitle"></div>
     <div class="row" style="gap:6px;margin-top:8px"><button class="btn" id="movieWatch" type="button">▶ Watch</button><button class="btn ghost" id="movieStop" type="button">⏹ Turn it off</button></div>
   </div>
-  <p class="lede" style="font-size:13.5px">Paste a YouTube link — everyone in this room watches it together, at the same moment.</p>
+  <p class="lede" style="font-size:13.5px">Paste a YouTube link — a <b>video</b>, or a whole <b>playlist</b> to play one after another. Everyone in this room watches together, at the same moment.</p>
   <form id="movieForm" class="row" style="gap:6px">
-    <input type="text" id="movieUrl" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" style="flex:1">
+    <input type="text" id="movieUrl" placeholder="https://www.youtube.com/watch?v=… or /playlist?list=…" autocomplete="off" style="flex:1">
     <button class="btn" type="submit">Play for everyone</button>
   </form>
   <div class="error" id="movieErr"></div>
@@ -1058,6 +1073,7 @@
     <li>Click <b>Hana or the counter</b> (or ☕ <b>Order</b>) for a drink — or a dessert from the <b>🍡 Desserts</b> tab. A plate goes in your other hand: <b>🍡 Take a bite</b>, or set it down next to your cup.</li>
     <li>Sitting at a table? Tick <b>🛎️ Bring it to my table</b> on the menu and Hana or Yuki will carry it over. <b>☕ Take a sip</b> (<kbd>C</kbd>) and <b>🍡 Take a bite</b> (<kbd>B</kbd>) work on what's in your hands — or on your table.</li>
     <li><b>🎧 The café radio</b> plays the songs the café chose — everyone hears the same song at the same moment. ▶ to listen, ⏸ to stop just for you.</li>
+    <li>Upstairs, the hallway's <b>Common Room</b> door (by the stairs to the roof) leads to the sofas and the big TV — it plays the café's playlist, and everyone watches together.</li>
     <li><b>🔗</b> at the top: invite a friend (they'll walk straight to your table) or take a 📸 photo of the café to share.</li>
     <li>Sitting at a table? Press <b>🎲 Games</b> to set out <b>tawla</b> or <b>chess</b> — play whoever sits across from you, or Yuto. Anyone can walk over and watch.</li>
     <li>Order at the counter and Hana <b>calls your name</b> when it's ready (if there's a line, you wait your turn). Every drink earns a stamp on your <b>🎟️ stamp card</b> — ten stamps and Yuto brings you a slice of the sakura cake.</li>
