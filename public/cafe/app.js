@@ -2718,10 +2718,12 @@ $('enterBtn').onclick = async () => {
   if (prefs.quality) { applyQuality(prefs.quality); state.qualityChosen = true; }
 
   playerAvatar();
+  // back where you were last time? (not when a friend has saved you a seat)
+  const back = invite.table ? null : lastPlace();
   // walk in through the front door
   player.pos.set(0, 0, mapZ(5.6));
   player.ry = Math.PI;
-  player.target = new THREE.Vector3(0, 0, mapZ(3.8));
+  player.target = back ? null : new THREE.Vector3(0, 0, mapZ(3.8));
   cam.yaw = 0; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.6;
 
   $('hudTop').classList.remove('hidden');
@@ -2751,11 +2753,15 @@ $('enterBtn').onclick = async () => {
     const { messages } = await api('/chat?room=main');
     messages.forEach(addChat);
   } catch (e) { /* fine */ }
-  sysChat('You came in. The door chimes softly behind you.');
-  setTimeout(() => {
-    const yuto = world.npcs.find(n => n.id === 'yuto');
-    if (yuto) bubble(yuto.av.group, `Welcome in, ${state.me.displayName}. Take any seat you like.`, 'npc');
-  }, 1600);
+  if (back && await resumePlace(back)) {
+    if (state.room === 'main') sysChat('Welcome back — right where you left off.');
+  } else {
+    sysChat('You came in. The door chimes softly behind you.');
+    setTimeout(() => {
+      const yuto = world.npcs.find(n => n.id === 'yuto');
+      if (yuto && state.room === 'main') bubble(yuto.av.group, `Welcome in, ${state.me.displayName}. Take any seat you like.`, 'npc');
+    }, 1600);
+  }
   // invited to someone's table? walk over and sit down with them
   if (invite.table) setTimeout(() => {
     const free = world.seats.filter(x => x.table === invite.table && !seatTaken(x));
@@ -3213,6 +3219,78 @@ async function goToRoom(room, group = null) {
 }
 
 $('floorAct').onclick = () => goToRoom(state.room === 'main' ? 'hall' : 'main');
+
+// ── where you were: refresh, close the tab or come back tomorrow, and the
+// café opens where you left it — the same room, where you stood, your seat.
+// Kept in this browser every couple of seconds, and on your account (prefs)
+// every half a minute and as you leave, so it follows you to your phone too.
+const placeKey = () => 'cafe.place.' + state.me.id;
+let placeSent = '';
+function currentPlace() {
+  return {
+    room: state.room, x: +player.pos.x.toFixed(2), z: +player.pos.z.toFixed(2), ry: +player.ry.toFixed(2),
+    seat: player.seat ? player.seat.id : null, at: Date.now(),
+  };
+}
+function savePlace(toAccount = false, leaving = false) {
+  // not mid-stairs (between rooms) or before you've come in
+  if (!state.started || !state.me || $('fade').classList.contains('on')) return;
+  const p = currentPlace();
+  try { localStorage.setItem(placeKey(), JSON.stringify(p)); } catch (e) { /* private window */ }
+  const same = JSON.stringify({ ...p, at: 0 });
+  if (!toAccount || same === placeSent) return;
+  placeSent = same;
+  // keepalive: the request still goes out as the page closes
+  fetch('/api/me', {
+    method: 'PATCH', credentials: 'same-origin', keepalive: leaving,
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefs: { place: p } }),
+  }).catch(() => {});
+}
+setInterval(() => savePlace(), 2000);
+setInterval(() => savePlace(true), 30e3);
+document.addEventListener('visibilitychange', () => { if (document.hidden) savePlace(true, true); });
+addEventListener('pagehide', () => savePlace(true, true));
+
+// the newer of this browser's note and the account's
+function lastPlace() {
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(placeKey()) || 'null'); } catch (e) { /* none */ }
+  const acct = (state.me.prefs || {}).place || null;
+  const p = [local, acct].filter(q => q && typeof q.room === 'string').sort((a, b) => (b.at || 0) - (a.at || 0))[0];
+  return p || null;
+}
+// is (x, z) somewhere you can stand on this floor? (the walls and furniture
+// wouldn't push you anywhere else)
+function standable(x, z) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
+  const p = new THREE.Vector3(x, 0, z);
+  collide(p);
+  return Math.hypot(p.x - x, p.z - z) < 0.05;
+}
+// back to where you were; false if there's nowhere to go back to
+async function resumePlace(p) {
+  if (!p) return false;
+  if (p.room !== 'main') {
+    let group = null;
+    if (p.room.startsWith('group:')) {
+      try { group = (await api('/groups')).mine.find(g => 'group:' + g.id === p.room); } catch (e) { /* offline */ }
+      if (!group) return false; // not in that group any more
+    }
+    await goToRoom(p.room, group);
+    if (state.room !== p.room) return false; // a door that's shut now
+  }
+  if (standable(p.x, p.z)) {
+    player.pos.set(p.x, world.floorY, p.z);
+    player.ry = p.ry || 0;
+    player.target = null;
+    cam.yaw = player.ry + Math.PI;
+    camTarget.copy(player.pos).add(new THREE.Vector3(0, 1.45, 0));
+    sendMove(true);
+  }
+  const seat = p.seat && world.seats.find(x => x.id === p.seat);
+  if (seat && !seatTaken(seat)) sitAt(seat);
+  return true;
+}
 
 // ── the hallway upstairs: whose door is whose (and whose has a light on)
 async function loadHallDoors() {
