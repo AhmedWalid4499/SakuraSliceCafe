@@ -3,7 +3,7 @@
 // big TV (it plays the playlist the café chooses — see app.js), beanbags
 // and floor cushions on a big rug, a coffee table with a board game on it,
 // a bookshelf, a little tea counter, lamps and fairy lights, windows onto
-// the Cairo evening.
+// the real Cairo outside.
 //
 // Like hall.js, world.js hands us a floor ({ group, colliders, seats,
 // surfaces, interactables }) and we fill its lists.
@@ -75,9 +75,19 @@ export function buildCommon({ floor, makeSign }) {
   ceil.rotation.x = Math.PI / 2; ceil.position.y = R.h;
   group.add(ceil);
   for (let x = R.minX + 2; x < R.maxX; x += 4) group.add(at(box(0.2, 0.2, D, wood), x, R.h - 0.1, 0));
-  const wall = (w, x, z, ry) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, R.h), wallM);
-    m.position.set(x, R.h / 2, z); m.rotation.y = ry; m.receiveShadow = true;
+  // a wall, with real openings where the windows go so you see the actual
+  // Cairo outside — its sky, the time of day and the weather
+  const WIN = { w: 1.6, y0: 1.05, y1: 2.45, at: [-2.6, 2.6] };
+  const wall = (w, x, z, ry, windows = false) => {
+    const sh = new THREE.Shape();
+    sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.lineTo(w / 2, R.h); sh.lineTo(-w / 2, R.h); sh.closePath();
+    if (windows) for (const c of WIN.at) {
+      const hole = new THREE.Path();
+      hole.moveTo(c - WIN.w / 2, WIN.y0); hole.lineTo(c + WIN.w / 2, WIN.y0); hole.lineTo(c + WIN.w / 2, WIN.y1); hole.lineTo(c - WIN.w / 2, WIN.y1); hole.closePath();
+      sh.holes.push(hole);
+    }
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), wallM);
+    m.position.set(x, 0, z); m.rotation.y = ry; m.receiveShadow = true;
     m.userData.surface = 'wall'; surfaces.push(m);
     group.add(m);
     const wain = new THREE.Mesh(new THREE.PlaneGeometry(w, 1.0), std('#93ab8c', { roughness: 0.9 }));
@@ -87,26 +97,14 @@ export function buildCommon({ floor, makeSign }) {
   };
   wall(W, 0, R.minZ, 0);
   wall(W, 0, R.maxZ, Math.PI);
-  wall(D, R.minX, 0, Math.PI / 2);
-  wall(D, R.maxX, 0, -Math.PI / 2);
+  wall(D, R.minX, 0, Math.PI / 2, true);
+  wall(D, R.maxX, 0, -Math.PI / 2, true);
 
-  // windows onto the Cairo evening (east and west walls)
-  const winM = new THREE.MeshBasicMaterial({ color: '#f6c99a' });
-  const skyCanvas = (() => {
-    const c = document.createElement('canvas'); c.width = 256; c.height = 256;
-    const g = c.getContext('2d');
-    const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#7f8fc7'); gr.addColorStop(0.6, '#f2b38e'); gr.addColorStop(1, '#f7d7a8');
-    g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
-    g.fillStyle = '#5a4a5a';
-    for (let i = 0; i < 9; i++) { const w = 18 + (i * 37) % 30, h = 50 + (i * 53) % 90; g.fillRect(i * 30, 256 - h, w, h); }
-    g.fillStyle = '#ffd98a';
-    for (let i = 0; i < 40; i++) g.fillRect((i * 47) % 250, 256 - 20 - ((i * 31) % 100), 3, 4);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-  })();
-  winM.map = skyCanvas;
+  // the windows: clear glass onto the real outside (east and west walls)
+  const winM = new THREE.MeshStandardMaterial({ color: '#dff1ff', roughness: 0.05, transparent: true, opacity: 0.12, depthWrite: false });
   for (const [x, ry] of [[R.minX + 0.02, Math.PI / 2], [R.maxX - 0.02, -Math.PI / 2]]) {
-    for (const z of [-2.6, 2.6]) {
-      const w = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.4), winM);
+    for (const z of WIN.at) {
+      const w = new THREE.Mesh(new THREE.PlaneGeometry(WIN.w, WIN.y1 - WIN.y0), winM);
       w.position.set(x, 1.75, z); w.rotation.y = ry;
       group.add(w);
       const f = new THREE.Group();

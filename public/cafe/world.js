@@ -1683,20 +1683,68 @@ export function buildWorld(renderer) {
     // the little stair house the spiral stairs come up into
     {
       const hx = STAIRS.x, hz = STAIRS.z - 0.2, hw = 3.2, hd = 2.6, hh = 2.5;
-      const body = shadowy(new THREE.Mesh(new THREE.BoxGeometry(hw, hh, hd), parapetM));
-      body.position.set(hx, hh / 2, hz);
-      body.userData.surface = 'wall';
-      surfaces.push(body);
+      // walls all round, with an open archway at the front: you can see the
+      // stairs going down inside, under the roof, out of the rain
+      const AW = 1.3, AH = 2.1, t = 0.16;
+      const fz = hz + hd / 2 - t / 2;
+      const walls = [
+        [hw, hh, t, hx, hh / 2, hz - hd / 2 + t / 2],                      // back
+        [t, hh, hd, hx - hw / 2 + t / 2, hh / 2, hz],                      // sides
+        [t, hh, hd, hx + hw / 2 - t / 2, hh / 2, hz],
+        [(hw - AW) / 2, hh, t, hx - (hw + AW) / 4, hh / 2, fz],           // front, either side of the arch
+        [(hw - AW) / 2, hh, t, hx + (hw + AW) / 4, hh / 2, fz],
+        [AW, hh - AH, t, hx, AH + (hh - AH) / 2, fz],                      // over the arch
+      ].map(([w, h, d, x, y, z]) => {
+        const m = shadowy(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), parapetM));
+        m.position.set(x, y, z);
+        m.userData.surface = 'wall';
+        surfaces.push(m);
+        return m;
+      });
       const roof = shadowy(new THREE.Mesh(new THREE.BoxGeometry(hw + 0.4, 0.14, hd + 0.4), std(COLORS.forest, { roughness: 0.6 })));
       roof.position.set(hx, hh + 0.07, hz);
-      const door = rbox(1.1, 2.1, 0.08, 0.02, std(COLORS.sage, { roughness: 0.6 }));
-      door.position.set(hx, 1.05, hz + hd / 2 + 0.02);
-      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), M.brass);
-      knob.position.set(hx + 0.4, 1.0, hz + hd / 2 + 0.08);
+      const ceil = new THREE.Mesh(new THREE.PlaneGeometry(hw - 2 * t, hd - 2 * t), std('#f3e9dc', { roughness: 1 }));
+      ceil.rotation.x = Math.PI / 2; ceil.position.set(hx, hh - 0.01, hz);
+      // a wooden frame round the arch, and a little canopy over it
+      const frameM = M.woodDark;
+      const at = (o, x, y, z) => { o.position.set(x, y, z); return o; };
+      const arch = new THREE.Group();
+      for (const s of [-1, 1]) arch.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.1, AH, 0.24), frameM), hx + s * (AW / 2 + 0.05), AH / 2, fz));
+      arch.add(at(new THREE.Mesh(new THREE.BoxGeometry(AW + 0.2, 0.1, 0.24), frameM), hx, AH + 0.05, fz));
+      const canopy = shadowy(new THREE.Mesh(new THREE.BoxGeometry(AW + 0.7, 0.06, 0.7), std(COLORS.forest, { roughness: 0.6 })));
+      canopy.position.set(hx, AH + 0.32, fz + 0.38); canopy.rotation.x = 0.18;
+      // the stairs: down through a hole in the deck, from the back towards
+      // the arch, so you see them going down as you walk up to it
+      const pit = new THREE.Group();
+      const pitM = std('#e9dccb', { roughness: 1, side: THREE.DoubleSide });
+      const PW = AW - 0.1, PD = hd - 2 * t - 0.1, P0 = fz - t / 2 - 0.05;
+      for (const s of [-1, 1]) pit.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.56, PD), pitM), hx + s * PW / 2, -1.31, P0 - PD / 2));
+      for (const z of [P0, P0 - PD]) pit.add(at(new THREE.Mesh(new THREE.BoxGeometry(PW, 2.56, 0.06), pitM), hx, -1.31, z));
+      pit.add(at(new THREE.Mesh(new THREE.BoxGeometry(PW, 0.06, PD), std('#8a6a50')), hx, -2.6, P0 - PD / 2));
+      for (let i = 0; i < 9; i++) {
+        const step = shadowy(rbox(PW - 0.06, 0.07, PD / 9 + 0.02, 0.02, std('#b58a63', { roughness: 0.6 })));
+        step.position.set(hx, -0.26 * (i + 1), P0 - PD + PD / 18 + i * PD / 9);
+        pit.add(step);
+      }
+      const well = new THREE.PointLight('#ffe2b8', 2.2, 5, 1.6);
+      well.position.set(hx, hh - 0.5, hz);
       const lampM = std('#fff1d6', { emissive: '#ffcf8f', emissiveIntensity: 0.4 });
       const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), lampM);
       lamp.position.set(hx, 2.3, hz + hd / 2 + 0.12);
-      root.add(body, roof, door, knob, lamp);
+      root.add(...walls, roof, ceil, arch, canopy, pit, well, lamp);
+      // cut the stair opening out of the deck
+      {
+        const sh = new THREE.Shape();
+        sh.moveTo(-W3 / 2, -D3 / 2); sh.lineTo(W3 / 2, -D3 / 2); sh.lineTo(W3 / 2, D3 / 2); sh.lineTo(-W3 / 2, D3 / 2); sh.closePath();
+        const hole = new THREE.Path(); // the deck is turned flat, so its y is −z
+        hole.moveTo(hx - PW / 2, -P0); hole.lineTo(hx - PW / 2, -(P0 - PD)); hole.lineTo(hx + PW / 2, -(P0 - PD)); hole.lineTo(hx + PW / 2, -P0); hole.closePath();
+        sh.holes.push(hole);
+        const geo = new THREE.ShapeGeometry(sh);
+        const pos = geo.attributes.position, uv = geo.attributes.uv;
+        for (let i = 0; i < uv.count; i++) uv.setXY(i, (pos.getX(i) + W3 / 2) / W3, (pos.getY(i) + D3 / 2) / D3);
+        deck.geometry.dispose();
+        deck.geometry = geo;
+      }
       colliders.push({ type: 'box', fixed: true, minX: hx - hw / 2, maxX: hx + hw / 2, minZ: hz - hd / 2, maxZ: hz + hd / 2 });
       const sign = makeSign([
         { text: 'downstairs ↓', font: 'Dancing Script, cursive', size: 140, color: COLORS.sakuraDark, weight: '700' },
