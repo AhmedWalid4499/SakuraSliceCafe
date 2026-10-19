@@ -85,19 +85,26 @@ export function createGames({ world, send, me, seatTable, toast, bubble, sound, 
     return t;
   }
 
+  // take a board off its table (and out of the things you can click)
+  function remove3D(old) {
+    old.mesh.parent && old.mesh.parent.remove(old.mesh);
+    old.face.map.dispose();
+    // in place: the world keeps a reference to this same list
+    if (old.floor) for (const o of old.parts) { const i = old.floor.interactables.indexOf(o); if (i >= 0) old.floor.interactables.splice(i, 1); }
+  }
   function show3D(table) {
     const g = games.get(table);
     const top = topOf(table);
     const old = boards.get(table);
     if (!g) {
-      if (old) { old.mesh.parent && old.mesh.parent.remove(old.mesh); old.mesh.material.map.dispose(); boards.delete(table); }
+      if (old) { remove3D(old); boards.delete(table); }
       if (top && top.userData.vase) top.userData.vase.visible = true;
       return;
     }
     if (!top) return;
     const tex = drawBoard(g);
-    if (old && old.kind === g.kind) { old.mesh.material.map.dispose(); old.mesh.material.map = tex; old.mesh.material.needsUpdate = true; return; }
-    if (old) { old.mesh.parent && old.mesh.parent.remove(old.mesh); old.mesh.material.map.dispose(); }
+    if (old && old.kind === g.kind) { old.face.map.dispose(); old.face.map = tex; old.face.needsUpdate = true; return; }
+    if (old) remove3D(old);
     const size = g.kind === 'chess' ? 0.4 : 0.46;
     const board = new THREE.Group();
     const base = new THREE.Mesh(new THREE.BoxGeometry(size + 0.03, 0.018, size + 0.03), new THREE.MeshStandardMaterial({ color: '#5a3a26', roughness: 0.6 }));
@@ -114,9 +121,10 @@ export function createGames({ world, send, me, seatTable, toast, bubble, sound, 
     board.traverse(o => { if (o.isMesh) o.userData = { kind: 'game', table, label: `${label} — ${g.players.a.name} and ${g.players.b ? g.players.b.name : '…'} · click to watch` }; });
     top.parent.add(board);
     // it goes in the same floor's list of things you can click
-    for (const f of Object.values(world.floors)) if (f.surfaces && f.surfaces.includes(top)) f.interactables.push(base, face);
+    const floor = Object.values(world.floors).find(f => f.surfaces && f.surfaces.includes(top));
+    if (floor) floor.interactables.push(base, face);
     if (top.userData.vase) top.userData.vase.visible = false;
-    boards.set(table, { kind: g.kind, mesh: board, face: face.material });
+    boards.set(table, { kind: g.kind, mesh: board, face: face.material, parts: [base, face], floor });
   }
 
   // ── messages from the server
