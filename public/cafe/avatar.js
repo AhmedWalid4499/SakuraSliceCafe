@@ -871,6 +871,47 @@ function buildAvatarParts(avatar, extra) {
   let gesture = null, gestureT = 0;
   function play(kind) { if (!isOwl) { gesture = kind; gestureT = 0; } }
   let sitDrop = 0.13;
+
+  // Asleep: little Zzz drift up from the head, one after another, and fade.
+  // They're made the first time someone falls asleep, and kept upright
+  // whichever way the head is lying.
+  let zzz = null, zzzShow = 0;
+  const zq = new THREE.Quaternion();
+  function makeZzz() {
+    const g = new THREE.Group();
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d');
+    x.font = '800 104px Nunito, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.lineWidth = 14; x.strokeStyle = '#fffaf2'; x.strokeText('Z', 64, 70);
+    x.fillStyle = '#8f8bd6'; x.fillText('Z', 64, 70);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    for (let i = 0; i < 3; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0, fog: false }));
+      sp.userData.phase = i / 3;
+      sp.renderOrder = 11;
+      g.add(sp);
+    }
+    head.add(g);
+    return g;
+  }
+  function updateZzz(dt, asleep) {
+    zzzShow += ((asleep ? 1 : 0) - zzzShow) * Math.min(1, dt * 2);
+    if (!zzz) { if (!asleep) return; zzz = makeZzz(); }
+    zzz.visible = zzzShow > 0.02;
+    if (!zzz.visible) return;
+    // keep the little column of Zs pointing up in the world, not along the pillow
+    head.getWorldQuaternion(zq);
+    zzz.quaternion.copy(zq).invert();
+    for (const sp of zzz.children) {
+      const k = (t * 0.32 + sp.userData.phase) % 1; // 0 → 1 as each one rises
+      sp.position.set(0.12 + k * 0.16 + Math.sin(k * 6 + sp.userData.phase * 9) * 0.02, 0.2 + k * 0.42, 0);
+      const size = 0.07 + k * 0.11;
+      sp.scale.set(size, size, 1);
+      sp.material.opacity = Math.sin(Math.PI * k) * 0.95 * zzzShow;
+      sp.material.rotation = -0.25 + Math.sin(k * 4) * 0.12;
+    }
+  }
   // sitH: how high the seat's cushion is, so you sit on it rather than in it
   // asleep: eyes closed, very still. typing: hands forward on a keyboard.
   function update(dt, { moving = false, sitting = false, sitH = 0.54, waving = 0, asleep = false, typing = false } = {}) {
@@ -893,6 +934,7 @@ function buildAvatarParts(avatar, extra) {
     const lid = asleep ? 0.07 : closed ? Math.max(0.08, Math.abs(Math.cos((-nextBlink / blinkLen) * Math.PI))) : 1;
     for (const e of blinkers) e.scale.y = lid;
     if (nextBlink < -blinkLen) nextBlink = 2 + Math.random() * 4;
+    updateZzz(dt, asleep);
 
     if (parts.legL) {
       parts.legL.rotation.x = swing * (1 - sitBlend) - sitBlend * 1.45;
