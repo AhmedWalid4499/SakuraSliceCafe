@@ -1677,5 +1677,14 @@
       "items": []
     },
     "description": "The A-frame specials board by the counter. Leave items empty for the week's own picks, or set { title: 'This week', items: [{ name, note }, …] } (up to 3)."
+  },
+  "common.tv": {
+    "value": {
+      "url": "",
+      "list": null,
+      "videoId": null,
+      "title": ""
+    },
+    "description": "The Common room TV (upstairs, off the hallway): a YouTube playlist or video that plays for everyone. Set it from the TV in the Common room."
   }
 }

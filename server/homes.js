@@ -296,11 +296,26 @@ function youtubeId(url) {
   const m = s.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/);
   return m ? m[1] : null;
 }
-async function videoTitle(id) {
+// A playlist link (youtube.com/playlist?list=…, or a video in a playlist) — or just its id.
+function playlistId(url) {
+  const s = String(url || '').trim();
+  if (/^(PL|UU|LL|FL|OL|RD)[\w-]{10,60}$/.test(s)) return s;
+  const m = s.match(/[?&]list=([\w-]{10,64})/);
+  return m ? m[1] : null;
+}
+// What a link puts on the screen: a playlist (played in order, then round again) or one video.
+function youtubeLink(url) {
+  const list = playlistId(url);
+  if (list) return { list, videoId: null };
+  const videoId = youtubeId(url);
+  return videoId ? { list: null, videoId } : null;
+}
+async function videoTitle(id, list = null) {
   try {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 3000);
-    const r = await fetch(`https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=${id}`, { signal: ctl.signal });
+    const page = list ? `https://www.youtube.com/playlist?list=${list}` : `https://www.youtube.com/watch?v=${id}`;
+    const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(page)}`, { signal: ctl.signal });
     clearTimeout(timer);
     if (!r.ok) return '';
     return cleanText((await r.json()).title, 80);
@@ -309,10 +324,14 @@ async function videoTitle(id) {
 router.post('/home/:ownerId(\\d+)/movie', auth.requireUser, smallLimit, wrap(async (req, res) => {
   const ownerId = await inRoom(req, res);
   if (!ownerId) return;
-  const videoId = youtubeId((req.body || {}).url);
-  if (!videoId) return res.status(400).json({ error: "That doesn't look like a YouTube link — paste the address of the video." });
-  const movie = { videoId, title: (await videoTitle(videoId)) || 'a film', by: req.user.display_name, byId: req.user.id, startedAt: Date.now() };
+  const link = youtubeLink((req.body || {}).url);
+  if (!link) return res.status(400).json({ error: "That doesn't look like a YouTube link — paste the address of a video or a playlist." });
+  const movie = {
+    ...link, title: (await videoTitle(link.videoId, link.list)) || (link.list ? 'a playlist' : 'a film'),
+    by: req.user.display_name, byId: req.user.id, startedAt: Date.now(),
+  };
   movies.set(roomOf(ownerId), movie);
+  tvPos.delete(roomOf(ownerId));
   realtime.broadcast({ t: 'home:movie', movie, now: Date.now() }, null, roomOf(ownerId));
   res.json({ movie, now: Date.now() });
 }));
@@ -322,6 +341,51 @@ router.delete('/home/:ownerId(\\d+)/movie', auth.requireUser, smallLimit, wrap(a
   movies.delete(roomOf(ownerId));
   realtime.broadcast({ t: 'home:movie', movie: null, by: req.user.display_name }, null, roomOf(ownerId));
   res.json({ movie: null });
+}));
+
+// ── where a playlist is up to, in each room. A playlist's videos have their
+// own lengths, which only the players know, so the people watching tell us
+// (every few seconds) which video and how far in — the first one to report
+// keeps the job while they're watching — and anyone who comes in later picks
+// it up from there. ('common' is the Common room; 'home:<id>' a resident's room.)
+const tvPos = new Map(); // room -> { list, index, t, at, by }
+const TV_ROOM = /^(common|home:\d+)$/;
+async function mayWatch(userId, room) {
+  if (room === 'common') return true;
+  const m = /^home:(\d+)$/.exec(room);
+  return !!m && canEnterHome(userId, Number(m[1]));
+}
+router.get('/tv/:room', auth.requireUser, wrap(async (req, res) => {
+  const room = String(req.params.room);
+  if (!TV_ROOM.test(room) || !(await mayWatch(req.user.id, room))) return res.status(403).json({ error: "You're not in that room." });
+  const pos = tvPos.get(room);
+  res.json({ pos: pos && Date.now() - pos.at < 6 * HOUR ? pos : null, now: Date.now() });
+}));
+router.post('/tv/pos', auth.requireUser, smallLimit, wrap(async (req, res) => {
+  const b = req.body || {};
+  const room = String(b.room || '');
+  if (!TV_ROOM.test(room) || !(await mayWatch(req.user.id, room))) return res.status(403).json({ error: "You're not in that room." });
+  const list = playlistId(b.list);
+  if (!list) return res.status(400).json({ error: 'Which playlist?' });
+  const cur = tvPos.get(room);
+  const fresh = !cur || cur.list !== list || cur.by === req.user.id || Date.now() - cur.at > 30e3;
+  if (fresh) tvPos.set(room, { list, index: Math.max(0, Math.min(5000, Math.floor(Number(b.index) || 0))), t: Math.max(0, Math.min(36000, Number(b.t) || 0)), at: Date.now(), by: req.user.id });
+  res.json({ ok: true, kept: fresh });
+}));
+
+// The Common room's TV: a playlist (or a video) the café's owner chooses,
+// on for everyone who comes in (site_content 'common.tv').
+router.put('/admin/common/tv', auth.requireAdmin, wrap(async (req, res) => {
+  const url = String((req.body || {}).url || '').trim();
+  let value = { url: '', list: null, videoId: null, title: '' };
+  if (url) {
+    const link = youtubeLink(url);
+    if (!link) return res.status(400).json({ error: "That doesn't look like a YouTube link — paste the address of a playlist or a video." });
+    value = { url: url.slice(0, 300), ...link, title: (await videoTitle(link.videoId, link.list)) || (link.list ? 'the Common room playlist' : 'a film'), setAt: Date.now() };
+  }
+  await require('./media').setContent('common.tv', value, req.user.id, "The Common room TV (upstairs, off the hallway): a YouTube playlist or video that plays for everyone. Set it from the TV in the Common room.");
+  tvPos.delete('common');
+  res.json({ tv: value });
 }));
 
 // ── presents: send a friend a piece of furniture or a drink, with a note. It

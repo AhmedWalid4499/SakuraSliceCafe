@@ -151,7 +151,7 @@ function attach(server, opts = {}) {
       if (m.t === 'room') {
         const room = typeof m.room === 'string' ? m.room : '';
         let ok = false;
-        try { ok = /^(main|garden|hall|group:\d+|home:\d+)$/.test(room) && await canEnter(entry.user.id, room); } catch (e) { ok = false; }
+        try { ok = /^(main|garden|hall|common|group:\d+|home:\d+)$/.test(room) && await canEnter(entry.user.id, room); } catch (e) { ok = false; }
         if (!ok) return send(ws, { t: 'room:denied', room });
         const from = entry.room;
         if (m.state) entry.state = cleanState(m.state);

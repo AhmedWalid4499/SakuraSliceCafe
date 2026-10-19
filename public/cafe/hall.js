@@ -100,6 +100,16 @@ export function buildHall({ floor, makeSign }) {
     well.add(at(box(3.4, 0.1, SW + 0.4, std('#e9dccb')), end * 1.7, end < 0 ? -2.6 : 3.4, 0));
     for (const s of [-1, 1]) well.add(at(box(3.4, 6, 0.1, wallM), end * 1.7, end < 0 ? -1 : 2, s * (SW / 2 + 0.2)));
     well.add(at(box(0.1, 6, SW + 0.4, wallM), end * 3.4, end < 0 ? -1 : 2, 0));
+    // covered all the way up: a roof over the well, the walls meeting it, a skylight
+    const top = end < 0 ? H.h + 0.05 : 5.05;
+    well.add(at(box(3.6, 0.14, SW + 0.6, std('#e6d8c6', { roughness: 1 })), end * 1.7, top + 0.07, 0));
+    if (end < 0) {
+      for (const s of [-1, 1]) well.add(at(box(3.4, H.h + 0.05 - 2, 0.1, wallM), end * 1.7, 2 + (H.h + 0.05 - 2) / 2, s * (SW / 2 + 0.2)));
+      well.add(at(box(0.1, H.h + 0.05 - 2, SW + 0.4, wallM), end * 3.4, 2 + (H.h + 0.05 - 2) / 2, 0));
+    }
+    const sky = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.9), new THREE.MeshBasicMaterial({ color: '#dceaf5' }));
+    sky.rotation.x = Math.PI / 2;
+    well.add(at(sky, end * 1.9, top - 0.01, 0));
     for (let i = 0; i < 12; i++) {
       const step = rbox(0.3, 0.07, SW - 0.1, 0.02, std('#b58a63', { roughness: 0.6 }));
       well.add(at(step, end * (0.2 + i * 0.27), end < 0 ? -0.2 * (i + 1) : 0.2 * (i + 1), 0));
@@ -158,14 +168,29 @@ export function buildHall({ floor, makeSign }) {
     }
     group.add(at(p, x, 0, z));
   };
-  plant(-13.2, H.maxZ - 0.35); plant(13.4, H.minZ + 0.35);
-  // a round window above the group-room doors' end
+  plant(-13.2, H.maxZ - 0.35); plant(14.6, H.minZ + 0.35);
+  // a round window above the bench by the stairs
   const win = new THREE.Mesh(new THREE.CircleGeometry(0.45, 32), new THREE.MeshBasicMaterial({ color: '#cfe6f5' }));
-  win.position.set(13.4, 2.0, H.minZ + 0.01);
+  win.position.set(-13.2, 2.0, H.minZ + 0.01);
   group.add(win);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.04, 8, 40), wood);
-  ring.position.set(13.4, 2.0, H.minZ + 0.03);
+  ring.position.set(-13.2, 2.0, H.minZ + 0.03);
   group.add(ring);
+  // the Common room: a wide double door on the north wall at the east end, opposite the study rooms
+  {
+    const g = new THREE.Group();
+    g.position.set(13.2, 0, H.minZ);
+    for (const s of [-1, 1]) g.add(at(rbox(0.7, DOOR_H + 0.1, 0.05, 0.015, std('#93ab8c', { roughness: 0.55 })), s * 0.36, (DOOR_H + 0.1) / 2, 0.025));
+    for (const s of [-1, 1]) g.add(at(new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.9), std('#fff1d6', { roughness: 0.1, emissive: '#ffd9a6', emissiveIntensity: 0.45 })), s * 0.36, 1.45, 0.055));
+    for (const [w, h, dx, y] of [[0.1, DOOR_H + 0.15, -0.77, (DOOR_H + 0.15) / 2], [0.1, DOOR_H + 0.15, 0.77, (DOOR_H + 0.15) / 2], [1.64, 0.1, 0, DOOR_H + 0.15]]) g.add(at(box(w, h, 0.08, wood), dx, y, 0.04));
+    const sign = makeSign([{ text: 'Common Room', size: 110, weight: '700' }, { text: 'sofas · the big TV · tea', size: 66 }], 1.1, 0.36, { bg: '#fbe3ea' });
+    sign.position.set(0, DOOR_H + 0.45, 0.03);
+    g.add(sign);
+    const hit = at(new THREE.Mesh(new THREE.PlaneGeometry(1.5, DOOR_H + 0.1), new THREE.MeshBasicMaterial({ visible: false })), 0, DOOR_H / 2, 0.1);
+    hit.userData = { kind: 'hall-common', label: 'The Common room — sofas, the big TV, everyone who lives upstairs' };
+    g.add(hit); interactables.push(hit);
+    group.add(g);
+  }
 
   // ── the doors
   const doorAt = ({ x, side }, color) => {
@@ -254,5 +279,6 @@ export function buildHall({ floor, makeSign }) {
     arrival: { x: H.minX + 1.4, z: 0.3, ry: Math.PI / 2 },   // at the top of the stairs from the café
     fromGarden: { x: H.maxX - 1.4, z: 0, ry: -Math.PI / 2 }, // down from the roof
     fromGroups: { x: 13.2, z: H.maxZ - 0.9, ry: Math.PI },
+    fromCommon: { x: 13.2, z: H.minZ + 0.9, ry: 0 },       // out of the Common room's door
   };
 }

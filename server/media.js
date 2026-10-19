@@ -234,4 +234,4 @@ router.post('/admin/stories/sync', auth.requireAdmin, wrap(async (req, res) => {
 // keep the shelf fresh: read the sheet again every six hours
 setInterval(() => { syncStories(null).catch(() => {}); }, 6 * 3600e3).unref();
 
-module.exports = { uploadRouter, router, storiesFromRows, parseCSV, sheetCsvUrl };
+module.exports = { uploadRouter, router, storiesFromRows, parseCSV, sheetCsvUrl, setContent };

@@ -12,6 +12,7 @@ import { makeDessert } from './pastries.js';
 import { mapX, mapZ, deltaAt, OLD } from './layout.mjs';
 import { buildHome } from './home.js';
 import { buildHall, HALL } from './hall.js';
+import { buildCommon, COMMON } from './common.js';
 import { ROOM_SIZE as HOME_SIZE } from './furniture.mjs';
 
 export const ROOM = { minX: -15, maxX: 15, minZ: -11, maxZ: 11, h: 4.2 };
@@ -344,8 +345,12 @@ export function buildWorld(renderer) {
     interactables: [], // meshes that respond to hover/click (userData.kind)
     group: new THREE.Group(),
   });
-  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor() };
-  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group);
+  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor() };
+  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group);
+  // the Common room (common.js), off the hallway, for everyone who lives upstairs
+  floors.common.group.position.y = FLOOR2_Y;
+  floors.common.group.visible = false;
+  let common = null;
   // the hallway upstairs (hall.js), with everyone's doors off it
   floors.hall.group.position.y = FLOOR2_Y;
   floors.hall.group.visible = false;
@@ -3415,9 +3420,11 @@ export function buildWorld(renderer) {
   noFog(floors.home.group);
   hall = buildHall({ floor: floors.hall, makeSign });
   noFog(floors.hall.group);
+  common = buildCommon({ floor: floors.common, makeSign });
+  noFog(floors.common.group);
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall,
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, common,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setBookOfWeek, setPhotos, photoFrames: PHOTO_FRAMES, setMenuBoard, setSpecials, setSeason, setEvents, setHours,
     walk, kitchen: { ...KIT, door: { x: KX, z: ROOM.minZ - 0.1 } }, updateDoors, counter,
@@ -3429,8 +3436,8 @@ export function buildWorld(renderer) {
     const f = floors[name];
     Object.assign(api, {
       floor: name,
-      floorY: name === 'up' || name === 'home' || name === 'hall' ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
-      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' ? HALL.h : name === 'garden' ? 7 : ROOM.h,
+      floorY: name === 'up' || name === 'home' || name === 'hall' || name === 'common' ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
+      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' ? HALL.h : name === 'common' ? COMMON.h : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
   }
@@ -4129,7 +4136,8 @@ function buildCairo(scene) {
     let x, z;
     do { x = (Math.random() - 0.5) * 100; z = (Math.random() - 0.5) * 90; }
     // the café has a roof — and so does the kitchen behind the back door
-    while ((Math.abs(x) < 15.6 && Math.abs(z) < 11.6) || (x > -15.4 && x < -6.4 && z > -15 && z < -10.6));
+    while ((Math.abs(x) < 15.6 && Math.abs(z) < 11.6) || (x > -15.4 && x < -6.4 && z > -15 && z < -10.6)
+      || (Math.abs(x) < 19 && Math.abs(z) < 1.6)); // the covered stairwells off the hallway upstairs
     rainSeed[i * 3] = x; rainSeed[i * 3 + 1] = y; rainSeed[i * 3 + 2] = z;
   }
   for (let i = 0; i < RAIN_N; i++) dropAt(i, Math.random() * 30);
