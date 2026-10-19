@@ -21,8 +21,16 @@ import { fullMenu, SEASONS } from './drinks.mjs';
 import { FURNITURE, BY_KIND, CATS, MAX_ITEMS, WALLS, FLOORS, AREAS, areaAt, WALLPAPERS, COATS } from './furniture.mjs';
 import { createRadio, audioDuration } from './radio.js';
 import { createRegulars } from './regulars.js';
+import { createGames } from './games.js';
+import { createTour } from './tour.js';
 
 const $ = id => document.getElementById(id);
+// Came from an invite link? (/cafe?invite=<username>&table=<table>)
+const invite = (() => {
+  const q = new URLSearchParams(location.search);
+  const from = (q.get('invite') || '').toLowerCase().slice(0, 24);
+  return { from: /^[a-z0-9_.]{3,24}$/.test(from) ? from : '', table: /^[\w-]{1,24}$/.test(q.get('table') || '') ? q.get('table') : '', name: '' };
+})();
 
 // ───────────────────────────────────────── API
 
@@ -441,7 +449,8 @@ function seatTaken(seat) {
 }
 // a seat a real person has (or is heading for) — the regulars give these up
 function seatHeld(seat) {
-  return [...state.people.values()].some(p => p.state.seat === seat.id)
+  return (seat.table && games.hasGame(seat.table)) // a game is out on that table: the regulars leave it be
+    || [...state.people.values()].some(p => p.state.seat === seat.id)
     || (player.seat && player.seat.id === seat.id) || (player.goingToSeat && player.goingToSeat.id === seat.id);
 }
 
@@ -624,6 +633,7 @@ function refreshActions() {
   $('decorAct').classList.toggle('hidden', !inMyRoom());
   $('roomAct').classList.toggle('hidden', !inMyRoom());
   $('studyAct').classList.toggle('hidden', !state.home);
+  $('gameAct').classList.toggle('hidden', !(player.seat && player.seat.table && !/^bar-/.test(player.seat.table)));
 }
 
 // A sip at a time — the cup goes down; four and it's finished.
@@ -746,15 +756,27 @@ function lerpAngle(a, b, t) {
 }
 
 const camPos = new THREE.Vector3();
+// While the welcome tour is on, the camera turns to what Hana is showing.
+const tourCam = { yaw: 0, pitch: 0.3, dist: 4, on: false };
 function updateCamera(dt) {
   cam.dist += (cam.targetDist - cam.dist) * Math.min(1, dt * 6);
-  const focus = player.av ? player.pos.clone().add(new THREE.Vector3(0, player.seat ? 1.15 : 1.45, 0)) : new THREE.Vector3(0, 1.5 + world.floorY, 0);
-  camTarget.lerp(focus, Math.min(1, dt * 8));
-  const cp = Math.cos(cam.pitch);
+  const tv = typeof tour !== 'undefined' ? tour.view() : null;
+  if (tv && !tourCam.on) Object.assign(tourCam, { yaw: cam.yaw, pitch: cam.pitch, dist: cam.dist, on: true });
+  if (!tv && tourCam.on) { tourCam.on = false; cam.yaw = tourCam.yaw; }
+  if (tv) {
+    const k = Math.min(1, dt * 2.2);
+    tourCam.yaw = lerpAngle(tourCam.yaw, tv.yaw, k);
+    tourCam.pitch += (tv.pitch - tourCam.pitch) * k;
+    tourCam.dist += (tv.dist - tourCam.dist) * k;
+  }
+  const yaw = tv ? tourCam.yaw : cam.yaw, pitch = tv ? tourCam.pitch : cam.pitch, dist = tv ? tourCam.dist : cam.dist;
+  const focus = tv ? tv.focus : player.av ? player.pos.clone().add(new THREE.Vector3(0, player.seat ? 1.15 : 1.45, 0)) : new THREE.Vector3(0, 1.5 + world.floorY, 0);
+  camTarget.lerp(focus, Math.min(1, dt * (tv ? 2.5 : 8)));
+  const cp = Math.cos(pitch);
   camPos.set(
-    camTarget.x + Math.sin(cam.yaw) * cp * cam.dist,
-    camTarget.y + Math.sin(cam.pitch) * cam.dist,
-    camTarget.z + Math.cos(cam.yaw) * cp * cam.dist,
+    camTarget.x + Math.sin(yaw) * cp * dist,
+    camTarget.y + Math.sin(pitch) * dist,
+    camTarget.z + Math.cos(yaw) * cp * dist,
   );
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
@@ -966,6 +988,11 @@ function handle(m) {
       if (p) addPerson({ ...m.person, state: p.state });
       break;
     }
+    case 'games':
+    case 'game':
+    case 'game:end':
+      games.onMessage(m);
+      break;
     case 'emote': {
       const p = state.people.get(m.id);
       if (!p) break;
@@ -1687,6 +1714,7 @@ function click(x, y) {
   }
   if (d.kind === 'shelf') return openShelf();
   if (d.kind === 'photo') return openPhoto(d.id);
+  if (d.kind === 'game') return games.open(d.table);
   if (d.kind === 'specials') return openSpecials();
   if (d.kind === 'events') return openEvents();
   if (d.kind === 'bookweek') return openBook();
@@ -1734,7 +1762,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
+const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2426,6 +2454,7 @@ $('photoRemove').onclick = async () => {
 
 // ───────────────────────────────────────── actions
 
+$('gameAct').onclick = () => games.open();
 $('noteAct').onclick = () => (state.placing ? stopPlacing() : startPlacing());
 $('orderAct').onclick = () => openMenu(undefined, { cook: false });
 $('sitAct').onclick = toggleSit;
@@ -2723,6 +2752,15 @@ $('enterBtn').onclick = async () => {
     const yuto = world.npcs.find(n => n.id === 'yuto');
     if (yuto) bubble(yuto.av.group, `Welcome in, ${state.me.displayName}. Take any seat you like.`, 'npc');
   }, 1600);
+  // invited to someone's table? walk over and sit down with them
+  if (invite.table) setTimeout(() => {
+    const free = world.seats.filter(x => x.table === invite.table && !seatTaken(x));
+    if (free.length) { goSit(free[0]); toast(`🌸 ${invite.name || 'Your friend'} saved you a seat at ${free[0].label}.`); }
+    else if (world.seats.some(x => x.table === invite.table)) toast(`${invite.name || 'Your friend'}'s table is full just now — sit nearby 🌸`);
+    invite.table = '';
+  }, 2600);
+  // first time here? Hana shows you round
+  if (!prefs.toured) setTimeout(() => { if (!invite.table) tour.start(); }, 3600);
   updateOnline();
 };
 
@@ -4109,6 +4147,26 @@ function watchSpeed(realDt) {
 // where you are and how busy it is.
 const counterBox = new THREE.Box3().setFromObject(world.counter);
 const counterSpot = () => ({ x: (counterBox.min.x + counterBox.max.x) / 2, y: 1.1, z: counterBox.max.z - 0.4 });
+// Games at the tables (games.js): chess and tawla, with each other or with Yuto.
+const games = createGames({
+  world, send, $, toast, sound, openPanel,
+  me: () => state.me,
+  seatTable: () => (player.seat && player.seat.table && !/^bar-/.test(player.seat.table) ? player.seat.table : null),
+  bubble: (obj, text, kind) => bubble(obj, text, kind),
+  isOpen: () => !$('gamePanel').classList.contains('hidden'),
+});
+// The welcome tour (tour.js): once, on your first visit.
+const tour = createTour({
+  world, stairs: STAIRS, player, $, sound,
+  bubble: (obj, text, kind) => bubble(obj, text, kind),
+  onOrder: () => openMenu(),
+  onDone: () => {
+    if (state.me && !(state.me.prefs || {}).toured) {
+      api('/me', { method: 'PATCH', body: { prefs: { toured: true } } }).then(r => { state.me = r.user; }).catch(() => {});
+    }
+  },
+});
+$('tourAgain').onclick = () => { closePanels(); if (!tour.start()) toast('The tour starts on the ground floor — come downstairs first.'); };
 const regulars = createRegulars({
   world, staff, sound, menu, pastries,
   takenBy: seatHeld,
@@ -4162,11 +4220,97 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { player, cam, state, world, camera, staff, goToRoom, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
 
 // ───────────────────────────────────────── start
 
+// ───────────────────────────────────────── sharing: invites and photos
+
+function inviteLink(withTable = true) {
+  const u = new URL('/cafe', location.origin);
+  if (state.me && state.me.username) u.searchParams.set('invite', state.me.username);
+  const t = player.seat && player.seat.table;
+  if (withTable && t && world.floor === 'main') u.searchParams.set('table', t);
+  return u.toString();
+}
+function openShare() {
+  const seated = player.seat && player.seat.table && world.floor === 'main';
+  $('shareTable').classList.toggle('hidden', !seated);
+  $('shareTable').textContent = seated ? `🪑 Include my seat — they'll sit down at ${player.seat.label}` : '';
+  $('shareWithTable').checked = !!seated;
+  $('shareLink').value = inviteLink(!!seated);
+  $('snapWrap').classList.add('hidden');
+  openPanel('sharePanel');
+}
+const shareText = () => `Come and sit with me at Sakura Slice Café 🌸 — a cozy little café in Cairo you can visit from anywhere.`;
+$('shareWithTable').onchange = () => { $('shareLink').value = inviteLink($('shareWithTable').checked); };
+$('shareBtn').onclick = openShare;
+$('shareNative').onclick = async () => {
+  const url = $('shareLink').value;
+  if (navigator.share) { try { await navigator.share({ title: 'Sakura Slice Café', text: shareText(), url }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  copyLink();
+};
+async function copyLink() {
+  const url = $('shareLink').value;
+  try { await navigator.clipboard.writeText(url); toast('🔗 Link copied — send it to a friend.'); }
+  catch (e) { $('shareLink').select(); document.execCommand && document.execCommand('copy'); toast('🔗 Link selected — copy it and send it to a friend.'); }
+}
+$('shareCopy').onclick = copyLink;
+$('shareWhatsapp').onclick = () => window.open(`https://wa.me/?text=${encodeURIComponent(shareText() + ' ' + $('shareLink').value)}`, '_blank', 'noopener');
+
+// A photo of the café as it is right now, with a little caption, to keep or share.
+let snapBlob = null;
+function takePhoto() {
+  if (post.on) post.composer.render(0); else renderer.render(scene, camera);
+  const src = renderer.domElement;
+  const scale = Math.min(1, 1600 / src.width);
+  const w = Math.round(src.width * scale), h = Math.round(src.height * scale);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h + Math.round(h * 0.11);
+  const x = c.getContext('2d');
+  x.fillStyle = '#fffaf2'; x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(src, 0, 0, w, h);
+  const band = c.height - h, k = band / 100;
+  x.fillStyle = '#6b4c4c'; x.textBaseline = 'middle';
+  x.font = `700 ${Math.round(46 * k)}px "Dancing Script", cursive`;
+  x.fillText('Sakura Slice Café', 28 * k, h + band / 2);
+  x.font = `600 ${Math.round(24 * k)}px Nunito, sans-serif`;
+  x.textAlign = 'right'; x.fillStyle = '#d4678a';
+  x.fillText(`${cairoDay().replace(' in Cairo', '')} · ${cairoClock()} in Cairo 🌸`, w - 28 * k, h + band / 2);
+  $('snapImg').src = c.toDataURL('image/jpeg', 0.9);
+  c.toBlob(b => { snapBlob = b; }, 'image/jpeg', 0.9);
+  $('snapWrap').classList.remove('hidden');
+  sound.cue('pin');
+}
+$('snapBtn').onclick = takePhoto;
+$('snapShare').onclick = async () => {
+  if (!snapBlob) return;
+  const file = new File([snapBlob], 'sakura-slice-cafe.jpg', { type: 'image/jpeg' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'Sakura Slice Café', text: shareText() + ' ' + inviteLink(false) }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  snapSave();
+};
+function snapSave() {
+  if (!snapBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(snapBlob);
+  a.download = `sakura-slice-cafe-${Date.now()}.jpg`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+$('snapSave').onclick = snapSave;
+
 (async function boot() {
+  if (invite.from) {
+    api('/invite/' + invite.from).then(r => {
+      invite.name = r.displayName;
+      for (const id of ['inviteNote', 'inviteNote2']) {
+        const el = $(id);
+        if (el) { el.textContent = `🌸 ${r.displayName} saved you a seat${invite.table ? ' at their table' : ''} — come in and sit with them.`; el.classList.remove('hidden'); }
+      }
+    }).catch(() => {});
+  }
   try { state.content = await api('/content'); } catch (e) { state.content = {}; }
   state.booted = true;
   applyContent();

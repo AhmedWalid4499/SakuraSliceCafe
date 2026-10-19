@@ -573,6 +573,7 @@ export function buildWorld(renderer) {
     }
     g.position.set(x, y, z);
     root.add(g);
+    return g;
   }
 
   // A little standing card with the table's number, readable from both sides.
@@ -598,7 +599,9 @@ export function buildWorld(renderer) {
 
   function addTable(id, label, x, z, chairAngles, { reserved = false, sign = null, number = null } = {}) {
     const t = roundTable(x, z);
-    vase(x, t.top.userData.top - FY, z);
+    // the table's id and its vase (moved aside when a game is set out on it)
+    t.top.userData.tableId = id;
+    t.top.userData.vase = vase(x, t.top.userData.top - FY, z);
     if (number != null) {
       label = `Table ${number}`;
       t.top.userData.tableName = label;
@@ -1768,11 +1771,12 @@ export function buildWorld(renderer) {
       tableSpots.forEach(([x, z], ti) => {
         const t = roundTable(x, z, 0.5, 0.76, M.woodLight);
         t.top.userData.label = 'a garden table';
-        vase(x, 0.76 + 0.026, z);
+        t.top.userData.tableId = `garden-t${ti}`;
+        t.top.userData.vase = vase(x, 0.76 + 0.026, z);
         const chairs = [[x, z - 0.9, 0], [x, z + 0.9, Math.PI], [x - 0.9, z, Math.PI / 2], [x + 0.9, z, -Math.PI / 2]];
         chairs.forEach(([cx, cz, ry], ci) => {
           const c = chair(cx, cz, ry, ci % 2 ? M.cushionSage : M.cushion);
-          const seat = { id: `garden-t${ti}-${ci}`, label: 'a table under the sakura', x: cx, z: cz, y: FY, h: 0.54, ry, chair: c };
+          const seat = { id: `garden-t${ti}-${ci}`, label: 'a table under the sakura', x: cx, z: cz, y: FY, h: 0.54, ry, chair: c, table: `garden-t${ti}` };
           seats.push(seat);
           c.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat, label: 'Sit under the sakura' }; interactables.push(o); } });
         });
@@ -2183,7 +2187,8 @@ export function buildWorld(renderer) {
     const t = squareTable(x, z, 0.72, 0.76, ry);
     const label = `Table ${number}`;
     t.top.userData.tableName = label;
-    vase(x - 0.12, t.top.userData.top - FY, z - 0.1);
+    t.top.userData.tableId = id;
+    t.top.userData.vase = vase(x - 0.12, t.top.userData.top - FY, z - 0.1);
     numberCard(number, x + 0.16, t.top.userData.top - FY, z + 0.12, ry + 0.4);
     sides.forEach((a, i) => {
       const ang = ry + a;
@@ -2195,7 +2200,8 @@ export function buildWorld(renderer) {
     const label = `Table ${number}`;
     const t = roundTable(x, z);
     t.top.userData.tableName = label;
-    vase(x, t.top.userData.top - FY, z);
+    t.top.userData.tableId = id;
+    t.top.userData.vase = vase(x, t.top.userData.top - FY, z);
     numberCard(number, x + 0.26, t.top.userData.top - FY, z + 0.16, 0.4);
     angles.forEach((ang, i) => {
       const cx = x + Math.sin(ang) * 0.85, cz = z + Math.cos(ang) * 0.85;

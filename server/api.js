@@ -65,6 +65,7 @@ function cleanPrefs(p) {
   }
   if (typeof p.favouriteSeat === 'string') out.favouriteSeat = p.favouriteSeat.slice(0, 24);
   if (typeof p.quality === 'string' && ['high', 'balanced', 'gentle'].includes(p.quality)) out.quality = p.quality;
+  if (typeof p.toured === 'boolean') out.toured = p.toured; // has had the welcome tour
   return out;
 }
 
@@ -114,6 +115,13 @@ api.post('/auth/login', authLimit, wrap(async (req, res) => {
 api.post('/auth/logout', wrap(async (req, res) => {
   await auth.destroySession(req, res);
   res.json({ ok: true });
+}));
+
+// who sent an invite link (only their display name — for the door's welcome)
+api.get('/invite/:username', wrap(async (req, res) => {
+  const { rows } = await query('SELECT display_name FROM users WHERE username = $1', [String(req.params.username).toLowerCase().slice(0, 24)]);
+  if (!rows[0]) return res.status(404).json({ error: 'No one by that name.' });
+  res.json({ displayName: rows[0].display_name });
 }));
 
 api.get('/auth/me', (req, res) => res.json({ user: auth.publicUser(req.user) }));

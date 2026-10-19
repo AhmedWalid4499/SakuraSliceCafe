@@ -36,6 +36,52 @@ function roster(room) {
   return [...seen.values()].map(c => ({ ...c.profile, state: c.state }));
 }
 
+// ── games at the tables: chess and tawla, one game per table, played live.
+// The rules run in the players' browsers (chess.js, tawla.mjs); here we keep
+// the board, check it's the right person's turn, and tell the room.
+const games = new Map(); // `${room}|${table}` → game
+const gameList = room => [...games.values()].filter(g => g.room === room);
+function handleGame(ws, entry, m) {
+  const table = typeof m.table === 'string' ? m.table.slice(0, 24) : '';
+  if (!/^[\w-]{1,24}$/.test(table)) return;
+  const key = entry.room + '|' + table;
+  const me = { id: entry.user.id, name: entry.profile.displayName };
+  let g = games.get(key);
+  const isPlayer = g && [g.players.a, g.players.b].some(p => p && p.id === me.id);
+  const state = m.state && typeof m.state === 'object' ? m.state : null;
+  if (state && JSON.stringify(state).length > 1500) return;
+  if (m.action === 'start') {
+    // a game is already going at this table (left alone for 10 minutes, it can be cleared for a new one)
+    if (g && !g.over && !isPlayer && Date.now() - g.at < 10 * 60e3) return;
+    const kind = m.kind === 'tawla' ? 'tawla' : 'chess';
+    g = { table, room: entry.room, kind, players: { a: me, b: m.vs === 'yuto' ? { id: 'yuto', name: 'Yuto' } : null }, state, turn: 'a', over: null, at: Date.now(), moves: 0 };
+    games.set(key, g);
+  } else if (!g) return;
+  else if (m.action === 'join') {
+    if (g.players.b || g.players.a.id === me.id) return;
+    g.players.b = me;
+  } else if (m.action === 'move') {
+    if (g.over || !state) return;
+    const mover = g.players[g.turn];
+    // your own turn — or Yuto's, played for him by the person who invited him
+    const ok = mover && (mover.id === me.id || (mover.id === 'yuto' && g.players.a.id === me.id));
+    if (!ok) return;
+    g.state = state;
+    g.turn = m.turn === 'b' ? 'b' : 'a';
+    g.over = m.over ? { winner: m.over.winner === 'b' ? 'b' : m.over.winner === 'a' ? 'a' : null, why: String(m.over.why || '').slice(0, 60) } : null;
+    g.moves++;
+  } else if (m.action === 'end') {
+    if (!isPlayer && !entry.user.is_admin) return;
+    games.delete(key);
+    broadcast({ t: 'game:end', table, by: me.name }, null, entry.room);
+    return;
+  } else return;
+  g.at = Date.now();
+  broadcast({ t: 'game', game: g }, null, entry.room);
+}
+// games nobody has touched for an hour are cleared away
+setInterval(() => { for (const [k, g] of games) if (Date.now() - g.at > 3600e3) games.delete(k); }, 600e3).unref();
+
 function stillIn(userId, room, exceptWs) {
   for (const [ws, c] of clients) if (ws !== exceptWs && c.user.id === userId && c.room === room) return true;
   return false;
@@ -91,6 +137,7 @@ function attach(server, opts = {}) {
     clients.set(ws, entry);
 
     send(ws, { t: 'hello', you: p.id, room: entry.room, people: roster(entry.room) });
+    send(ws, { t: 'games', games: gameList(entry.room) });
     if (!stillIn(p.id, entry.room, ws)) broadcast({ t: 'join', person: { ...entry.profile, state: entry.state } }, ws, entry.room);
 
     ws.isAlive = true;
@@ -111,7 +158,17 @@ function attach(server, opts = {}) {
         entry.room = room;
         if (from !== room && !stillIn(entry.user.id, from, ws)) broadcast({ t: 'leave', id: entry.user.id }, ws, from);
         send(ws, { t: 'hello', you: entry.user.id, room, people: roster(room).filter(x => x.id !== entry.user.id) });
+        send(ws, { t: 'games', games: gameList(room) });
         broadcast({ t: 'join', person: { ...entry.profile, state: entry.state } }, ws, room);
+        return;
+      }
+
+      // A move in a game at a table: never throttled (it's one click at a time anyway).
+      if (m.t === 'game') {
+        const now = Date.now();
+        if (now - (entry.lastGame || 0) < 150) return;
+        entry.lastGame = now;
+        handleGame(ws, entry, m);
         return;
       }
 

@@ -13,7 +13,8 @@
 <script type="importmap">
 { "imports": {
   "three": "/vendor/three/build/three.module.js",
-  "three/addons/": "/vendor/three/addons/"
+  "three/addons/": "/vendor/three/addons/",
+  "chess.js": "/vendor/chess/chess.js"
 } }
 </script>
 <style>
@@ -273,6 +274,39 @@
   .shelf-book span { font-size: 11.5px; opacity: .75; }
   .story-text { max-height: 56vh; overflow: auto; font-size: 15px; line-height: 1.7; padding-right: 4px; }
   .story-text p { margin: 0 0 12px; }
+  .invite-note { background: var(--sakura-light); color: var(--sakura-dark); border-radius: 12px; padding: 8px 12px; font-weight: 700; font-size: 13.5px; margin: 6px 0 10px; }
+  #tourCard { position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%); width: min(460px, calc(100vw - 28px)); padding: 14px 16px; border-radius: 20px; z-index: 30; }
+  #gamePanel { width: min(560px, calc(100vw - 28px)); }
+  .game-choice { border: 1px solid var(--line); background: var(--field); border-radius: 14px; padding: 12px 14px; margin-top: 10px; }
+  .game-choice b { font-size: 15px; color: var(--text-dark); }
+  .game-names { margin: 0 0 8px; }
+  .game-status { font-weight: 700; color: var(--sakura-dark); margin: 10px 0 6px; }
+  .chess { display: grid; grid-template-columns: repeat(8, 1fr); width: min(400px, 100%); aspect-ratio: 1; margin: 0 auto; border: 6px solid #5a3a26; border-radius: 6px; }
+  .chess .sq { border: 0; padding: 0; display: grid; place-items: center; font-size: clamp(22px, 5.4vw, 38px); line-height: 1; cursor: pointer; }
+  .chess .light { background: #f1dfc4; } .chess .dark { background: #b07a52; }
+  .chess .picked { box-shadow: inset 0 0 0 3px var(--sakura-dark); }
+  .chess .target { background-image: radial-gradient(circle, #d4678a88 22%, transparent 24%); }
+  .chess .check { box-shadow: inset 0 0 0 3px #c0392b; }
+  .chess .pw { color: #fffaf2; text-shadow: 0 0 2px #3b2a22, 0 0 1px #3b2a22, 0 1px 1px #3b2a22; }
+  .chess .pb { color: #2b1d18; }
+  .tawla { background: #6b4226; border-radius: 8px; padding: 6px; display: grid; gap: 6px; }
+  .tawla .row-pts { display: flex; gap: 2px; height: 120px; }
+  .tawla .bar-gap { width: 10px; background: #4e2f1b; border-radius: 3px; }
+  .tawla .pt { flex: 1; border: 0; background: #e9d6b4; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 0; position: relative; cursor: pointer; border-radius: 3px; min-width: 0; }
+  .tawla .pt.bottom { flex-direction: column-reverse; }
+  .tawla .pt::before { content: ''; position: absolute; left: 12%; right: 12%; height: 78%; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+  .tawla .pt.top::before { top: 0; } .tawla .pt.bottom::before { bottom: 0; clip-path: polygon(50% 0, 0 100%, 100% 100%); }
+  .tawla .pt.red::before { background: #a8452e; } .tawla .pt.green::before { background: #2f5d3a; }
+  .tawla .ck { width: min(20px, 80%); aspect-ratio: 1; border-radius: 50%; position: relative; z-index: 1; box-shadow: 0 1px 2px #0006; }
+  .tawla .ck.light { background: #fffaf2; } .tawla .ck.dark { background: #2b1d18; border: 1px solid #8a5a3a; }
+  .tawla em { position: relative; z-index: 1; font-size: 11px; font-style: normal; font-weight: 800; color: #fff; text-shadow: 0 0 3px #000; }
+  .tawla .picked { outline: 3px solid var(--sakura-dark); } .tawla .target { outline: 3px dashed #f0c35a; }
+  .tawla .can { outline: 2px solid #ffffff99; }
+  .tawla-mid { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 2px 4px; }
+  .tawla .bar-btn { border: 0; border-radius: 999px; padding: 6px 12px; background: #4e2f1b; color: #f1dfc4; font: inherit; font-size: 12px; cursor: pointer; }
+  .tawla .dice { display: flex; gap: 6px; }
+  .tawla .die { width: 30px; height: 30px; border-radius: 7px; background: #fffaf2; display: grid; place-items: center; font-weight: 800; color: #2b1d18; }
+  .tawla .die.used { opacity: .35; }
   .card-btn { display: block; margin: 10px 0 0; border: 1px dashed var(--sakura-dark); background: var(--sakura-light); color: var(--sakura-dark); border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
   .stamp-card { margin: 12px 0 8px; padding: 14px; border-radius: 16px; background: #fffaf2; border: 2px solid #ead8c4; box-shadow: inset 0 0 0 4px #fffaf2, inset 0 0 0 5px #f2a7bb55; }
   .stamp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
@@ -388,6 +422,7 @@
 <div id="door" class="overlay hidden">
   <div class="card">
     <p class="eyebrow">Sakura Slice Café · Cairo</p>
+    <p class="invite-note hidden" id="inviteNote"></p>
     <h2>Come in, <em>stay a while.</em></h2>
     <p class="lede">A quiet café you can sit in from anywhere. Make yourself an avatar, find a seat, and leave a note for whoever needs it next.</p>
     <div class="tabs" role="tablist">
@@ -437,6 +472,7 @@
 <div id="welcome" class="overlay hidden">
   <div class="card">
     <p class="eyebrow" id="welcomeEyebrow">Welcome back</p>
+    <p class="invite-note hidden" id="inviteNote2"></p>
     <h2 id="welcomeTitle">Welcome in.</h2>
     <div id="welcomeLines" class="lede"></div>
     <p class="sign" id="welcomeSign">— Yuto 🌸</p>
@@ -460,6 +496,7 @@
   <div class="iconbar">
     <button class="icon" id="soundBtn" title="Sound" aria-label="Sound">🔊</button>
     <button class="icon" id="avatarBtn" title="Change your avatar" aria-label="Change your avatar">🪞</button>
+    <button class="icon" id="shareBtn" title="Invite a friend · take a photo" aria-label="Share">🔗</button>
     <button class="icon" id="helpBtn" title="How to move" aria-label="Help">?</button>
     <button class="icon" id="musicBtn" title="The café radio" aria-label="The café radio">🎧</button>
     <a class="icon hidden" id="adminLink" href="/admin" title="Café admin" aria-label="Admin">🗝️</a>
@@ -476,6 +513,7 @@
   <button id="drinkAct" class="hidden" title="Put your drink down"><span>🍵</span> <span class="t">Put drink down</span></button>
   <button id="sipAct" class="hidden" title="Take a sip (C)"><span>☕</span> <span class="t">Take a sip</span></button>
   <button id="biteAct" class="hidden" title="Take a bite (B)"><span>🍡</span> <span class="t">Take a bite</span></button>
+  <button id="gameAct" class="hidden" title="Play a game at this table"><span>🎲</span> <span class="t">Games</span></button>
   <button id="waveAct" title="Wave"><span>👋</span> <span class="t">Wave</span></button>
   <button id="emoteAct" title="Send a little something"><span>🌸</span></button>
   <button id="studyAct" class="hidden" title="Start a study session"><span>📚</span> <span class="t">Study</span></button>
@@ -638,6 +676,50 @@
     <h3 id="storyTitle"></h3>
     <div class="story-text" id="storyText"></div>
   </div>
+</div>
+
+<div id="tourCard" class="hud card hidden" role="dialog" aria-live="polite">
+  <p class="eyebrow" id="tourStep"></p>
+  <h3 id="tourTitle" style="margin:2px 0 6px"></h3>
+  <p class="lede" id="tourText" style="font-size:13.5px;margin:0"></p>
+  <div class="row" style="justify-content:space-between;margin-top:10px;gap:6px;flex-wrap:wrap">
+    <button type="button" class="btn ghost small" id="tourSkip">Skip the tour</button>
+    <span class="row" style="gap:6px">
+      <button type="button" class="btn ghost" id="tourBack">← Back</button>
+      <button type="button" class="btn ghost hidden" id="tourOrder">☕ Order a drink</button>
+      <button type="button" class="btn" id="tourNext">Next →</button>
+    </span>
+  </div>
+</div>
+
+<div id="sharePanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Bring someone along</p>
+  <h3>Invite a friend</h3>
+  <p class="lede" style="font-size:13.5px">Send them this link. They'll see you saved them a seat — and when they come in, they walk straight over to you.</p>
+  <label class="check" id="shareTableRow"><input type="checkbox" id="shareWithTable"> <span id="shareTable"></span></label>
+  <div class="row" style="gap:6px;margin-top:8px"><input type="text" id="shareLink" readonly style="flex:1"></div>
+  <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
+    <button type="button" class="btn" id="shareNative">📤 Share…</button>
+    <button type="button" class="btn ghost" id="shareWhatsapp">💬 WhatsApp</button>
+    <button type="button" class="btn ghost" id="shareCopy">🔗 Copy link</button>
+  </div>
+  <div class="up-more" style="margin-top:16px">
+    <p class="eyebrow">📸 A photo of the café</p>
+    <p class="fine" style="margin:4px 0 8px">Just as it looks right now — with a little caption. Keep it, or share it.</p>
+    <button type="button" class="btn ghost" id="snapBtn">📸 Take a photo</button>
+    <div id="snapWrap" class="hidden" style="margin-top:10px">
+      <img id="snapImg" alt="Your photo of the café" class="photo-big">
+      <div class="row" style="gap:6px;margin-top:8px"><button type="button" class="btn" id="snapShare">📤 Share it</button><button type="button" class="btn ghost" id="snapSave">⬇️ Save</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="gamePanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">At the table</p>
+  <h3 id="gameTitle">Games at the table</h3>
+  <div id="gameBody"></div>
 </div>
 
 <div id="cardPanel" class="panel card hidden">
@@ -967,6 +1049,7 @@
   <button class="x" data-close aria-label="Close">✕</button>
   <p class="eyebrow">Finding your way</p>
   <h3>How the café works</h3>
+  <button type="button" class="btn ghost" id="tourAgain" style="margin:4px 0 10px">👋 Take the tour again</button>
   <ul class="help-list">
     <li><kbd>W A S D</kbd> or <kbd>arrows</kbd> to walk — or just click the floor</li>
     <li><b>Drag</b> to look around · <b>scroll</b> to come closer</li>
@@ -975,6 +1058,8 @@
     <li>Click <b>Hana or the counter</b> (or ☕ <b>Order</b>) for a drink — or a dessert from the <b>🍡 Desserts</b> tab. A plate goes in your other hand: <b>🍡 Take a bite</b>, or set it down next to your cup.</li>
     <li>Sitting at a table? Tick <b>🛎️ Bring it to my table</b> on the menu and Hana or Yuki will carry it over. <b>☕ Take a sip</b> (<kbd>C</kbd>) and <b>🍡 Take a bite</b> (<kbd>B</kbd>) work on what's in your hands — or on your table.</li>
     <li><b>🎧 The café radio</b> plays the songs the café chose — everyone hears the same song at the same moment. ▶ to listen, ⏸ to stop just for you.</li>
+    <li><b>🔗</b> at the top: invite a friend (they'll walk straight to your table) or take a 📸 photo of the café to share.</li>
+    <li>Sitting at a table? Press <b>🎲 Games</b> to set out <b>tawla</b> or <b>chess</b> — play whoever sits across from you, or Yuto. Anyone can walk over and watch.</li>
     <li>Order at the counter and Hana <b>calls your name</b> when it's ready (if there's a line, you wait your turn). Every drink earns a stamp on your <b>🎟️ stamp card</b> — ten stamps and Yuto brings you a slice of the sakura cake.</li>
     <li>The <b>menu board</b> above the counter changes every day (click it to order); the <b>A-frame</b> by the counter has the week's specials. The <b>easel by the fire</b> says what's on — story evenings and book club.</li>
     <li>The café follows the calendar: spring bunting, a summer bowl of lemons, autumn leaves, winter candles and blankets — and lanterns and later hours in <b>Ramadan</b>.</li>
