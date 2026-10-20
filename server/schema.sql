@@ -249,6 +249,9 @@ CREATE TABLE IF NOT EXISTS home_guests (
 );
 CREATE INDEX IF NOT EXISTS home_guests_guest_idx ON home_guests(guest_id);
 ALTER TABLE home_rooms ADD COLUMN IF NOT EXISTS wallpaper TEXT NOT NULL DEFAULT 'plain';
+-- each flat's own door in the hallway upstairs (0–13, the same for everyone; see public/cafe/hall.js)
+ALTER TABLE home_rooms ADD COLUMN IF NOT EXISTS door INTEGER;
+CREATE UNIQUE INDEX IF NOT EXISTS home_rooms_door ON home_rooms (door) WHERE door IS NOT NULL;
 -- your cat (one each)
 CREATE TABLE IF NOT EXISTS home_pets (
   owner_id   INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

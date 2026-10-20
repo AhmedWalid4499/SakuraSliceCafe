@@ -45,6 +45,7 @@ async function migrate() {
   }
 
   await moveNotesToTheBiggerCafe();
+  await giveEveryFlatADoor();
 
   // Promote the owner. Set ADMIN_EMAIL in Railway; whoever registers (or has
   // registered) with that email becomes an admin.
@@ -53,6 +54,28 @@ async function migrate() {
   }
 
   await pool.query('DELETE FROM sessions WHERE expires_at < now()');
+}
+
+// Every flat has its own door in the hallway upstairs, the same one for
+// everyone who walks along it (doors 0–13: public/cafe/hall.js SLOTS, two
+// to each spot, facing each other). Flats used to be shown with your own
+// always behind the first door, so everyone's looked like the same door.
+// Once, for the flats that don't have a door yet: the owner's (ADMIN_EMAIL)
+// is Room 01, Zanaty's the one across the hallway from it (Room 02), and
+// the rest take the next free door in the order they were made.
+const DOORS = 14;
+async function giveEveryFlatADoor() {
+  const claim = (door, where, params) => pool.query(
+    `UPDATE home_rooms SET door = ${door} WHERE door IS NULL AND NOT EXISTS (SELECT 1 FROM home_rooms WHERE door = ${door})
+       AND owner_id = (SELECT id FROM users WHERE ${where} ORDER BY id LIMIT 1)`, params);
+  if (process.env.ADMIN_EMAIL) await claim(0, 'lower(email) = lower($1)', [process.env.ADMIN_EMAIL]);
+  await claim(1, "lower(username) IN ('zanaty', 'zananty') OR lower(display_name) IN ('zanaty', 'zananty')", []);
+  const { rows } = await pool.query('SELECT owner_id FROM home_rooms WHERE door IS NULL ORDER BY created_at, owner_id');
+  for (const { owner_id: id } of rows) {
+    await pool.query(
+      `UPDATE home_rooms SET door = (SELECT s FROM generate_series(0, $2 - 1) s WHERE NOT EXISTS (SELECT 1 FROM home_rooms h WHERE h.door = s) ORDER BY s LIMIT 1)
+       WHERE owner_id = $1 AND door IS NULL`, [id, DOORS]);
+  }
 }
 
 // The café grew from 22 × 16 m to 30 × 22 m (see public/cafe/layout.mjs).

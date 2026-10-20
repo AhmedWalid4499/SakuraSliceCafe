@@ -21,10 +21,16 @@ const catalogue = () => lib || (lib = import(pathToFileURL(path.join(__dirname, 
 const roomOf = ownerId => 'home:' + ownerId;
 const HOUR = 3600e3;
 
+const DOORS = 14; // the doors along the hallway (public/cafe/hall.js SLOTS)
 async function ensureRoom(user) {
   await query(
     `INSERT INTO home_rooms (owner_id, name) VALUES ($1, $2) ON CONFLICT (owner_id) DO NOTHING`,
     [user.id, `${user.display_name}'s room`.slice(0, 40)]);
+  // and its own door in the hallway: the first free one (two people moving in at
+  // once can't both get it — the unique index says no, and the next visit tries again)
+  await query(
+    `UPDATE home_rooms SET door = (SELECT s FROM generate_series(0, $2 - 1) s WHERE NOT EXISTS (SELECT 1 FROM home_rooms h WHERE h.door = s) ORDER BY s LIMIT 1)
+     WHERE owner_id = $1 AND door IS NULL`, [user.id, DOORS]).catch(() => {});
 }
 
 async function canEnterHome(userId, ownerId) {
@@ -35,7 +41,7 @@ async function canEnterHome(userId, ownerId) {
   return !!(rows[0] && (rows[0].open || rows[0].invited));
 }
 
-const ROOM_FIELDS = `r.owner_id AS "ownerId", r.name, r.wall, r.wallpaper, r.floor, r.open, u.display_name AS "ownerName"`;
+const ROOM_FIELDS = `r.owner_id AS "ownerId", r.name, r.wall, r.wallpaper, r.floor, r.open, r.door, u.display_name AS "ownerName"`;
 async function roomRow(ownerId) {
   const { rows } = await query(`SELECT ${ROOM_FIELDS} FROM home_rooms r JOIN users u ON u.id = r.owner_id WHERE r.owner_id = $1`, [ownerId]);
   return rows[0] || null;
@@ -77,15 +83,20 @@ const smallLimit = rateLimit({ windowMs: 60e3, max: 20 });
 router.get('/home', auth.requireUser, wrap(async (req, res) => {
   await ensureRoom(req.user);
   const mine = await roomRow(req.user.id);
+  // every door along the hallway, each in its own place; you can go in where
+  // the door's open or you're invited (a shut door just has its resident's name)
   const { rows } = await query(
     `SELECT ${ROOM_FIELDS}, EXISTS (SELECT 1 FROM home_guests g WHERE g.owner_id = r.owner_id AND g.guest_id = $1) AS invited
      FROM home_rooms r JOIN users u ON u.id = r.owner_id
-     WHERE r.owner_id <> $1 AND (r.open OR EXISTS (SELECT 1 FROM home_guests g WHERE g.owner_id = r.owner_id AND g.guest_id = $1))
-     ORDER BY invited DESC, r.updated_at DESC LIMIT 40`, [req.user.id]);
+     WHERE r.owner_id <> $1 AND r.door IS NOT NULL
+     ORDER BY r.door`, [req.user.id]);
   const counts = realtime.roomCounts();
   const here = r => ({ ...r, here: counts[roomOf(r.ownerId)] || 0 });
+  const door = r => (r.open || r.invited
+    ? { ...here(r), canEnter: true }
+    : { door: r.door, ownerName: r.ownerName, canEnter: false, here: 0 });
   const { rows: g } = await query('SELECT count(*)::int AS n FROM home_gifts WHERE to_id = $1 AND opened_at IS NULL', [req.user.id]);
-  res.json({ mine: here(mine), doors: rows.map(here), stats: await statsOf(req.user.id), giftsWaiting: g[0].n });
+  res.json({ mine: here(mine), doors: rows.map(door), stats: await statsOf(req.user.id), giftsWaiting: g[0].n });
 }));
 
 router.get('/home/:ownerId(\\d+)', auth.requireUser, wrap(async (req, res) => {
@@ -375,6 +386,20 @@ router.post('/tv/pos', auth.requireUser, smallLimit, wrap(async (req, res) => {
 
 // The Common room's TV: a playlist (or a video) the café's owner chooses,
 // on for everyone who comes in (site_content 'common.tv').
+// The owner moves a flat to another door in the hallway (0–13); whoever lives
+// there swaps to the flat's old door.
+router.put('/admin/home/:ownerId(\\d+)/door', auth.requireAdmin, wrap(async (req, res) => {
+  const ownerId = Number(req.params.ownerId), door = Number(req.body.door);
+  if (!Number.isInteger(door) || door < 0 || door >= DOORS) return res.status(400).json({ error: `Doors go from 0 to ${DOORS - 1}.` });
+  const flat = await roomRow(ownerId);
+  if (!flat) return res.status(404).json({ error: "That flat doesn't exist yet." });
+  const { rows } = await query('SELECT owner_id FROM home_rooms WHERE door = $1 AND owner_id <> $2', [door, ownerId]);
+  await query('UPDATE home_rooms SET door = NULL WHERE owner_id = $1', [ownerId]);
+  if (rows[0]) await query('UPDATE home_rooms SET door = $2 WHERE owner_id = $1', [rows[0].owner_id, flat.door]);
+  await query('UPDATE home_rooms SET door = $2 WHERE owner_id = $1', [ownerId, door]);
+  res.json({ ok: true, door, swappedWith: rows[0] ? rows[0].owner_id : null });
+}));
+
 router.put('/admin/common/tv', auth.requireAdmin, wrap(async (req, res) => {
   const url = String((req.body || {}).url || '').trim();
   let value = { url: '', list: null, videoId: null, title: '' };

@@ -1,7 +1,7 @@
 // The hallway upstairs: a long corridor everyone can walk along, with the
-// rooms off it. Your own door is first on the left from the stairs; then the
-// rooms you're invited into and the ones with their doors left open; the rest
-// are other people's, closed. At the west end the stairs go back down to the
+// rooms off it. Every flat has its own door, the same one for everyone: yours,
+// the ones you're invited into or that are left open, and the rest shut with
+// their resident's name on them. At the west end the stairs go back down to the
 // café, at the east end they go on up to the roof garden, and the big double
 // door there is the group study rooms.
 //
@@ -249,24 +249,27 @@ export function buildHall({ floor, makeSign }) {
 
   // Who's behind which door. mine: { ownerId, name }; others: [{ ownerId, name, ownerName, here, invited, open }]
   const byOwner = new Map();
+  // Each flat has its own door (r.door, 0–13), the same for everyone: yours says
+  // "Your room"; one you can go into (open, or you're invited) has its name; a
+  // shut one just has its resident's name on it.
   function setDoors(mine, others = []) {
     byOwner.clear();
-    const list = [mine ? { ...mine, mine: true } : null, ...others].filter(Boolean).slice(0, doors.length);
     doors.forEach((d, i) => {
-      const r = list[i] || null;
+      const r = mine && mine.door === i ? { ...mine, mine: true, canEnter: true } : others.find(o => o.door === i) || null;
       if (d.plaque) { d.g.remove(d.plaque); d.plaque.material.map?.dispose(); d.plaque.material.dispose(); d.plaque.geometry.dispose(); d.plaque = null; }
       const n = String(i + 1).padStart(2, '0');
-      const lines = r
-        ? [{ text: r.mine ? 'Your room' : r.name, size: 100, weight: '700' }, { text: r.mine ? r.name : `${r.ownerName}'s · ${r.invited ? 'invited' : 'door open'}`, size: 62 }]
-        : [{ text: `Room ${n}`, size: 110, weight: '700' }];
+      const lines = !r ? [{ text: `Room ${n}`, size: 110, weight: '700' }]
+        : r.mine ? [{ text: 'Your room', size: 100, weight: '700' }, { text: `${r.name} · Room ${n}`, size: 62 }]
+        : r.canEnter ? [{ text: r.name, size: 100, weight: '700' }, { text: `${r.ownerName}'s · ${r.invited ? 'invited' : 'door open'}`, size: 62 }]
+        : [{ text: `Room ${n}`, size: 100, weight: '700' }, { text: `${r.ownerName}'s`, size: 62 }];
       d.plaque = makeSign(lines, 0.78, 0.26, r && r.mine ? { bg: '#fbe3ea' } : {});
       d.plaque.position.set(0, DOOR_H + 0.3, 0.05);
       d.g.add(d.plaque);
       d.under.visible = !!(r && r.here);
-      d.hit.userData = r
+      d.hit.userData = r && r.canEnter
         ? { kind: 'hall-door', ownerId: r.ownerId, label: r.mine ? `Your room — ${r.name}` : `Knock on ${r.ownerName}'s door${r.here ? ` · ${r.here} in there` : ''}` }
-        : { kind: 'hall-door', ownerId: null, label: `Room ${n} — someone's room; the door is shut` };
-      if (r) byOwner.set(Number(r.ownerId), i);
+        : { kind: 'hall-door', ownerId: null, label: r ? `Room ${n} — ${r.ownerName}'s room; the door is shut` : `Room ${n} — nobody lives here yet` };
+      if (r && r.canEnter) byOwner.set(Number(r.ownerId), i);
     });
   }
   setDoors(null, []);

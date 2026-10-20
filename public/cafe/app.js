@@ -3294,7 +3294,7 @@ async function goToRoom(room, group = null) {
   sysChat(isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.'
     : isKoshari ? 'You cross the road — mind the tuk-tuk — to Koshari Abu Saied. The spoon rings on the steel bowls.'
     : isMusic ? 'You open the doors to the Music Room. Someone has left the piano lid up.'
-    : isPrayer ? 'You slip off your shoes and step into the Prayer Room. It is very quiet in here.' : isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs. Your door is the first on the left.' : 'You step out into the hallway.')
+    : isPrayer ? 'You slip off your shoes and step into the Prayer Room. It is very quiet in here.' : isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs.' + (state.myHome && state.myHome.door != null ? ` Your door is Room ${String(state.myHome.door + 1).padStart(2, '0')}.` : '') : 'You step out into the hallway.')
     : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
@@ -3385,6 +3385,7 @@ async function loadHallDoors() {
     const r = await api('/home');
     state.myHome = r.mine;
     world.hall.setDoors(r.mine, r.doors);
+    if (r.mine && r.mine.door == null && !state.hallFullNoted) { state.hallFullNoted = true; toast('🏠 Every door in the hallway is taken just now — your room is through 🏠 My room.'); }
     if (r.giftsWaiting && !state.giftNudged) { state.giftNudged = true; toast(`🎁 ${r.giftsWaiting === 1 ? 'A present is' : `${r.giftsWaiting} presents are`} waiting by your door.`); }
   } catch (e) { /* signed out: the doors stay shut */ }
 }
@@ -3559,7 +3560,7 @@ async function loadHallway() {
     $('homeStats').textContent = state.room === 'home:' + r.mine.ownerId ? "You're in it now"
       : s.focusMinutes || s.nights ? `📚 ${s.focusMinutes} min studied · 🌙 ${s.nights} night${s.nights === 1 ? '' : 's'}` : '';
     $('homeGo').disabled = state.room === 'home:' + r.mine.ownerId;
-    $('homeDoors').replaceChildren(...r.doors.map(d => {
+    $('homeDoors').replaceChildren(...r.doors.filter(d => d.canEnter).map(d => {
       const card = document.createElement('div');
       card.className = 'group-card';
       const t = document.createElement('div');
