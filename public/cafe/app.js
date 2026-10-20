@@ -327,7 +327,7 @@ const player = {
 // in your room or anyone's, in the hallway, the Common room and the Music Room.
 // Everyone in the room sees them; downstairs, in the garden and the Prayer Room
 // you're in your day clothes.
-const pjRoom = room => room === 'hall' || room === 'common' || room === 'music' || /^home:/.test(room || '');
+const pjRoom = room => room === 'hall' || room === 'hall2' || room === 'common' || room === 'music' || /^home:/.test(room || '');
 const dressFor = avatar => (avatar && avatar.pj && avatar.pj.on && pjRoom(state.room) ? { pj: avatar.pj } : {});
 let wearingPJ = false;
 
@@ -791,7 +791,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
   const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
-  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'common' ? world.common.bounds : world.floor === 'koshari' ? world.koshari.bounds : world.floor === 'music' ? world.music.bounds : world.floor === 'prayer' ? world.prayer.bounds : ROOM;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'hall2' ? world.hall2.bounds : world.floor === 'common' ? world.common.bounds : world.floor === 'koshari' ? world.koshari.bounds : world.floor === 'music' ? world.music.bounds : world.floor === 'prayer' ? world.prayer.bounds : ROOM;
   camPos.x = Math.min(box.maxX - 0.25, Math.max(box.minX + 0.25, camPos.x));
   camPos.z = Math.min(box.maxZ - 0.25, Math.max(box.minZ + 0.25, camPos.z));
   camPos.y = Math.min(world.floorY + (inKitchen ? 3.2 : world.floorH) - 0.3, Math.max(world.floorY + 0.4, camPos.y));
@@ -879,7 +879,7 @@ function updatePeople(dt) {
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'common' ? ' · in the Common room' : state.room === 'koshari' ? ' · at Koshari Abu Saied, across the road' : state.room === 'music' ? ' · in the Music Room' : state.room === 'prayer' ? ' · in the Prayer Room' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'hall2' ? ' · in the upper hallway' : state.room === 'common' ? ' · in the Common room' : state.room === 'koshari' ? ' · at Koshari Abu Saied, across the road' : state.room === 'music' ? ' · in the Music Room' : state.room === 'prayer' ? ' · in the Prayer Room' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
   $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
@@ -936,7 +936,7 @@ function handle(m) {
       // the door closed, or they took us off the list: back down we go
       if (state.home && state.me && m.ownerId === state.home.ownerId && !m.open && !m.allowed.includes(state.me.id)) {
         toast('🚪 The door to this room is closed now — back out to the hallway.');
-        goToRoom('hall');
+        goToRoom(hallFor(state.home.room.door));
       }
       break;
     case 'home:pet':
@@ -1698,9 +1698,11 @@ function click(x, y) {
   if (d.kind === 'order') return openMenu();
   if (d.kind === 'npc') return openTalk(d.npc.id);
   if (d.kind === 'stairs-up') return goToRoom('hall');
-  if (d.kind === 'stairs-down') return goToRoom('hall'); // from a room, a group room or the roof: out to the hallway
-  if (d.kind === 'hall-down') return walkToThing(h, () => goToRoom('main'));
-  if (d.kind === 'hall-up') return walkToThing(h, () => goToRoom('garden'));
+  // out to the hallway: from a flat, the one its door is in; from the roof, the upper one
+  if (d.kind === 'stairs-down') return goToRoom(state.room === 'garden' ? 'hall2' : state.home ? hallFor(state.home.room.door) : 'hall');
+  // the stairs go café → hallway (Rooms 01–14) → upper hallway (15–28) → roof garden
+  if (d.kind === 'hall-down') return walkToThing(h, () => goToRoom(state.room === 'hall2' ? 'hall' : 'main'));
+  if (d.kind === 'hall-up') return walkToThing(h, () => goToRoom(state.room === 'hall2' ? 'garden' : 'hall2'));
   if (d.kind === 'hall-groups') return walkToThing(h, () => openUpstairs());
   if (d.kind === 'hall-common') return walkToThing(h, () => goToRoom('common'));
   if (d.kind === 'common-out') return walkToThing(h, () => goToRoom('hall'));
@@ -3033,7 +3035,7 @@ $('talkForm').addEventListener('submit', async e => {
   try {
     const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
       player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
-    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.room === 'koshari' ? 'across the road at Koshari Abu Saied, the koshari shop' : state.room === 'music' ? 'in the Music Room upstairs, by the piano and the little stage' : state.room === 'prayer' ? 'in the quiet Prayer Room upstairs' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'hall2' ? 'in the upper hallway, one floor further up' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.room === 'koshari' ? 'across the road at Koshari Abu Saied, the koshari shop' : state.room === 'music' ? 'in the Music Room upstairs, by the piano and the little stage' : state.room === 'prayer' ? 'in the quiet Prayer Room upstairs' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
@@ -3212,7 +3214,7 @@ async function goToRoom(room, group = null) {
   setPlaced(null);
   const roof = room === 'garden';
   const isHome = !!homeData;
-  const isHall = room === 'hall';
+  const isHall = room === 'hall' || room === 'hall2';
   const isCommon = room === 'common';
   const isMusic = room === 'music', isPrayer = room === 'prayer', isKoshari = room === 'koshari';
   const up = room !== 'main' && !roof && !isHome && !isHall && !isCommon && !isMusic && !isPrayer && !isKoshari; // a group's room upstairs
@@ -3221,7 +3223,7 @@ async function goToRoom(room, group = null) {
   state.home = isHome ? { ...homeData, ownerId: Number(room.slice(5)) } : null;
   // into your pyjamas upstairs (or back into your day clothes)
   if (!!dressFor(state.me.avatar).pj !== wearingPJ) playerAvatar();
-  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? 'hall' : isCommon ? 'common' : isMusic ? 'music' : isPrayer ? 'prayer' : isKoshari ? 'koshari' : up ? 'up' : 'main');
+  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? room : isCommon ? 'common' : isMusic ? 'music' : isPrayer ? 'prayer' : isKoshari ? 'koshari' : up ? 'up' : 'main');
   if (isHall) await loadHallDoors();
   if (isHome) {
     world.home.setRoom(homeData.room); world.home.setItems(homeData.items);
@@ -3244,8 +3246,9 @@ async function goToRoom(room, group = null) {
     cam.yaw = 0; cam.pitch = 0.42; cam.dist = cam.targetDist = 2.6; // a bedroom, not a hall
   }
   if (isHall) { // at the top of the stairs, or just out of the room you came from
-    const h = world.hall;
-    const a = (from && from.startsWith('home:') && h.doorFront(from.slice(5))) || (from === 'garden' ? h.fromGarden : from === 'common' ? h.fromCommon : from === 'music' ? h.fromMusic : from === 'prayer' ? h.fromPrayer : from && from.startsWith('group:') ? h.fromGroups : h.arrival);
+    const h = world[room];
+    // (between the two hallways: you come out at the top, or the foot, of the stairs at the east end)
+    const a = (from && from.startsWith('home:') && h.doorFront(from.slice(5))) || (from === 'garden' || from === 'hall2' ? h.fromGarden : from === 'hall' ? h.arrival : from === 'common' ? h.fromCommon : from === 'music' ? h.fromMusic : from === 'prayer' ? h.fromPrayer : from && from.startsWith('group:') ? h.fromGroups : h.arrival);
     player.pos.set(a.x, world.floorY, a.z);
     player.ry = a.ry;
     cam.yaw = a.ry + Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.0;
@@ -3294,7 +3297,11 @@ async function goToRoom(room, group = null) {
   sysChat(isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.'
     : isKoshari ? 'You cross the road — mind the tuk-tuk — to Koshari Abu Saied. The spoon rings on the steel bowls.'
     : isMusic ? 'You open the doors to the Music Room. Someone has left the piano lid up.'
-    : isPrayer ? 'You slip off your shoes and step into the Prayer Room. It is very quiet in here.' : isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs.' + (state.myHome && state.myHome.door != null ? ` Your door is Room ${String(state.myHome.door + 1).padStart(2, '0')}.` : '') : 'You step out into the hallway.')
+    : isPrayer ? 'You slip off your shoes and step into the Prayer Room. It is very quiet in here.' : isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs.' + yourDoor()
+      : room === 'hall2' && from === 'hall' ? 'You climb on up to the upper hallway — Rooms 15 to 28.' + yourDoor()
+      : room === 'hall2' && from === 'garden' ? 'You come down from the roof into the upper hallway.'
+      : room === 'hall' && from === 'hall2' ? 'You go back down to the first hallway.'
+      : 'You step out into the hallway.')
     : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
@@ -3379,17 +3386,30 @@ async function resumePlace(p) {
   return true;
 }
 
-// ── the hallway upstairs: whose door is whose (and whose has a light on)
+// ── the hallways upstairs: whose door is whose (and whose has a light on).
+// Doors 0–13 are along the first hallway, 14–27 along the upper one.
+const hallFor = door => (door != null && door >= 14 ? 'hall2' : 'hall');
+const roomNo = door => `Room ${String(door + 1).padStart(2, '0')}`;
+// which door is yours, said the way you'd say it: the 2nd door on your right
+const ORD = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
+function yourDoor() {
+  const d = state.myHome && state.myHome.door;
+  if (d == null) return ' Every door along here is taken — your room is through 🏠 My room.';
+  const i = d % 14, side = i % 2 === 0 ? 'left' : 'right'; // (even doors on the north wall: your left from the stairs)
+  if (hallFor(d) === state.room) return ` Your door is ${roomNo(d)} — the ${ORD[Math.floor(i / 2)]} door on your ${side}, with ★ on it.`;
+  return d >= 14 ? ` Your door is ${roomNo(d)}, in the upper hallway — up the stairs at the far end.` : ` Your door is ${roomNo(d)}, in the hallway below.`;
+}
 async function loadHallDoors() {
   try {
     const r = await api('/home');
     state.myHome = r.mine;
     world.hall.setDoors(r.mine, r.doors);
+    world.hall2.setDoors(r.mine, r.doors);
     if (r.mine && r.mine.door == null && !state.hallFullNoted) { state.hallFullNoted = true; toast('🏠 Every door in the hallway is taken just now — your room is through 🏠 My room.'); }
     if (r.giftsWaiting && !state.giftNudged) { state.giftNudged = true; toast(`🎁 ${r.giftsWaiting === 1 ? 'A present is' : `${r.giftsWaiting} presents are`} waiting by your door.`); }
   } catch (e) { /* signed out: the doors stay shut */ }
 }
-setInterval(() => { if (state.room === 'hall' && !document.hidden) loadHallDoors(); }, 20e3);
+setInterval(() => { if ((state.room === 'hall' || state.room === 'hall2') && !document.hidden) loadHallDoors(); }, 20e3);
 
 // ───────────────────────────────────────── the roof garden
 // Eight beds the whole café shares (server/garden.js): plant, water, weed,

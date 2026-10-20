@@ -141,7 +141,7 @@
   </section>
 
   <section class="card span12">
-    <div class="row between"><h2>Flats upstairs — the hallway doors</h2><span class="muted">Doors face each other in pairs: Room 01 is across from Room 02, 03 from 04, and so on. Moving a flat swaps it with whoever lives behind that door; nobody's furniture changes.</span></div>
+    <div class="row between"><h2>Flats upstairs — the hallway doors</h2><span class="muted">Rooms 01–14 are along the first hallway, 15–28 along the upper one (up the stairs at its east end). Doors face each other in pairs: Room 01 is across from Room 02, 03 from 04, and so on. Moving a flat swaps it with whoever lives behind that door; nobody's furniture changes.</span></div>
     <div class="scroll"><table><thead><tr><th>Door</th><th>Resident</th><th>Their room</th><th>Move to</th></tr></thead><tbody id="homes"></tbody></table></div>
     <div class="msg" id="homesMsg"></div>
   </section>
@@ -342,7 +342,7 @@
         const o = document.createElement('option');
         const there = byDoor.get(d);
         o.value = d;
-        o.textContent = `${roomNo(d)} — ${there ? (there.ownerId === h.ownerId ? 'here now' : there.ownerName + "'s (swap)") : 'free'}`;
+        o.textContent = `${roomNo(d)}${d >= 14 ? ' (upper)' : ''} — ${there ? (there.ownerId === h.ownerId ? 'here now' : there.ownerName + "'s (swap)") : 'free'}`;
         if (d === h.door) o.selected = true;
         pick.append(o);
       }

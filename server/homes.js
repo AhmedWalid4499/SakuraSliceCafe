@@ -21,7 +21,7 @@ const catalogue = () => lib || (lib = import(pathToFileURL(path.join(__dirname, 
 const roomOf = ownerId => 'home:' + ownerId;
 const HOUR = 3600e3;
 
-const DOORS = 14; // the doors along the hallway (public/cafe/hall.js SLOTS)
+const DOORS = 28; // the doors along the two hallways, 14 each (public/cafe/hall.js SLOTS)
 async function ensureRoom(user) {
   await query(
     `INSERT INTO home_rooms (owner_id, name) VALUES ($1, $2) ON CONFLICT (owner_id) DO NOTHING`,
@@ -396,7 +396,7 @@ router.get('/admin/homes', auth.requireAdmin, wrap(async (_req, res) => {
   res.json({ homes: rows, doors: DOORS });
 }));
 
-// The owner moves a flat to another door in the hallway (0–13); whoever lives
+// The owner moves a flat to another door upstairs (0–27); whoever lives
 // there swaps to the flat's old door.
 router.put('/admin/home/:ownerId(\\d+)/door', auth.requireAdmin, wrap(async (req, res) => {
   const ownerId = Number(req.params.ownerId), door = Number(req.body.door);
