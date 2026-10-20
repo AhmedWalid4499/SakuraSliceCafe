@@ -67,7 +67,7 @@ function cleanPrefs(p) {
   if (typeof p.quality === 'string' && ['high', 'balanced', 'gentle'].includes(p.quality)) out.quality = p.quality;
   if (typeof p.toured === 'boolean') out.toured = p.toured; // has had the welcome tour
   // where you were last, so the café opens there next time
-  if (p.place && typeof p.place === 'object' && /^(main|garden|hall|common|group:\d{1,9}|home:\d{1,9})$/.test(p.place.room)) {
+  if (p.place && typeof p.place === 'object' && /^(main|garden|hall|common|music|prayer|group:\d{1,9}|home:\d{1,9})$/.test(p.place.room)) {
     const n = (v, m) => (Number.isFinite(Number(v)) ? clamp(Number(v), -m, m) : 0);
     out.place = {
       room: p.place.room, x: n(p.place.x, 60), z: n(p.place.z, 60), ry: n(p.place.ry, 7),
@@ -300,6 +300,7 @@ api.post('/chat', auth.requireUser, chatLimit, wrap(async (req, res) => {
   const text = cleanText(req.body.text, 240).replace(/\n/g, ' ');
   if (!text) return res.status(400).json({ error: 'Say something first.' });
   const room = groups.roomFromQuery(req);
+  if (room === 'prayer') return res.status(403).json({ error: 'The Prayer Room is a quiet room — no chat in here 🤍' });
   if (!(await groups.canEnter(req.user.id, room))) return res.status(403).json({ error: 'That room is for its group only.' });
   if (!(await kindness.guard(res, text, 'chat', req.user))) return;
   const { rows } = await query(

@@ -53,6 +53,11 @@ export class Soundscape {
       g.connect(this.master);
       this.bus[k] = g;
     }
+    // the instruments people play (the Music Room): their own bus, so the
+    // sliders for the café's own sounds don't silence a friend's song
+    this.playBus = ctx.createGain();
+    this.playBus.gain.value = 0.9;
+    this.playBus.connect(this.master);
 
     this.noise = this.noiseBuffer(6);
     this.startRain();
@@ -85,6 +90,12 @@ export class Soundscape {
 
   setNight(n) { this.night = n; }
 
+  // a quiet room: the café's music, murmur, fire and chimes fade right down
+  setQuiet(on) {
+    this.quiet = !!on;
+    this.apply(1.5);
+  }
+
   // 0 = the middle of the room, 1 = right by a window (the rain gets louder)
   setNearWindow(k) {
     k = Math.max(0, Math.min(1, k));
@@ -114,6 +125,79 @@ export class Soundscape {
     return p;
   }
   ok() { return this.ctx && this.ctx.state === 'running'; }
+
+  // ───────────────────────────────────────── instruments (the Music Room)
+
+  playAt(pos, ref = 3) {
+    const p = this.at(pos, 'chimes', ref);
+    p.disconnect(this.bus.chimes);
+    p.connect(this.playBus);
+    return p;
+  }
+  // one note on the upright piano (midi number): a hammer, a ring, a long decay
+  piano(midi, pos) {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime, out = this.playAt(pos);
+    const f = 440 * Math.pow(2, (midi - 69) / 12);
+    const dur = 1.2 + Math.max(0, 84 - midi) * 0.05;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.32, t + 0.006);
+    env.gain.exponentialRampToValueAtTime(0.12, t + 0.25);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(Math.min(9000, f * 9), t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(400, f * 2), t + dur * 0.7);
+    env.connect(lp).connect(out);
+    [[1, 1], [2, 0.42], [3, 0.2], [4, 0.1], [5.02, 0.05]].forEach(([m, a]) => {
+      const o = ctx.createOscillator();
+      o.type = m === 1 ? 'triangle' : 'sine';
+      o.frequency.value = f * m * (1 + (m - 1) * 0.0008); // a touch of stretch, like real strings
+      const g = ctx.createGain(); g.gain.value = a * 0.5;
+      o.connect(g).connect(env); o.start(t); o.stop(t + dur + 0.1);
+    });
+    // the hammer's soft knock
+    const n = ctx.createBufferSource(); n.buffer = this.whiteBuffer(0.05);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f * 4; bp.Q.value = 1.2;
+    const ng = ctx.createGain(); ng.gain.setValueAtTime(0.05, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+    n.connect(bp).connect(ng).connect(out); n.start(t);
+  }
+  // one plucked string: a bright attack that mellows as it rings
+  pluck(midi, when, out, gain = 0.16) {
+    const ctx = this.ctx, f = 440 * Math.pow(2, (midi - 69) / 12);
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
+    const o2 = ctx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = f * 2.003;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7;
+    lp.frequency.setValueAtTime(f * 7, when);
+    lp.frequency.exponentialRampToValueAtTime(f * 1.4, when + 0.6);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(gain, when + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 2.4);
+    const g2 = ctx.createGain(); g2.gain.value = 0.25;
+    o.connect(lp); o2.connect(g2).connect(lp); lp.connect(g).connect(out);
+    o.start(when); o2.start(when); o.stop(when + 2.5); o2.stop(when + 2.5);
+  }
+  // a strummed chord on the guitar (down, string by string)
+  strum(notes, pos, up = false) {
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime, out = this.playAt(pos);
+    (up ? [...notes].reverse() : notes).forEach((m, i) => this.pluck(m, t + i * 0.018, out, 0.11));
+  }
+  // the cajón: 0 = the deep bass in the middle, 1 = the slap at the top edge
+  cajon(kind, pos) {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime, out = this.playAt(pos, 2.5);
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(kind ? 210 : 110, t);
+    o.frequency.exponentialRampToValueAtTime(kind ? 150 : 55, t + 0.12);
+    const g = ctx.createGain(); g.gain.setValueAtTime(kind ? 0.18 : 0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + (kind ? 0.12 : 0.3));
+    o.connect(g).connect(out); o.start(t); o.stop(t + 0.35);
+    const n = ctx.createBufferSource(); n.buffer = this.whiteBuffer(0.2);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = kind ? 2600 : 900; bp.Q.value = kind ? 0.8 : 1.5;
+    const ng = ctx.createGain(); ng.gain.setValueAtTime(kind ? 0.32 : 0.08, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + (kind ? 0.16 : 0.08));
+    n.connect(bp).connect(ng).connect(out); n.start(t);
+  }
 
   // The espresso machine: the grinder, the pump's low hum while it pours,
   // and the steam wand hissing as the milk spins.
@@ -262,6 +346,7 @@ export class Soundscape {
     for (const [k, g] of Object.entries(this.bus)) {
       // while Spotify is playing, the café's own piano steps aside
       const v = (this.levels[k] ?? 0) * (this.weather[k] ?? 1) * (k === 'music' && this.ducked ? 0 : 1)
+        * (this.quiet && k !== 'rain' && k !== 'birds' ? 0.04 : 1)     // the Prayer Room: only the weather outside
         * (k === 'rain' ? 0.7 + (this.nearWindow ?? 0.3) * 0.75 : 1)   // louder by the glass
         * (k === 'murmur' ? 0.55 + (this.crowd ?? 0.4) * 0.9 : 1);      // fuller when the café is busy
       g.gain.setTargetAtTime(v * v * 1.4, now, ramp);
