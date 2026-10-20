@@ -252,11 +252,51 @@ export function buildAvatar(avatar = {}, extra = {}) {
   try { return buildAvatarParts(avatar, extra); } finally { matCache = null; }
 }
 
+// Pyjamas (worn upstairs, if you like — app.js decides when): a soft cotton
+// set in your colour with a pattern, fluffy slippers, and a nightcap if you want one.
+export const PJ_PATTERNS = ['stripes', 'dots', 'stars', 'hearts', 'checks', 'plain'];
+const pjTexCache = new Map();
+function pjTexture(pattern, color) {
+  const key = pattern + color;
+  if (pjTexCache.has(key)) return pjTexCache.get(key);
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = color; g.fillRect(0, 0, 128, 128);
+  const ink = new THREE.Color(color).getHSL({}).l > 0.6 ? 'rgba(90,70,90,0.45)' : 'rgba(255,250,242,0.75)';
+  g.fillStyle = ink; g.strokeStyle = ink;
+  if (pattern === 'stripes') for (let x = 0; x < 128; x += 32) g.fillRect(x, 0, 12, 128);
+  else if (pattern === 'checks') { for (let x = 0; x < 128; x += 32) g.fillRect(x, 0, 14, 128); for (let y = 0; y < 128; y += 32) g.fillRect(0, y, 128, 14); }
+  else if (pattern === 'dots') for (let x = 0; x < 4; x++) for (let y = 0; y < 4; y++) { g.beginPath(); g.arc(16 + x * 32 + (y % 2) * 16, 16 + y * 32, 6, 0, Math.PI * 2); g.fill(); }
+  else if (pattern === 'stars' || pattern === 'hearts') {
+    for (let x = 0; x < 3; x++) for (let y = 0; y < 3; y++) {
+      const cx = 22 + x * 42 + (y % 2) * 21, cy = 22 + y * 42;
+      g.beginPath();
+      if (pattern === 'stars') for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 5 : 11; g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+      else { g.moveTo(cx, cy + 9); g.bezierCurveTo(cx - 14, cy - 2, cx - 6, cy - 12, cx, cy - 4); g.bezierCurveTo(cx + 6, cy - 12, cx + 14, cy - 2, cx, cy + 9); }
+      g.closePath(); g.fill();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 3);
+  pjTexCache.set(key, t);
+  return t;
+}
+
 function buildAvatarParts(avatar, extra) {
   const a = {
     body: 'person', skin: '#e0b48c', hair: '#3b2a22', hairStyle: 'short',
     outfit: '#7aab7a', accent: '#fef9f5', accessory: 'none', ...avatar,
   };
+  // in pyjamas: the outfit becomes the pyjama set (always trousers), the shoes slippers
+  const pj = extra.pj && a.body !== 'owl' ? extra.pj : null;
+  if (pj) {
+    a.outfit = pj.color || '#9fb8d6';
+    a.accent = '#fffaf2';
+    a.bottom = 'trousers';
+    if (pj.cap) a.accessory = 'nightcap';
+  }
   const root = new THREE.Group();
   const rig = new THREE.Group();     // everything that bobs and turns
   root.add(rig);
@@ -267,7 +307,9 @@ function buildAvatarParts(avatar, extra) {
   const she = a.gender === 'she', he = a.gender === 'he';
   const skirt = a.bottom === 'skirt' && !isOwl;
   const skinM = mat(a.skin, { roughness: furry ? 0.95 : 0.55 });
-  const outfitM = mat(a.outfit, { roughness: 0.85 });
+  const outfitM = pj
+    ? new THREE.MeshStandardMaterial({ color: '#ffffff', map: pjTexture(pj.pattern || 'stripes', a.outfit), roughness: 0.95 })
+    : mat(a.outfit, { roughness: 0.85 });
   const accentM = mat(a.accent, { roughness: 0.95 });
   const darkM = mat('#2a1d1d', { roughness: 0.25 });
   const pawM = isFox ? mat('#3b2722', { roughness: 0.95 }) : skinM; // foxes wear dark "socks"
@@ -278,15 +320,15 @@ function buildAvatarParts(avatar, extra) {
 
   // ── legs and shoes (or paws)
   if (!isOwl) {
-    const legM = furry ? pawM : skirt ? mat(shade(a.skin, -0.04), { roughness: 0.6 }) : mat(shade(a.outfit, -0.28), { roughness: 0.9 });
-    const shoeM = furry ? pawM : mat('#5a3e36', { roughness: 0.5 });
+    const legM = furry ? pawM : pj ? outfitM : skirt ? mat(shade(a.skin, -0.04), { roughness: 0.6 }) : mat(shade(a.outfit, -0.28), { roughness: 0.9 });
+    const shoeM = furry ? pawM : pj ? mat('#fbf3ea', { roughness: 1 }) : mat('#5a3e36', { roughness: 0.5 }); // fluffy slippers
     for (const side of [-1, 1]) {
       const hip = new THREE.Group();
       hip.position.set(0.092 * side, HIP, 0);
       const leg = capsule(0.078, 0.26, null, legM);
       leg.position.y = -0.2;
       const shoe = sphere(0.1, null, shoeM);
-      shoe.scale.set(0.85, 0.58, 1.25);
+      shoe.scale.set(pj ? 1.0 : 0.85, pj ? 0.66 : 0.58, pj ? 1.35 : 1.25);
       shoe.position.set(0, -0.47, 0.035);
       hip.add(leg, shoe);
       if (!furry) {
@@ -761,6 +803,17 @@ function buildAvatarParts(avatar, extra) {
     const pom = sphere(0.065, null, mat(a.accent, { roughness: 1 }));
     pom.position.y = 0.34;
     head.add(b, rib, pom);
+  }
+  if (acc === 'nightcap') {
+    // a long soft cap that flops over to one side, with a pompom on the end
+    const cm = mat(a.outfit, { roughness: 1 });
+    const brim = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.04, 10, SEG * 2), mat('#fffaf2', { roughness: 1 }));
+    brim.rotation.x = Math.PI / 2; brim.position.y = 0.07;
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.27, 0.55, SEG), cm);
+    cap.position.set(0.09, 0.3, -0.04); cap.rotation.z = -0.75;
+    const pom = sphere(0.06, null, mat('#fffaf2', { roughness: 1 }));
+    pom.position.set(0.34, 0.33, -0.06);
+    head.add(brim, cap, pom);
   }
   if (acc === 'flower') {
     const f = new THREE.Group();

@@ -11,6 +11,7 @@ import { QIBLA_BEARING } from './prayertimes.mjs';
 
 export const PRAYER = { minX: -5.5, maxX: 5.5, minZ: -4.5, maxZ: 4.5, h: 3.4 };
 const R = PRAYER;
+const rot = (o, axis, v) => { o.rotation[axis] = v; return o; };
 
 const MATS = ['#7c1f2c', '#2f5d3a', '#2f3f6e', '#8a5a2a'];
 function matTex(color) {
@@ -148,7 +149,7 @@ export function buildPrayer({ floor, makeSign }) {
       const x = s * (R.maxX - 0.55), z = 0.4 + i * 0.95;
       const g = new THREE.Group();
       g.add(at(rbox(0.62, 0.16, 0.62, 0.07, std(c, { roughness: 1 })), 0, 0.08, 0));
-      g.add(at(rbox(0.6, 0.42, 0.14, 0.06, std(c, { roughness: 1 })), s * 0.28, 0.3, 0)).rotation.y = Math.PI / 2;
+      g.add(rot(at(rbox(0.6, 0.42, 0.14, 0.06, std(c, { roughness: 1 })), s * 0.28, 0.3, 0), 'y', Math.PI / 2));
       g.position.set(x, 0, z); group.add(g);
       seat(`cushion-${s < 0 ? 'w' : 'e'}${i}`, 'a floor cushion by the wall', x, z, s < 0 ? Math.PI / 2 : -Math.PI / 2, 0.18, g);
     }
@@ -162,7 +163,7 @@ export function buildPrayer({ floor, makeSign }) {
     g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.9, 6), brass), 0, 0.45, 0));
     g.add(at(new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.16, 8), brass), 0, -0.04, 0));
     g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.3, 8), lampGlass), 0, -0.26, 0));
-    g.add(at(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.1, 8), brass), 0, -0.46, 0)).rotation.x = Math.PI;
+    g.add(rot(at(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.1, 8), brass), 0, -0.46, 0), 'x', Math.PI));
     g.position.set(x, R.h - 0.9, z);
     group.add(g);
     const l = new THREE.PointLight('#ffc98a', 1.3, 5.5, 1.7);

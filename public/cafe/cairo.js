@@ -24,6 +24,7 @@ const rbox = (w, h, d, r, m) => shade(new THREE.Mesh(new RoundedBoxGeometry(w, h
 const box = (w, h, d, m) => shade(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m));
 const cyl = (rt, rb, h, m, seg = 16) => shade(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m));
 const at = (o, x, y, z) => { o.position.set(x, y, z); return o; };
+const rot = (o, axis, v) => { o.rotation[axis] = v; return o; }; // (add() hands back the parent, so turn the child first)
 function tex(w, h, draw, repeat = null) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
@@ -108,7 +109,7 @@ export function buildCairoLife({ scene, r, STREET, nightMats, glowTex, makeSign,
       wheel(g, 0.65, 0, 0.3, 0.1); wheel(g, -0.65, 0, 0.3, 0.1);
       g.add(at(rbox(1.2, 0.3, 0.3, 0.1, std('#2f3a33', { metalness: 0.4 })), 0, 0.6, 0));
       g.add(at(rbox(0.5, 0.5, 0.5, 0.06, std(r() < 0.5 ? '#e8b44a' : '#c8352f')), -0.6, 1.05, 0));
-      g.add(at(cyl(0.02, 0.02, 0.6, chrome, 6), 0.62, 0.9, 0)).rotation.z = 0.3;
+      g.add(rot(at(cyl(0.02, 0.02, 0.6, chrome, 6), 0.62, 0.9, 0), 'z', 0.3));
       const rider = buildAvatar({ body: 'person', skin: '#b98a64', hair: '#1f1612', hairStyle: 'short', outfit: '#3a4a5a', accent: '#efe0c4', accessory: 'none' });
       rider.group.position.set(0, 0.3, 0); rider.group.rotation.y = Math.PI / 2; rider.group.scale.setScalar(0.92);
       g.add(rider.group);
@@ -121,9 +122,9 @@ export function buildCairoLife({ scene, r, STREET, nightMats, glowTex, makeSign,
       const donkeyM = std('#8f857a', { roughness: 1 });
       const d = new THREE.Group();
       d.add(at(rbox(0.9, 0.42, 0.36, 0.15, donkeyM), 0, 0.85, 0));
-      d.add(at(rbox(0.36, 0.3, 0.24, 0.1, donkeyM), 0.55, 1.12, 0)).rotation.z = 0.5;
+      d.add(rot(at(rbox(0.36, 0.3, 0.24, 0.1, donkeyM), 0.55, 1.12, 0), 'z', 0.5));
       d.add(at(rbox(0.28, 0.2, 0.2, 0.08, std('#6f675e')), 0.75, 1.0, 0));
-      for (const s of [-1, 1]) d.add(at(box(0.05, 0.22, 0.06, donkeyM), 0.55, 1.36, s * 0.07)).rotation.z = -0.3;
+      for (const s of [-1, 1]) d.add(rot(at(box(0.05, 0.22, 0.06, donkeyM), 0.55, 1.36, s * 0.07), 'z', -0.3));
       const legs = [];
       for (const [x, z] of [[0.33, 0.12], [0.33, -0.12], [-0.33, 0.12], [-0.33, -0.12]]) { const l = at(box(0.08, 0.66, 0.08, donkeyM), x, 0.33, z); d.add(l); legs.push(l); }
       d.position.x = 1.25;
@@ -372,7 +373,7 @@ export function buildCairoLife({ scene, r, STREET, nightMats, glowTex, makeSign,
         const lg = new THREE.Group();
         lg.add(at(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.12, 6), std('#b08a4a', { metalness: 0.6 })), 0, -0.1, 0));
         lg.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.07, 0.28, 6), lanternGlass), 0, -0.3, 0));
-        lg.add(at(new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.1, 6), std('#b08a4a', { metalness: 0.6 })), 0, -0.48, 0)).rotation.x = Math.PI;
+        lg.add(rot(at(new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.1, 6), std('#b08a4a', { metalness: 0.6 })), 0, -0.48, 0), 'x', Math.PI));
         lg.position.copy(p);
         lanterns.add(lg);
       }

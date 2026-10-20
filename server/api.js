@@ -33,6 +33,7 @@ const ACCESSORIES = ['none', 'glasses', 'beanie', 'flower', 'headphones', 'scarf
 const BODY_TYPES = ['person', 'fox', 'rabbit', 'owl', 'cat'];
 const GENDERS = ['he', 'she'];
 const BOTTOMS = ['trousers', 'skirt'];
+const PJ_PATTERNS = ['stripes', 'dots', 'stars', 'hearts', 'checks', 'plain'];
 const AVATAR_DEFAULTS = {
   body: 'person', skin: '#e0b48c', hair: '#3b2a22', hairStyle: 'short',
   outfit: '#7aab7a', accent: '#fef9f5', accessory: 'none', gender: 'she', bottom: 'trousers',
@@ -50,6 +51,13 @@ function cleanAvatar(a) {
     accessory: ACCESSORIES.includes(a.accessory) ? a.accessory : AVATAR_DEFAULTS.accessory,
     gender: GENDERS.includes(a.gender) ? a.gender : AVATAR_DEFAULTS.gender,
     bottom: BOTTOMS.includes(a.bottom) ? a.bottom : AVATAR_DEFAULTS.bottom,
+    // pyjamas, worn upstairs if you like
+    pj: a.pj && typeof a.pj === 'object' ? {
+      on: !!a.pj.on,
+      color: isHexColor(a.pj.color) ? a.pj.color : '#9fb8d6',
+      pattern: PJ_PATTERNS.includes(a.pj.pattern) ? a.pj.pattern : 'stripes',
+      cap: !!a.pj.cap,
+    } : { on: false, color: '#9fb8d6', pattern: 'stripes', cap: false },
   };
 }
 
@@ -67,7 +75,7 @@ function cleanPrefs(p) {
   if (typeof p.quality === 'string' && ['high', 'balanced', 'gentle'].includes(p.quality)) out.quality = p.quality;
   if (typeof p.toured === 'boolean') out.toured = p.toured; // has had the welcome tour
   // where you were last, so the café opens there next time
-  if (p.place && typeof p.place === 'object' && /^(main|garden|hall|common|music|prayer|group:\d{1,9}|home:\d{1,9})$/.test(p.place.room)) {
+  if (p.place && typeof p.place === 'object' && /^(main|garden|hall|common|music|prayer|koshari|group:\d{1,9}|home:\d{1,9})$/.test(p.place.room)) {
     const n = (v, m) => (Number.isFinite(Number(v)) ? clamp(Number(v), -m, m) : 0);
     out.place = {
       room: p.place.room, x: n(p.place.x, 60), z: n(p.place.z, 60), ry: n(p.place.ry, 7),

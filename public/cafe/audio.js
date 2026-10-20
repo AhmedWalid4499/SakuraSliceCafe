@@ -147,6 +147,16 @@ export class Soundscape {
           o.connect(lp).connect(g).connect(out); o.start(t0 + dt); o.stop(t0 + dt + len + 0.05);
         });
       }
+    } else if (kind === 'clang') {
+      // the koshari man's spoon on the steel bowl: ting-ting-ting
+      for (let k = 0; k < 3; k++) {
+        const t0 = t + k * 0.16;
+        [[1870, 0.05], [2990, 0.02], [4400, 0.01]].forEach(([f, gn]) => {
+          const o = ctx.createOscillator(); o.frequency.value = f * (1 + k * 0.01);
+          const g = ctx.createGain(); g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(gn, t0 + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+          o.connect(g).connect(out); o.start(t0); o.stop(t0 + 0.55);
+        });
+      }
     } else if (kind === 'hoof') {
       const src = ctx.createBufferSource(); src.buffer = this.whiteBuffer(0.05);
       const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400 + Math.random() * 500; bp.Q.value = 6;
