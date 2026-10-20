@@ -15,6 +15,7 @@ import { buildHall, HALL } from './hall.js';
 import { buildCommon, COMMON } from './common.js';
 import { buildMusic, MUSIC } from './music.js';
 import { buildPrayer, PRAYER } from './prayer.js';
+import { buildCairoLife, stripedKerb } from './cairo.js';
 import { ROOM_SIZE as HOME_SIZE } from './furniture.mjs';
 
 export const ROOM = { minX: -15, maxX: 15, minZ: -11, maxZ: 11, h: 4.2 };
@@ -3390,6 +3391,7 @@ export function buildWorld(renderer) {
   function setSeason({ season, ramadan = false, eid = false } = {}) {
     for (const k of ['spring', 'summer', 'autumn', 'winter']) decor[k].visible = k === season && !ramadan;
     decor.ramadan.visible = !!ramadan;
+    outside.life.setRamadan(ramadan);
     decor.eid.visible = !!eid && !ramadan;
   }
 
@@ -3483,6 +3485,8 @@ export function buildWorld(renderer) {
   const api = Object.assign(api_, {
     scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, common, music, prayer,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
+    setStreetSound: f => { outside.life.onSound = f; },
+    adhan: () => outside.adhan(),
     setBookOfWeek, setPhotos, photoFrames: PHOTO_FRAMES, setMenuBoard, setSpecials, setSeason, setEvents, setHours,
     walk, kitchen: { ...KIT, door: { x: KX, z: ROOM.minZ - 0.1 } }, updateDoors, counter,
     fire: { x: fire.x - 0.4, y: 0.5, z: fire.z }, board, tree,
@@ -3643,10 +3647,10 @@ function buildCairo(scene) {
   slab(sideW, STREET.road.z * 2, STREET.road.x + sideW / 2, 0, -0.02, farPave);
 
   // kerbs and lane markings
-  const kerbM = new THREE.MeshStandardMaterial({ color: '#d9cdb8', roughness: 0.9 });
   function kerbRect(hx, hz) {
     for (const [w, d, x, z] of [[hx * 2, 0.25, 0, -hz], [hx * 2, 0.25, 0, hz], [0.25, hz * 2, -hx, 0], [0.25, hz * 2, hx, 0]]) {
-      const k = new THREE.Mesh(new THREE.BoxGeometry(w, 0.14, d), kerbM);
+      // painted black and white, the way Cairo paints its kerbs
+      const k = new THREE.Mesh(new THREE.BoxGeometry(w, 0.14, d), stripedKerb(Math.max(w, d)));
       k.position.set(x, 0.04, z);
       k.receiveShadow = true;
       scene.add(k);
@@ -3926,7 +3930,12 @@ function buildCairo(scene) {
   nightMats.push({ mat: shopGlassM, max: 0.6 });
   const dishM = new THREE.MeshStandardMaterial({ color: '#e8e4dc', roughness: 0.5, side: THREE.DoubleSide });
   const tankM = new THREE.MeshStandardMaterial({ color: '#3c4a56', roughness: 0.6 });
-  const shopSigns = ['مخبز', 'كافيه', 'صيدلية', 'زهور', 'كتب', 'عصير', 'حلويات', 'بقالة'];
+  const shopSigns = ['مخبز', 'كافيه', 'صيدلية', 'زهور', 'كتب', 'عصير', 'حلويات', 'بقالة', 'كشري', 'فول وطعمية', 'موبايلات', 'مكوجي', 'عطارة', 'حلاق', 'ملابس', 'كبابجي'];
+  const acM = new THREE.MeshStandardMaterial({ color: '#f1efe9', roughness: 0.5 });
+  const rebarM = new THREE.MeshStandardMaterial({ color: '#4a3a32', roughness: 0.7, metalness: 0.3 });
+  const concreteM = new THREE.MeshStandardMaterial({ color: '#a8a39a', roughness: 1 });
+  const clothesM = ['#3f6a8a', '#f4ece0', '#d4678a', '#e8b44a', '#93ab8c', '#ffffff', '#c7605a', '#6f5f8f'].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 1, side: THREE.DoubleSide }));
+  const neonCols = ['#ff5a7a', '#3fd0ff', '#7dff6a', '#ffd23f'];
 
   function building(w, h, d, mat) {
     const g = new THREE.Group();
@@ -3951,7 +3960,19 @@ function buildCairo(scene) {
     const sign = makeSign([{ text: shopSigns[Math.floor(r() * shopSigns.length)], font: 'serif', size: 150, weight: '700', color: '#fdf3e6' }],
       Math.min(2.4, w - 1.4), 0.5, { bg: awningColors[ai][0], border: null, radius: 12 });
     sign.position.set(0, 3.12, 0.3);
+    // the shop signs light up after dark
+    sign.material.emissive = new THREE.Color('#ffffff'); sign.material.emissiveMap = sign.material.map; sign.material.emissiveIntensity = 0;
+    nightMats.push({ mat: sign.material, max: 0.55 });
     g.add(sign);
+    // and some have a neon one too, sticking out over the pavement
+    if (r() < 0.4) {
+      const col = neonCols[Math.floor(r() * neonCols.length)];
+      const neon = makeSign([{ text: shopSigns[Math.floor(r() * shopSigns.length)], font: 'serif', size: 150, weight: '700', color: col }], 0.5, 1.4, { bg: '#1a1416', border: col, radius: 20 });
+      neon.material.emissive = new THREE.Color('#ffffff'); neon.material.emissiveMap = neon.material.map; neon.material.emissiveIntensity = 0;
+      nightMats.push({ mat: neon.material, max: 1.1 });
+      neon.position.set(w / 2 - 0.3, 4.3, 0.55); neon.rotation.y = Math.PI / 2;
+      g.add(neon);
+    }
     // the flats above: shuttered windows, some lit, some with balconies
     const floorsN = Math.max(1, Math.floor((h - 3.6) / 2.6));
     const cols = Math.max(1, Math.floor(w / 1.9));
@@ -3969,6 +3990,12 @@ function buildCairo(scene) {
           sh.position.set(x + side * 0.66, y, 0.04);
           g.add(sh);
         }
+        // air conditioners everywhere, dripping onto the pavement
+        if (r() < 0.3) {
+          const ac = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.5, 0.3), acM);
+          ac.position.set(x + (r() < 0.5 ? -0.85 : 0.85), y - 0.55, 0.17);
+          g.add(ac);
+        }
         if (balcony) {
           const slabB = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.7), new THREE.MeshStandardMaterial({ color: '#efe3cc' }));
           slabB.position.set(x, y - 0.75, 0.35);
@@ -3980,6 +4007,15 @@ function buildCairo(scene) {
             pot.position.set(x + 0.45, y - 0.5, 0.45);
             g.add(pot);
           }
+          // the washing, pegged out on a line over the street
+          if (r() < 0.5) {
+            for (let k = 0; k < 4; k++) {
+              const wq = 0.18 + r() * 0.14, hq = 0.25 + r() * 0.25;
+              const c = new THREE.Mesh(new THREE.PlaneGeometry(wq, hq), clothesM[Math.floor(r() * clothesM.length)]);
+              c.position.set(x - 0.55 + k * 0.36, y - 0.25 - hq / 2, 0.82);
+              g.add(c);
+            }
+          }
         }
       }
     }
@@ -3987,7 +4023,7 @@ function buildCairo(scene) {
     const par = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, 0.15), mat);
     par.position.set(0, h + 0.25, 0);
     g.add(par);
-    const dishes = 1 + Math.floor(r() * 3);
+    const dishes = 3 + Math.floor(r() * 5); // a forest of them
     for (let i = 0; i < dishes; i++) {
       const dish = new THREE.Mesh(new THREE.SphereGeometry(0.45, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.32), dishM);
       dish.rotation.x = -1.1;
@@ -3998,6 +4034,35 @@ function buildCairo(scene) {
       const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.9, 16), tankM);
       tank.position.set(-w / 2 + 1 + r() * (w - 2), h + 0.45, -d / 2);
       g.add(tank);
+    }
+    // the floor that's never quite finished: columns and rebar waiting for the next storey
+    if (r() < 0.35) {
+      for (const cx of [-w / 2 + 0.3, w / 2 - 0.3]) for (const cz of [-0.3, -d + 0.3]) {
+        const col = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), concreteM);
+        col.position.set(cx, h + 0.45, cz);
+        g.add(col);
+        for (let k = 0; k < 4; k++) {
+          const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.0, 4), rebarM);
+          bar.position.set(cx + (k % 2 ? 0.08 : -0.08), h + 1.4, cz + (k < 2 ? 0.08 : -0.08));
+          bar.rotation.z = (r() - 0.5) * 0.25;
+          g.add(bar);
+        }
+      }
+    }
+    // a pigeon tower (burg hamam) on the odd roof, painted, with the birds' doors
+    if (r() < 0.12) {
+      const tower = new THREE.Group();
+      const towerM = new THREE.MeshStandardMaterial({ color: r() < 0.5 ? '#e8d6b8' : '#cfe0dc', roughness: 0.9 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.0, 2.6, 4, 1, true), towerM);
+      body.rotation.y = Math.PI / 4; body.position.y = 1.3;
+      tower.add(body);
+      for (let k = 0; k < 10; k++) { const dr = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.12), shutterM[0]); dr.position.set(-0.45 + (k % 5) * 0.22, 0.8 + Math.floor(k / 5) * 0.7, 0.86 - Math.floor(k / 5) * 0.2); tower.add(dr); }
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.6, 4), new THREE.MeshStandardMaterial({ color: '#4f6f5a', roughness: 0.8 }));
+      cap.rotation.y = Math.PI / 4; cap.position.y = 2.9;
+      tower.add(cap);
+      for (let k = 0; k < 4; k++) { const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.4, 4), rebarM); stick.position.set(-0.6 + k * 0.4, 3.2, 0); stick.rotation.z = Math.PI / 2 * (k % 2) * 0.2; tower.add(stick); }
+      tower.position.set(-w / 2 + 1.4, h, -d / 2);
+      g.add(tower);
     }
     return g;
   }
@@ -4037,6 +4102,9 @@ function buildCairo(scene) {
 
   // ── the mosque behind the back street, and Cairo Tower far away
   const stoneM = new THREE.MeshStandardMaterial({ color: '#efe0c4', roughness: 0.9 });
+  const minaretGlowM = new THREE.MeshStandardMaterial({ color: '#3a6a45', emissive: '#4dff7a', emissiveIntensity: 0, roughness: 0.5 });
+  nightMats.push({ mat: minaretGlowM, max: 1.8 });
+  let adhanK = 0; // brighter for a while when the call to prayer goes out
   function minaret(x, z, h) {
     const g = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.1, h * 0.45, 8), stoneM);
@@ -4055,6 +4123,19 @@ function buildCairo(scene) {
     const fin = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 16), new THREE.MeshStandardMaterial({ color: '#c9a25b', metalness: 0.8, roughness: 0.3 }));
     fin.position.y = h * 1.09;
     g.add(base, mid, balcony, balcony2, top, cap, fin);
+    // the green lights round each balcony, on at night; the loudspeakers for the call to prayer
+    for (const [y, rad] of [[h * 0.62 + 0.22, 1.12], [h * 0.8 + 0.18, 0.9]]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(rad, 0.06, 6, 40), minaretGlowM);
+      ring.rotation.x = Math.PI / 2; ring.position.y = y;
+      g.add(ring);
+    }
+    for (let k = 0; k < 4; k++) {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 10, 1, true), new THREE.MeshStandardMaterial({ color: '#d9d4c7', roughness: 0.6, side: THREE.DoubleSide }));
+      const a = k * Math.PI / 2;
+      horn.position.set(Math.cos(a) * 0.55, h * 0.86, Math.sin(a) * 0.55);
+      horn.rotation.set(0, -a, Math.PI / 2 + 0.3);
+      g.add(horn);
+    }
     g.position.set(x, 0, z);
     scene.add(g);
   }
@@ -4169,6 +4250,9 @@ function buildCairo(scene) {
     walkers.push({ av, s: i * walkLen / looks.length + r() * 5, speed: (i % 2 ? -1 : 1) * (0.9 + r() * 0.3) });
   });
 
+  // Cairo's street life: the traffic, the carts and stalls, the ahwa, the flags (cairo.js)
+  const life = buildCairoLife({ scene, r, STREET, nightMats, glowTex, makeSign, buildAvatar });
+
   // birds: a few soft V shapes gliding in slow circles
   const birdM = new THREE.MeshBasicMaterial({ color: '#4a3a3a', side: THREE.DoubleSide, transparent: true });
   const birds = [];
@@ -4278,6 +4362,11 @@ function buildCairo(scene) {
 
   function update(dt, t) {
     animated.forEach(f => f(dt, t));
+    life.update(dt, t);
+    if (adhanK > 0) {
+      adhanK = Math.max(0, adhanK - dt / 90);
+      minaretGlowM.emissiveIntensity = Math.max(minaretGlowM.emissiveIntensity, adhanK * 2.2);
+    }
     if (rain.visible) {
       const fall = (18 + wx.rain * 10) * dt;
       const slant = 0.12 + wx.rain * 0.12;
@@ -4317,7 +4406,7 @@ function buildCairo(scene) {
     });
   }
 
-  return { setSky, setWeather, setFlash, update, setClock, faceTex };
+  return { setSky, setWeather, setFlash, update, setClock, faceTex, life, adhan() { adhanK = 1; } };
 }
 
 function lerpAngleW(a, b, t) {

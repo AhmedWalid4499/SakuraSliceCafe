@@ -738,7 +738,10 @@ export function buildHome({ floor, makeSign }) {
   const bz = R.minZ - 0.08, fz = R.maxZ + 0.08, lx = R.minX - 0.08, rx = R.maxX + 0.08, ix = 6.08;
   const dw = 1.1, dh = 2.2;
   const DK = DOORWAYS.kitchen, DB = DOORWAYS.bath, DL = DOORWAYS.library;
-  run('x', bz, R.minX - 0.08, R.maxX + 0.08, [[-10, -8, 1.0, 2.4], [-0.5, 2.5, wy0, wy1], [7.4, 8.8, 1.2, 2.3]]); // back: reading room, big window, kitchen
+  // the balcony: off the main room's back wall, beside the big window (BD = its doors)
+  const BAL = { minX: -1.3, maxX: 5.6, minZ: R.minZ - 1.8, maxZ: R.minZ - 0.17 };
+  const BD = { x: 4.1, hw: 0.6 };
+  run('x', bz, R.minX - 0.08, R.maxX + 0.08, [[-10, -8, 1.0, 2.4], [-0.5, 2.5, wy0, wy1], [BD.x - BD.hw, BD.x + BD.hw, 0, dh], [7.4, 8.8, 1.2, 2.3]]); // back: reading room, big window, the balcony doors, kitchen
   run('z', lx, R.minZ, R.maxZ, [[-1.5, 1.5, 0.7, 2.6]]);                                     // left: the reading room's tall window
   run('z', -6.08, M.minZ, M.maxZ, [[DL.z - DL.hw, DL.z + DL.hw, 0, dh]]);                   // into the reading room
   run('z', rx, R.minZ, R.maxZ, [[2.0, 2.9, 1.5, 2.35]]);                                     // right: the bathroom's little window
@@ -764,6 +767,206 @@ export function buildHome({ floor, makeSign }) {
     fr.position.set(x, 0, z); fr.rotation.y = ry;
     shell.add(fr);
   }
+  // ── the balcony. A Cairo balcony: patterned cement tiles, a wrought-iron
+  // railing, a striped awning, pots of basil, jasmine and a bougainvillea,
+  // two chairs and a little table with tea, the washing out on its rack, and
+  // the basket on a rope for things from the kiosk downstairs. Outside the
+  // flat: the building's own sandy plaster, all the way down to the street.
+  const balcony = new THREE.Group();
+  shell.add(balcony);
+  const balHits = [], balSeats = [];
+  let washing = [];
+  {
+    const bw = BAL.maxX - BAL.minX, bd = BAL.maxZ - BAL.minZ, cx = (BAL.minX + BAL.maxX) / 2, cz = (BAL.minZ + BAL.maxZ) / 2;
+    const iron = std('#2b2522', { roughness: 0.45, metalness: 0.5 });
+    // the building's face, with the flat's windows and the balcony doors cut out
+    {
+      const top = H + 0.6, bottom = -4.4;
+      const sh = new THREE.Shape();
+      // (it faces −z, so its own x runs the other way: x' = −x)
+      sh.moveTo(-(R.maxX + 0.2), bottom); sh.lineTo(-(R.minX - 0.2), bottom); sh.lineTo(-(R.minX - 0.2), top); sh.lineTo(-(R.maxX + 0.2), top); sh.closePath();
+      for (const [x0, x1, y0, y1] of [[-10, -8, 1.0, 2.4], [-0.5, 2.5, wy0, wy1], [BD.x - BD.hw, BD.x + BD.hw, 0, dh], [7.4, 8.8, 1.2, 2.3]]) {
+        const h = new THREE.Path();
+        h.moveTo(-x1, y0); h.lineTo(-x0, y0); h.lineTo(-x0, y1); h.lineTo(-x1, y1); h.closePath();
+        sh.holes.push(h);
+      }
+      const plaster = std('#e2c79f', { roughness: 1 });
+      const face = new THREE.Mesh(new THREE.ShapeGeometry(sh), plaster);
+      face.rotation.y = Math.PI; face.position.z = R.minZ - 0.165;
+      face.receiveShadow = true;
+      balcony.add(face);
+      // a band at each floor, a cornice at the top
+      for (const y of [-0.12, H + 0.5]) balcony.add(at(box(R.maxX - R.minX + 0.5, 0.16, 0.14, std('#efe0c4', { roughness: 0.9 })), (R.minX + R.maxX) / 2, y, R.minZ - 0.24));
+      // the air conditioner by the kitchen window, dripping into a tin
+      const ac = new THREE.Group();
+      ac.add(at(rbox(0.85, 0.55, 0.32, 0.03, std('#f1efe9', { roughness: 0.5 })), 0, 0, 0));
+      for (let i = 0; i < 7; i++) ac.add(at(box(0.6, 0.02, 0.02, std('#9a9890')), -0.05, -0.18 + i * 0.06, -0.165));
+      ac.add(at(new THREE.Mesh(new THREE.CircleGeometry(0.17, 20), std('#7a7870')), 0.24, 0, -0.165)).rotation.y = Math.PI;
+      for (const s of [-1, 1]) ac.add(at(box(0.04, 0.04, 0.4, iron), s * 0.35, -0.3, 0.05));
+      ac.position.set(8.1, 0.6, R.minZ - 0.36);
+      balcony.add(ac);
+      // a satellite dish clamped to the railing of the flat next door (well, nearly)
+      const dish = at(new THREE.Mesh(new THREE.SphereGeometry(0.35, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.32), std('#e8e4dc', { roughness: 0.5, side: THREE.DoubleSide })), -6.5, 2.9, R.minZ - 0.45);
+      dish.rotation.x = 1.9;
+      balcony.add(dish);
+    }
+    // the floor: patterned cement tiles
+    const tileTex = canvasTex(256, (g, n) => {
+      const c = n / 2;
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+        const x = i * c, y = j * c;
+        g.fillStyle = '#efe4d2'; g.fillRect(x, y, c, c);
+        g.fillStyle = '#3f6a8a';
+        g.beginPath(); g.moveTo(x + c / 2, y + 6); g.lineTo(x + c - 6, y + c / 2); g.lineTo(x + c / 2, y + c - 6); g.lineTo(x + 6, y + c / 2); g.closePath(); g.fill();
+        g.fillStyle = '#c0763a'; g.beginPath(); g.arc(x + c / 2, y + c / 2, c * 0.16, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#efe4d2'; g.beginPath(); g.arc(x + c / 2, y + c / 2, c * 0.07, 0, Math.PI * 2); g.fill();
+        for (const [qx, qy] of [[0, 0], [c, 0], [0, c], [c, c]]) { g.fillStyle = '#c0763a'; g.beginPath(); g.arc(x + qx, y + qy, c * 0.14, 0, Math.PI * 2); g.fill(); }
+        g.strokeStyle = 'rgba(0,0,0,0.12)'; g.strokeRect(x, y, c, c);
+      }
+    }, [bw / 0.8, bd / 0.8]);
+    balcony.add(at(box(bw + 0.1, 0.2, bd + 0.05, std('#d8c8ae', { roughness: 0.9 })), cx, -0.1, cz));
+    const balFloor = new THREE.Mesh(new THREE.PlaneGeometry(bw, bd), std('#ffffff', { map: tileTex, roughness: 0.7 }));
+    balFloor.rotation.x = -Math.PI / 2; balFloor.position.set(cx, 0.004, cz);
+    balFloor.receiveShadow = true;
+    balFloor.userData.floor = true; // you can click it to walk out there
+    balcony.add(balFloor);
+    balHits.push(balFloor);
+    // the railing: a top rail, a bottom rail, balusters, and curls between them
+    const RH = 1.0;
+    const railRun = (x0, z0, x1, z1) => {
+      const len = Math.hypot(x1 - x0, z1 - z0), ry = Math.atan2(x1 - x0, z1 - z0) - Math.PI / 2;
+      const g = new THREE.Group();
+      g.position.set(x0, 0, z0); g.rotation.y = ry;
+      g.add(at(box(len + 0.05, 0.05, 0.07, iron), len / 2, RH, 0));
+      g.add(at(box(len, 0.03, 0.03, iron), len / 2, 0.12, 0));
+      g.add(at(box(len, 0.025, 0.025, iron), len / 2, RH - 0.22, 0));
+      for (let d = 0.06; d < len; d += 0.11) g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, RH - 0.12, 6), iron), d, 0.12 + (RH - 0.12) / 2, 0));
+      for (let d = 0.3; d < len - 0.2; d += 0.55) {
+        for (const s of [-1, 1]) {
+          const curl = at(new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.009, 6, 18, Math.PI * 1.5), iron), d + s * 0.08, RH - 0.34, 0);
+          curl.rotation.z = s > 0 ? Math.PI : 0;
+          g.add(curl);
+        }
+      }
+      balcony.add(g);
+    };
+    railRun(BAL.minX + 0.03, BAL.maxZ, BAL.minX + 0.03, BAL.minZ + 0.03);
+    railRun(BAL.minX + 0.03, BAL.minZ + 0.03, BAL.maxX - 0.03, BAL.minZ + 0.03);
+    railRun(BAL.maxX - 0.03, BAL.minZ + 0.03, BAL.maxX - 0.03, BAL.maxZ);
+    // the awning: green and white stripes, with a scalloped edge
+    const awnTex = canvasTex(256, (g, n) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#fdf3e6' : '#3f7a55'; g.fillRect(i * n / 8, 0, n / 8, n); } }, [bw / 1.6, 1]);
+    const awnM = std('#ffffff', { map: awnTex, roughness: 1, side: THREE.DoubleSide });
+    const slope = Math.atan2(0.5, bd);
+    const awn = at(new THREE.Mesh(new THREE.PlaneGeometry(bw + 0.3, Math.hypot(bd + 0.15, 0.5)), awnM), cx, H - 0.05 - 0.25, cz - 0.05);
+    awn.rotation.x = -Math.PI / 2 + slope;
+    balcony.add(awn);
+    for (let x = BAL.minX - 0.1; x < BAL.maxX + 0.1; x += 0.36) {
+      const sc = at(new THREE.Mesh(new THREE.CircleGeometry(0.18, 16, 0, Math.PI), awnM), x + 0.18, H - 0.55, BAL.minZ - 0.07);
+      sc.rotation.z = Math.PI;
+      balcony.add(sc);
+    }
+    for (const x of [BAL.minX - 0.05, BAL.maxX + 0.05]) balcony.add(at(box(0.03, 0.03, bd + 0.2, iron), x, H - 0.55, cz));
+    // the French doors, both leaves open out onto the balcony
+    const glassD = std('#dff1ff', { roughness: 0.05, transparent: true, opacity: 0.25, depthWrite: false });
+    const doorWood = std('#f4ece0', { roughness: 0.6 });
+    for (const s of [-1, 1]) {
+      const leaf = new THREE.Group();
+      const w = BD.hw;
+      for (const [fw, fh, fx, fy] of [[w, 0.07, w / 2, 0.035], [w, 0.07, w / 2, dh - 0.04], [0.06, dh, 0.03, dh / 2], [0.06, dh, w - 0.03, dh / 2], [w, 0.05, w / 2, 0.9]]) leaf.add(at(box(fw, fh, 0.05, doorWood), fx, fy, 0));
+      leaf.add(at(new THREE.Mesh(new THREE.PlaneGeometry(w - 0.12, dh - 0.2), glassD), w / 2, dh / 2, 0));
+      // hinged at each side of the opening, both swung out towards the street
+      leaf.position.set(BD.x + s * BD.hw, 0, R.minZ - 0.2);
+      leaf.rotation.y = Math.PI / 2 - s * 0.3;
+      balcony.add(leaf);
+    }
+    for (const [w, h, x, y] of [[0.08, dh, BD.x - BD.hw, dh / 2], [0.08, dh, BD.x + BD.hw, dh / 2], [BD.hw * 2 + 0.16, 0.08, BD.x, dh]]) balcony.add(at(box(w, h, 0.22, wood), x, y, bz));
+    // pots: basil, jasmine, a bougainvillea climbing the corner
+    const potM = std('#b8683f', { roughness: 0.9 });
+    const pot = (x, z, leaf, flower, s = 1) => {
+      const g = new THREE.Group();
+      g.add(at(cyl(0.16 * s, 0.12 * s, 0.28 * s, potM), 0, 0.14 * s, 0));
+      for (let i = 0; i < 8; i++) {
+        const a = i * 0.8, l = at(ball(0.11 * s, std(leaf, { roughness: 0.9 }), 10), Math.cos(a) * 0.08 * s, (0.36 + (i % 3) * 0.08) * s, Math.sin(a) * 0.08 * s);
+        g.add(l);
+        if (flower && i % 2) g.add(at(ball(0.03 * s, std(flower, { roughness: 0.8 }), 6), Math.cos(a) * 0.15 * s, (0.42 + (i % 3) * 0.08) * s, Math.sin(a) * 0.15 * s));
+      }
+      g.position.set(x, 0, z);
+      balcony.add(g);
+    };
+    pot(BAL.minX + 0.3, BAL.minZ + 0.3, '#4f8a4a', null);
+    pot(BAL.minX + 0.75, BAL.minZ + 0.25, '#5f9a5a', '#ffffff', 0.9);
+    pot(BAL.maxX - 0.3, BAL.minZ + 0.3, '#4f7a45', '#d4378a', 1.3);
+    pot(BAL.maxX - 0.3, BAL.maxZ - 0.35, '#5f9a5a', '#ffffff');
+    // the bougainvillea up the corner and along the awning
+    for (let i = 0; i < 14; i++) balcony.add(at(ball(0.07 + (i % 3) * 0.02, std(i % 2 ? '#d4378a' : '#4f7a45', { roughness: 0.9 }), 8), BAL.maxX - 0.12 - (i > 8 ? (i - 8) * 0.3 : 0), Math.min(H - 0.6, 0.6 + i * 0.2), BAL.minZ + 0.12));
+    // a little table with two glasses of tea, two chairs
+    {
+      const tx = 1.9, tz = cz;
+      const t = new THREE.Group();
+      t.add(at(cyl(0.3, 0.3, 0.03, std('#f4ece0', { roughness: 0.5 }), 24), 0, 0.68, 0));
+      t.add(at(cyl(0.025, 0.025, 0.68, iron, 8), 0, 0.34, 0));
+      t.add(at(cyl(0.16, 0.18, 0.03, iron, 16), 0, 0.015, 0));
+      const teaM = std('#b0522a', { roughness: 0.15, transparent: true, opacity: 0.85 });
+      for (const s of [-1, 1]) {
+        t.add(at(cyl(0.028, 0.024, 0.08, std('#ffffff', { roughness: 0.05, transparent: true, opacity: 0.35 }), 12), s * 0.09, 0.735, 0.02));
+        t.add(at(cyl(0.025, 0.022, 0.06, teaM, 12), s * 0.09, 0.725, 0.02));
+      }
+      t.add(at(cyl(0.1, 0.1, 0.012, std('#c9a25b', { metalness: 0.6, roughness: 0.3 }), 20), 0, 0.698, 0.02)); // the tray
+      t.position.set(tx, 0, tz);
+      balcony.add(t);
+      for (const s of [-1, 1]) {
+        const c = new THREE.Group();
+        const cane = std('#c9a27e', { roughness: 0.8 });
+        c.add(at(rbox(0.44, 0.05, 0.42, 0.02, cane), 0, 0.46, 0));
+        c.add(at(rbox(0.44, 0.46, 0.04, 0.02, cane), 0, 0.7, -0.2));
+        for (const a of [-1, 1]) for (const b of [-1, 1]) c.add(at(box(0.03, 0.46, 0.03, std('#8a6a4a')), a * 0.19, 0.23, b * 0.18));
+        c.add(at(rbox(0.38, 0.05, 0.36, 0.02, std('#e7b7c4', { roughness: 1 })), 0, 0.5, 0.01));
+        const x = tx + s * 0.62, ry = s < 0 ? Math.PI / 2 + 0.35 : -Math.PI / 2 - 0.35;
+        c.position.set(x, 0, tz); c.rotation.y = ry;
+        balcony.add(c);
+        const seat = { id: `home-balcony-${s < 0 ? 0 : 1}`, label: 'a chair on the balcony', x, z: tz, y: group.position.y, h: 0.5, ry };
+        balSeats.push(seat);
+        c.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat, label: 'Sit out on the balcony' }; balHits.push(o); } });
+      }
+    }
+    // the washing, out on its rack over the street
+    {
+      const rack = new THREE.Group();
+      for (const s of [-1, 1]) rack.add(at(box(0.03, 0.03, 0.55, iron), s * 0.8, 0, -0.27));
+      for (let i = 0; i < 4; i++) rack.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 1.6, 4), std('#dddddd')), 0, 0, -0.1 - i * 0.13)).rotation.z = Math.PI / 2;
+      const clothes = ['#3f6a8a', '#f4ece0', '#d4678a', '#e8b44a', '#93ab8c', '#ffffff', '#c7605a'];
+      for (let i = 0; i < 7; i++) {
+        const w = 0.22 + (i % 3) * 0.08, h = 0.3 + (i % 2) * 0.18;
+        const c = new THREE.Mesh(new THREE.PlaneGeometry(w, h), std(clothes[i], { roughness: 1, side: THREE.DoubleSide }));
+        c.geometry.translate(0, -h / 2, 0);
+        const holder = new THREE.Group();
+        holder.position.set(-0.65 + i * 0.21, 0, -0.1 - (i % 4) * 0.13);
+        holder.add(c);
+        rack.add(holder);
+        washing.push({ g: holder, ph: i * 1.3 });
+      }
+      rack.position.set(-0.2, RH - 0.05, BAL.minZ);
+      balcony.add(rack);
+    }
+    // the basket on a rope: let it down to the street, and something comes back up
+    {
+      const rope = at(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 3.4, 4), std('#c9b28a')), 3.6, RH - 1.7, BAL.minZ - 0.12);
+      balcony.add(rope);
+      const basket = new THREE.Group();
+      basket.add(at(cyl(0.16, 0.12, 0.2, std('#b98a4f', { roughness: 1 }), 14), 0, 0, 0));
+      const handle = at(new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.012, 6, 16, Math.PI), std('#9a6a3a')), 0, 0.1, 0);
+      basket.add(handle);
+      basket.position.set(3.6, RH - 3.45, BAL.minZ - 0.12);
+      balcony.add(basket);
+      const tie = at(box(0.04, 0.06, 0.04, std('#c9b28a')), 3.6, RH + 0.01, BAL.minZ + 0.02);
+      balcony.add(tie);
+      const hit = at(new THREE.Mesh(new THREE.BoxGeometry(0.5, 3.8, 0.5), new THREE.MeshBasicMaterial({ visible: false })), 3.6, RH - 1.7, BAL.minZ - 0.12);
+      hit.userData = { kind: 'home-basket', label: 'The basket on its rope — let it down to the street' };
+      balcony.add(hit); balHits.push(hit);
+    }
+  }
+  const onBalcony = p => p.z < R.minZ - 0.12;
+
   // a sage skirting band round each room; white tiles halfway up the bathroom walls
   for (const a of [M, K, B, L]) {
     const w = a.maxX - a.minX, d = a.maxZ - a.minZ, cx = (a.minX + a.maxX) / 2, cz = (a.minZ + a.maxZ) / 2;
@@ -901,15 +1104,24 @@ export function buildHome({ floor, makeSign }) {
     ...Object.values(AREAS).map(a => ({ minX: a.minX + IN, maxX: a.maxX - IN, minZ: a.minZ + IN, maxZ: a.maxZ - IN })),
     // (a little wider than a straight inset, so it's easy to walk through with the keys too)
     ...Object.values(DOORWAYS).map(d => ({ minX: d.x - 0.45, maxX: d.x + 0.45, minZ: d.z - d.hw + 0.2, maxZ: d.z + d.hw - 0.2 })),
+    // the balcony, and the way out through its doors
+    { minX: BAL.minX + 0.3, maxX: BAL.maxX - 0.3, minZ: BAL.minZ + 0.3, maxZ: BAL.maxZ - 0.12 },
+    { minX: BD.x - BD.hw + 0.2, maxX: BD.x + BD.hw - 0.2, minZ: BAL.maxZ - 0.3, maxZ: M.minZ + 0.4 },
   ];
   // the spaces furniture can't block
   const CLEAR = [
     { minX: -0.75, maxX: 0.75, minZ: R.maxZ - 1.0, maxZ: R.maxZ + 1 },
     ...Object.values(DOORWAYS).map(d => ({ minX: d.x - 0.9, maxX: d.x + 0.9, minZ: d.z - d.hw - 0.1, maxZ: d.z + d.hw + 0.1 })),
+    { minX: BD.x - 0.9, maxX: BD.x + 0.9, minZ: M.minZ, maxZ: M.minZ + 1.1 }, // in front of the balcony doors
     ...builtIns.map(b => b.box),
   ];
   // Walking from one room to another goes through the doorway between them.
   function route(from, to) {
+    // out to the balcony, or back in: through its doors
+    const inside = { x: BD.x, z: M.minZ + 0.6 }, outside = { x: BD.x, z: BAL.maxZ - 0.55 };
+    if (onBalcony(from) && onBalcony(to)) return [to];
+    if (onBalcony(from)) return [outside, inside, ...route(inside, to)];
+    if (onBalcony(to)) return [...route(from, inside), outside, to];
     const a = areaAt(from.x, from.z), b = areaAt(to.x, to.z);
     if (a === b) return [to];
     const out = d => ({ x: d.x - d.side * 0.68, z: d.z }), inn = d => ({ x: d.x + d.side * 0.68, z: d.z });
@@ -920,6 +1132,8 @@ export function buildHome({ floor, makeSign }) {
   }
   // The camera stays in the room you're in, so a wall never comes between.
   function cameraBox(p) {
+    // out on the balcony the camera can drift out over the street, to look back at you
+    if (onBalcony(p)) return { minX: BAL.minX - 1.2, maxX: BAL.maxX + 1.2, minZ: BAL.minZ - 2.6, maxZ: R.minZ - 0.3 };
     const a = AREAS[areaAt(p.x, p.z)] || M;
     return { minX: a.minX, maxX: a.maxX, minZ: a.minZ, maxZ: a.maxZ };
   }
@@ -930,7 +1144,9 @@ export function buildHome({ floor, makeSign }) {
   let cat = null;      // the cat, if there is one (setPet): { pet, model, pos, ry, state, t, path, y, perch, petted }
   const things = new THREE.Group();
   group.add(things);
-  const base = { colliders: builtIns.map(b => ({ type: 'box', fixed: true, ...b.box })), interactables: [doorHit, ...builtIns.flatMap(b => b.hits)], surfaces: [...walls], seats: builtIns.flatMap(b => b.seats || []) };
+  const base = { colliders: builtIns.map(b => ({ type: 'box', fixed: true, ...b.box })), interactables: [doorHit, ...builtIns.flatMap(b => b.hits), ...balHits.filter(m => !m.userData.floor)], surfaces: [...walls, ...balHits.filter(m => m.userData.floor)], seats: [...builtIns.flatMap(b => b.seats || []), ...balSeats] };
+  // the balcony's table and chairs, so you walk round them
+  base.colliders.push({ type: 'circle', fixed: true, x: 1.9, z: (BAL.minZ + BAL.maxZ) / 2, r: 0.32 });
 
   // Rebuild the floor's lists from the shell and the furniture.
   function sync() {
@@ -1217,6 +1433,8 @@ export function buildHome({ floor, makeSign }) {
     goTo(randomSpot());
   }
   function updatePet(dt, t, { typist = null } = {}) {
+    // the washing stirs in the breeze off the street
+    for (const w of washing) w.g.rotation.x = Math.sin(t * 1.6 + w.ph) * 0.12 + 0.06;
     if (!cat) return;
     const c = cat, m = c.model;
     c.t -= dt;
@@ -1271,7 +1489,7 @@ export function buildHome({ floor, makeSign }) {
     // a couple of steps in from the door, so the camera behind you isn't
     // squashed against the wall looking down at the top of your head
     arrival: { x: 0, z: R.maxZ - 2.2, ry: Math.PI },
-    bounds: R, ceilingLight, lampShade, sideLights, route, cameraBox, walls,
+    bounds: R, ceilingLight, lampShade, sideLights, route, cameraBox, walls, onBalcony,
     setSnacks, setMovie, setGifts, setPet, updatePet, petCat, spotNear,
   };
 }
