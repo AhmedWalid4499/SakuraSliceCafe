@@ -180,7 +180,9 @@
     $('gate').classList.add('hidden');
     $('app').classList.remove('hidden');
     $('who').textContent = 'signed in as ' + me.displayName;
-    await Promise.all([loadStats(), loadContent(), loadNotes(), loadGuestbook(), loadSubs(), loadUsers(), loadHomes(), loadModeration()]);
+    await Promise.all([loadStats(), loadContent(), loadNotes(), loadGuestbook(), loadSubs(), loadUsers(), loadModeration()]);
+    // the flats on their own, so a hiccup there never holds up the rest of the page
+    loadHomes().catch(e => { $('homesMsg').textContent = 'Could not load the flats: ' + e.message; });
   }
 
   $('loginForm').addEventListener('submit', async e => {
