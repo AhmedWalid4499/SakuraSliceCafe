@@ -472,6 +472,9 @@
       <div class="opt-group" id="bottomGroup"><span>Wearing</span><div class="chips" id="optBottom"></div></div>
       <div class="opt-group"><span>Accent</span><div class="chips" id="optAccent"></div></div>
       <div class="opt-group"><span>Something extra</span><div class="chips" id="optAccessory"></div></div>
+      <div class="opt-group"><span>Pyjamas upstairs?</span><p class="fine" style="margin:2px 0 6px">Wear them in your room, the hallway, the Common room and the Music Room — everyone up there sees them.</p><div class="chips" id="optPJ"></div>
+        <div id="pjMore" class="hidden" style="margin-top:8px"><div class="chips" id="optPJColor"></div><div class="chips" id="optPJPattern" style="margin-top:8px"></div><div class="chips" id="optPJCap" style="margin-top:8px"></div>
+        <button class="btn ghost" id="pjPreview" type="button" style="margin-top:8px;font-size:13px;padding:6px 12px"></button></div></div>
       <div class="error" id="creatorErr"></div>
       <div class="row end"><button class="btn ghost hidden" id="creatorCancel" type="button">Cancel</button><button class="btn" id="creatorSave" type="button">Step inside</button></div>
     </div>
@@ -988,6 +991,18 @@
   <p class="fine hidden" id="snackEmpty">The shelf is empty — just crumbs and good intentions.</p>
 </div>
 
+<div id="kosharyPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Koshari Abu Saied · كشري أبو سعيد</p>
+  <h3>A bowl of koshari 🥣</h3>
+  <p class="fine">Rice and lentils, macaroni, chickpeas, the tomato sauce, crispy fried onions on top — the dakka (garlic vinegar) and the shatta (hot sauce) are on every table.</p>
+  <p class="eyebrow" style="margin-top:10px">How hungry are you?</p>
+  <div class="chips" id="kSizes"><button class="chip" type="button" data-k="s">Small · صغير</button><button class="chip" type="button" data-k="m">Medium · وسط</button><button class="chip" type="button" data-k="l">Large · كبير</button></div>
+  <p class="eyebrow" style="margin-top:10px">How do you like it?</p>
+  <div class="chips" id="kExtras"><button class="chip" type="button" data-k="dakka">Extra dakka</button><button class="chip" type="button" data-k="shatta">Shatta 🌶️</button><button class="chip" type="button" data-k="crispy">Extra crispy onions</button></div>
+  <div class="row end" style="margin-top:12px"><button class="btn" id="kOrder" type="button">Order it 🥣</button></div>
+</div>
+
 <div id="pianoPanel" class="panel card hidden">
   <button class="x" data-close aria-label="Close">✕</button>
   <p class="eyebrow">The Music Room</p>
@@ -1101,6 +1116,8 @@
     <li>Click <b>Hana or the counter</b> (or ☕ <b>Order</b>) for a drink — or a dessert from the <b>🍡 Desserts</b> tab. A plate goes in your other hand: <b>🍡 Take a bite</b>, or set it down next to your cup.</li>
     <li>Sitting at a table? Tick <b>🛎️ Bring it to my table</b> on the menu and Hana or Yuki will carry it over. <b>☕ Take a sip</b> (<kbd>C</kbd>) and <b>🍡 Take a bite</b> (<kbd>B</kbd>) work on what's in your hands — or on your table.</li>
     <li><b>🎧 The café radio</b> plays the songs the café chose — everyone hears the same song at the same moment. ▶ to listen, ⏸ to stop just for you.</li>
+    <li>Across the road, right opposite the front door: <b>Koshari Abu Saied</b>. Click the shop through the front windows to cross over, order a bowl at the counter, and sit at a marble table. And at the end of the street (best seen from the roof garden): the Nile, with feluccas, Gezira and Cairo Tower.</li>
+    <li>Upstairs, your flat's <b>balcony doors</b> open and close — click them. And in the avatar maker you can pick <b>pyjamas</b> to wear in your room, the hallway, the Common room and the Music Room.</li>
     <li>At the other end of the hallway: the <b>Music Room</b> (a piano and a guitar anyone can play, a cajón, a record player and an open-mic stage — sit on the stool to take it) and the <b>Prayer Room</b>, a quiet room with prayer mats facing the qibla and today's prayer times for Cairo. There's no chat in there.</li>
     <li>Upstairs, the hallway's <b>Common Room</b> door (by the stairs to the roof) leads to the sofas and the big TV — it plays the café's playlist, and everyone watches together.</li>
     <li><b>🔗</b> at the top: invite a friend (they'll walk straight to your table) or take a 📸 photo of the café to share.</li>

@@ -323,9 +323,18 @@ const player = {
   waving: 0,
 };
 
+// Pyjamas: if you've chosen a pair (avatar.pj), you wear them at home upstairs —
+// in your room or anyone's, in the hallway, the Common room and the Music Room.
+// Everyone in the room sees them; downstairs, in the garden and the Prayer Room
+// you're in your day clothes.
+const pjRoom = room => room === 'hall' || room === 'common' || room === 'music' || /^home:/.test(room || '');
+const dressFor = avatar => (avatar && avatar.pj && avatar.pj.on && pjRoom(state.room) ? { pj: avatar.pj } : {});
+let wearingPJ = false;
+
 function playerAvatar() {
   if (player.av) { scene.remove(player.av.group); disposeTree(player.av.group); }
-  player.av = buildAvatar(state.me.avatar);
+  player.av = buildAvatar(state.me.avatar, dressFor(state.me.avatar));
+  wearingPJ = !!dressFor(state.me.avatar).pj;
   noFog(player.av.group);
   player.label = makeLabel(state.me.displayName, { bg: 'rgba(212,103,138,0.92)', color: '#fff' });
   player.label.position.y = player.av.height + 0.12;
@@ -782,7 +791,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
   const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
-  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'common' ? world.common.bounds : world.floor === 'music' ? world.music.bounds : world.floor === 'prayer' ? world.prayer.bounds : ROOM;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'common' ? world.common.bounds : world.floor === 'koshari' ? world.koshari.bounds : world.floor === 'music' ? world.music.bounds : world.floor === 'prayer' ? world.prayer.bounds : ROOM;
   camPos.x = Math.min(box.maxX - 0.25, Math.max(box.minX + 0.25, camPos.x));
   camPos.z = Math.min(box.maxZ - 0.25, Math.max(box.minZ + 0.25, camPos.z));
   camPos.y = Math.min(world.floorY + (inKitchen ? 3.2 : world.floorH) - 0.3, Math.max(world.floorY + 0.4, camPos.y));
@@ -799,7 +808,7 @@ function updateCamera(dt) {
 function addPerson(p) {
   if (!state.me || p.id === state.me.id) return;
   removePerson(p.id);
-  const av = buildAvatar(p.avatar);
+  const av = buildAvatar(p.avatar, dressFor(p.avatar));
   noFog(av.group);
   const label = makeLabel(p.displayName);
   label.position.y = av.height + 0.12;
@@ -870,7 +879,7 @@ function updatePeople(dt) {
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'common' ? ' · in the Common room' : state.room === 'music' ? ' · in the Music Room' : state.room === 'prayer' ? ' · in the Prayer Room' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'common' ? ' · in the Common room' : state.room === 'koshari' ? ' · at Koshari Abu Saied, across the road' : state.room === 'music' ? ' · in the Music Room' : state.room === 'prayer' ? ' · in the Prayer Room' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
   $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
@@ -1259,7 +1268,10 @@ const drinkTemp = id => tempOf(menu().find(d => d.id === id) || {});
 
 // The pastry counter — the same twelve as the website (site_content 'counter.pastries').
 const pastries = () => (Array.isArray(state.content['counter.pastries']) ? state.content['counter.pastries'] : []).filter(p => p && p.id && p.name);
-const pastryOf = id => pastries().find(p => p.id === id) || { id, name: 'pastry', shape: 'daifuku', by: 'yuki' };
+// a bowl from Koshari Abu Saied across the road counts as something to eat, like a pastry
+const KOSHARI_BOWLS = { 'koshari-s': 'a small koshari', 'koshari-m': 'a medium koshari', 'koshari-l': 'a large koshari' };
+const pastryOf = id => (KOSHARI_BOWLS[id] ? { id, name: KOSHARI_BOWLS[id], shape: 'koshari', by: 'abu-saied' } : null)
+  || pastries().find(p => p.id === id) || { id, name: 'pastry', shape: 'daifuku', by: 'yuki' };
 const bakerOf = p => (p.by === 'hana' ? 'Hana' : 'Yuki');
 
 // A picture: the Drive image when there is one, otherwise the drawing from /art.js.
@@ -1694,6 +1706,9 @@ function click(x, y) {
   if (d.kind === 'common-out') return walkToThing(h, () => goToRoom('hall'));
   if (d.kind === 'common-tv') return openCommonTV();
   if (d.kind === 'hall-music') return walkToThing(h, () => goToRoom('music'));
+  if (d.kind === 'koshari-go') return goToRoom('koshari');
+  if (d.kind === 'koshari-out') return goToRoom('main');
+  if (d.kind === 'koshari-order') return openKoshari();
   if (d.kind === 'hall-prayer') return walkToThing(h, () => goToRoom('prayer'));
   if (d.kind === 'music-out' || d.kind === 'prayer-out') return walkToThing(h, () => goToRoom('hall'));
   if (d.kind === 'music-piano') return openPiano();
@@ -1708,6 +1723,7 @@ function click(x, y) {
   }
   if (d.kind === 'home-bed') return goToBed(d.seat);
   if (d.kind === 'home-basket') return lowerBasket();
+  if (d.kind === 'home-baldoor') return toggleBalconyDoor();
   if (d.kind === 'home-desk') {
     // sit at a chair by the desk if there is one, then open the timer
     const c = new THREE.Vector3(); h.object.getWorldPosition(c);
@@ -1784,7 +1800,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
+const PANELS = ['kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2584,7 +2600,10 @@ const OPTIONS = {
   outfit: ['#7aab7a', '#4d7a4d', '#f2a7bb', '#d4678a', '#efe0c4', '#6b8fb5', '#e8b44a', '#a0714f', '#3a3a4a', '#fef9f5'],
   accent: ['#fef9f5', '#fde8ef', '#f4ead8', '#d4678a', '#7aab7a', '#6b8fb5', '#e8b44a'],
   accessory: [['none', 'Nothing'], ['glasses', 'Glasses'], ['headphones', 'Headphones'], ['scarf', 'Scarf'], ['beanie', 'Beanie'], ['flower', 'A sakura flower']],
+  pjColor: ['#9fb8d6', '#f2c6d0', '#c9b3d9', '#b8cfc4', '#f4ead8', '#3f4d6e', '#d4678a', '#e8b44a'],
+  pjPattern: [['stripes', 'Stripes'], ['dots', 'Dots'], ['stars', 'Stars'], ['hearts', 'Hearts'], ['checks', 'Checks'], ['plain', 'Plain']],
 };
+let previewPJ = false; // the avatar maker's preview: day clothes, or pyjamas
 
 let draft = null;
 let preview = null;
@@ -2650,6 +2669,31 @@ function renderCreator() {
   swatches($('optOutfit'), OPTIONS.outfit, 'outfit');
   swatches($('optAccent'), OPTIONS.accent, 'accent');
   chips($('optAccessory'), OPTIONS.accessory, 'accessory');
+  // pyjamas, for upstairs
+  draft.pj = { on: false, color: OPTIONS.pjColor[0], pattern: 'stripes', cap: false, ...(draft.pj || {}) };
+  const pjChips = (el, list, key) => {
+    el.replaceChildren();
+    for (const [id, name] of list) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip' + (draft.pj[key] === id ? ' on' : '');
+      b.textContent = name;
+      b.onclick = () => { draft.pj[key] = id; if (key !== 'on') draft.pj.on = true; previewPJ = draft.pj.on; renderCreator(); };
+      el.appendChild(b);
+    }
+  };
+  pjChips($('optPJ'), [[false, 'No, day clothes'], [true, 'Yes, pyjamas 🌙']], 'on');
+  $('pjMore').classList.toggle('hidden', !draft.pj.on);
+  $('optPJColor').replaceChildren(...OPTIONS.pjColor.map(c => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'swatch' + (draft.pj.color === c ? ' on' : '');
+    b.style.background = c; b.setAttribute('aria-label', 'pyjamas ' + c);
+    b.onclick = () => { draft.pj.color = c; previewPJ = true; renderCreator(); };
+    return b;
+  }));
+  pjChips($('optPJPattern'), OPTIONS.pjPattern, 'pattern');
+  pjChips($('optPJCap'), [[false, 'No cap'], [true, 'A nightcap']], 'cap');
+  $('pjPreview').textContent = previewPJ && draft.pj.on ? '👀 Showing your pyjamas — tap to see your day clothes' : '👀 See them on';
   if (preview) preview.rebuild();
 }
 
@@ -2673,7 +2717,7 @@ function startPreview() {
   preview = {
     rebuild() {
       if (av) { s.remove(av.group); disposeTree(av.group); }
-      av = buildAvatar(draft);
+      av = buildAvatar(draft, previewPJ && draft.pj && draft.pj.on ? { pj: draft.pj } : {});
       s.add(av.group);
     },
     frame(dt) {
@@ -2695,6 +2739,7 @@ function startPreview() {
 }
 
 $('creatorCancel').onclick = () => $('creator').classList.add('hidden');
+$('pjPreview').onclick = () => { if (!draft.pj.on) draft.pj.on = true; previewPJ = !previewPJ; renderCreator(); };
 $('creatorSave').onclick = async () => {
   const btn = $('creatorSave');
   btn.disabled = true;
@@ -2988,7 +3033,7 @@ $('talkForm').addEventListener('submit', async e => {
   try {
     const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
       player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
-    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.room === 'music' ? 'in the Music Room upstairs, by the piano and the little stage' : state.room === 'prayer' ? 'in the quiet Prayer Room upstairs' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.room === 'koshari' ? 'across the road at Koshari Abu Saied, the koshari shop' : state.room === 'music' ? 'in the Music Room upstairs, by the piano and the little stage' : state.room === 'prayer' ? 'in the quiet Prayer Room upstairs' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
@@ -3169,15 +3214,18 @@ async function goToRoom(room, group = null) {
   const isHome = !!homeData;
   const isHall = room === 'hall';
   const isCommon = room === 'common';
-  const isMusic = room === 'music', isPrayer = room === 'prayer';
-  const up = room !== 'main' && !roof && !isHome && !isHall && !isCommon && !isMusic && !isPrayer; // a group's room upstairs
+  const isMusic = room === 'music', isPrayer = room === 'prayer', isKoshari = room === 'koshari';
+  const up = room !== 'main' && !roof && !isHome && !isHall && !isCommon && !isMusic && !isPrayer && !isKoshari; // a group's room upstairs
   state.room = room;
   state.roomName = up ? group.name : isHome ? homeData.room.name : null;
   state.home = isHome ? { ...homeData, ownerId: Number(room.slice(5)) } : null;
-  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? 'hall' : isCommon ? 'common' : isMusic ? 'music' : isPrayer ? 'prayer' : up ? 'up' : 'main');
+  // into your pyjamas upstairs (or back into your day clothes)
+  if (!!dressFor(state.me.avatar).pj !== wearingPJ) playerAvatar();
+  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? 'hall' : isCommon ? 'common' : isMusic ? 'music' : isPrayer ? 'prayer' : isKoshari ? 'koshari' : up ? 'up' : 'main');
   if (isHall) await loadHallDoors();
   if (isHome) {
     world.home.setRoom(homeData.room); world.home.setItems(homeData.items);
+    restoreBalconyDoor();
     world.home.setPet(homeData.pet); setSnackShelf(homeData.snacks);
     world.home.setGifts(homeData.gifts, homeData.canEdit);
     setMovie(homeData.movie, homeData.now);
@@ -3208,6 +3256,15 @@ async function goToRoom(room, group = null) {
     player.ry = a.ry;
     cam.yaw = 0; cam.pitch = 0.32; cam.dist = cam.targetDist = 3.4;
   }
+  if (room === 'main' && from === 'koshari') { // back across the road and in at the front door
+    player.pos.set(0, 0, mapZ(3.8)); player.ry = Math.PI;
+    cam.yaw = 0; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.6;
+  }
+  if (isKoshari) { // in from the street, the counter ahead
+    const a = world.koshari.arrival;
+    player.pos.set(a.x, 0, a.z); player.ry = a.ry;
+    cam.yaw = Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 2.8;
+  }
   if (isMusic || isPrayer) { // just in from the door: the stage, or the qibla wall, ahead
     const a = world[room].arrival;
     player.pos.set(a.x, world.floorY, a.z);
@@ -3222,8 +3279,8 @@ async function goToRoom(room, group = null) {
   send({ t: 'room', room, state: {
     x: player.pos.x, z: player.pos.z, ry: player.ry, seat: null, drink: player.drink, placed: null, moving: false,
   } });
-  $('floorAct').querySelector('.t').textContent = room !== 'main' ? 'Downstairs' : 'Upstairs';
-  $('floorAct').firstElementChild.textContent = room !== 'main' ? '⬇️' : '🪜';
+  $('floorAct').querySelector('.t').textContent = isKoshari ? 'Back to the café' : room !== 'main' ? 'Downstairs' : 'Upstairs';
+  $('floorAct').firstElementChild.textContent = isKoshari ? '☕' : room !== 'main' ? '⬇️' : '🪜';
   refreshActions();
   garden.open = null;
   if (roof) await loadGarden();
@@ -3235,12 +3292,13 @@ async function goToRoom(room, group = null) {
   if (isCommon) { world.common.setTV(state.content['common.tv']); setTimeout(() => commonTV(true), 900); }
   setQuietRoom(isPrayer);
   sysChat(isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.'
+    : isKoshari ? 'You cross the road — mind the tuk-tuk — to Koshari Abu Saied. The spoon rings on the steel bowls.'
     : isMusic ? 'You open the doors to the Music Room. Someone has left the piano lid up.'
     : isPrayer ? 'You slip off your shoes and step into the Prayer Room. It is very quiet in here.' : isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs. Your door is the first on the left.' : 'You step out into the hallway.')
     : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
-    : up ? `You climb the spiral stairs to ${group.name}'s room.` : 'You come back down into the café.');
+    : up ? `You climb the spiral stairs to ${group.name}'s room.` : from === 'koshari' ? 'You cross back over the road and in at the café door. The bell chimes.' : 'You come back down into the café.');
   if (isHome && homeData.focus) offerFocus(homeData.focus, homeData.now);
   updateOnline();
   await wait(120);
@@ -4136,6 +4194,47 @@ async function playPlaylist(list, room) {
   }, 10000);
 }
 
+// ── Koshari Abu Saied, across the road: a bowl of koshari, just how you like it
+const kosh = { size: 'm', dakka: true, shatta: false, crispy: true, busy: false };
+function openKoshari() {
+  const render = () => {
+    for (const b of $('kSizes').children) b.classList.toggle('on', b.dataset.k === kosh.size);
+    for (const b of $('kExtras').children) b.classList.toggle('on', !!kosh[b.dataset.k]);
+  };
+  $('kSizes').onclick = e => { const b = e.target.closest('[data-k]'); if (b) { kosh.size = b.dataset.k; render(); } };
+  $('kExtras').onclick = e => { const b = e.target.closest('[data-k]'); if (b) { kosh[b.dataset.k] = !kosh[b.dataset.k]; render(); } };
+  render();
+  openPanel('kosharyPanel');
+}
+$('kOrder').onclick = () => {
+  if (kosh.busy) return;
+  closePanels();
+  if (player.dessert) return toast('🥣 Finish what you have first — or put it down on a table.');
+  kosh.busy = true;
+  const k = world.koshari;
+  const extras = [kosh.dakka && 'extra dakka', kosh.shatta && 'shatta', kosh.crispy && 'extra crispy onions'].filter(Boolean);
+  bubble(k.cook.group, `${{ s: 'Small', m: 'Medium', l: 'Large' }[kosh.size]} koshari${extras.length ? ', ' + extras.join(', ') : ''}! Wa ahlan 🌶️`, 'npc');
+  sound.street('clang', k.counterAt);
+  setTimeout(() => sound.street('clang', k.counterAt), 1100);
+  setTimeout(() => {
+    kosh.busy = false;
+    const id = 'koshari-' + kosh.size;
+    player.dessert = { id, bites: 0 };
+    player.av.setDessert('koshari', 0);
+    sound.cue('drink');
+    sendMove(true);
+    refreshActions();
+    toast(`🥣 Your ${KOSHARI_BOWLS[id].replace('a ', '')} is here, steaming${extras.length ? ' — with ' + extras.join(' and ') : ''}. Sit at a marble table; press B for a bite.`);
+  }, 2400);
+};
+// the koshari man calls out now and then, and his spoon rings on the bowls
+setInterval(() => {
+  if (state.room !== 'koshari' || document.hidden || Math.random() < 0.5) return;
+  const k = world.koshari;
+  bubble(k.cook.group, ['Koshari! Koshari! 🥣', 'Ahlan! Come in, come in!', 'Hot and fresh — the onions are crispy today!', 'Dakka on the table, shatta if you dare 🌶️'][Math.floor(Math.random() * 4)], 'npc');
+  sound.street('clang', k.counterAt);
+}, 16000);
+
 // ── the basket on the balcony's rope: down to the street, and back up with
 // something in it from the kiosk (the way Cairo has always done its shopping)
 const BASKET = [
@@ -4143,6 +4242,20 @@ const BASKET = [
   'two glasses of sugarcane juice', 'a bag of lemons and a bunch of mint', 'the evening paper, folded in half',
   'a little bag of ful and taameya, still hot', 'a box of basbousa from the bakery on the corner',
 ];
+// the balcony doors: open or shut, remembered for each flat (in this browser)
+const balKey = () => 'cafe.baldoor.' + (state.home ? state.home.ownerId : '');
+function toggleBalconyDoor() {
+  const open = !world.home.balconyDoorOpen();
+  world.home.setBalconyDoor(open);
+  try { localStorage.setItem(balKey(), open ? '1' : '0'); } catch (e) { /* fine */ }
+  sound.cue('sit');
+  toast(open ? '🚪 You open the balcony doors — the sound of the street comes in.' : '🚪 You pull the balcony doors shut. The street goes quiet.');
+}
+function restoreBalconyDoor() {
+  let v = null;
+  try { v = localStorage.getItem(balKey()); } catch (e) { /* fine */ }
+  world.home.setBalconyDoor(v !== '0', true);
+}
 let basketBusy = false;
 async function lowerBasket() {
   if (basketBusy) return;
@@ -4618,7 +4731,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
 
 // ───────────────────────────────────────── start
 

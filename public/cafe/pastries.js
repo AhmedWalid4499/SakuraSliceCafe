@@ -24,6 +24,25 @@ function sprinkle(g, n, r, y, color, size = 0.0035) {
 }
 
 const BUILD = {
+  koshari(g) { // Koshari Abu Saied's: a steel bowl — rice and lentils, macaroni, tomato sauce, chickpeas, crispy onions
+    const bowl = mesh(new THREE.CylinderGeometry(0.07, 0.045, 0.045, SEG, 1, true), '#c8ccd2', { metalness: 0.75, roughness: 0.25, side: THREE.DoubleSide });
+    bowl.position.y = 0.024;
+    g.add(bowl);
+    const base = disc(0.045, 0.004, '#c8ccd2', { metalness: 0.75, roughness: 0.25 }); base.position.y = 0.002; g.add(base);
+    const heap = dome(0.064, '#a07a4a', { roughness: 0.95 }); // the rice and lentils
+    heap.scale.y = 0.45; heap.position.y = 0.04;
+    g.add(heap);
+    for (let i = 0; i < 14; i++) { // macaroni
+      const a = i * 2.4, r = 0.012 + (i % 5) * 0.008;
+      const m = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.014, 6), '#efd69a', { roughness: 0.7 });
+      m.position.set(Math.cos(a) * r, 0.064, Math.sin(a) * r); m.rotation.set(Math.PI / 2, a, 0.4);
+      g.add(m);
+    }
+    const sauce = dome(0.035, '#b8341f', { roughness: 0.4 }); sauce.scale.y = 0.35; sauce.position.y = 0.064;
+    g.add(sauce);
+    for (let i = 0; i < 6; i++) { const c = ball(0.006, '#e3c27a'); c.position.set(Math.cos(i) * 0.03, 0.066, Math.sin(i) * 0.03); g.add(c); } // chickpeas
+    for (let i = 0; i < 16; i++) { const o = box(0.012, 0.002, 0.006, '#7a4318', { roughness: 0.8 }); o.position.set((Math.random() - 0.5) * 0.05, 0.075, (Math.random() - 0.5) * 0.05); o.rotation.y = i; g.add(o); } // crispy onions
+  },
   slice(g) { // white chocolate & strawberry mochi cake, one pressed sakura
     const layers = [['#f0d8c6', 0.008], ['#fff4f0', 0.012], ['#f5a8b8', 0.006], ['#fff4f0', 0.012], ['#fbe0e6', 0.006]];
     let y = 0;

@@ -18,6 +18,7 @@ const box = (w, h, d, m) => shade(new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
 const cyl = (rt, rb, h, m, seg = 24) => shade(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m));
 const ball = (r, m, seg = 20) => shade(new THREE.Mesh(new THREE.SphereGeometry(r, seg, Math.max(8, seg * 0.6)), m));
 const at = (o, x, y, z) => { o.position.set(x, y, z); return o; };
+const rot = (o, axis, v) => { o.rotation[axis] = v; return o; }; // (add() hands back the parent, so turn the child first)
 function rand(seed) { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
 const lighten = (c, k) => new THREE.Color(c).lerp(new THREE.Color('#ffffff'), k);
 const darken = (c, k) => new THREE.Color(c).lerp(new THREE.Color('#1a1210'), k);
@@ -776,6 +777,8 @@ export function buildHome({ floor, makeSign }) {
   shell.add(balcony);
   const balHits = [], balSeats = [];
   let washing = [];
+  const doorLeaves = [];
+  let doorOpen = true, doorK = 1; // 1 = wide open
   {
     const bw = BAL.maxX - BAL.minX, bd = BAL.maxZ - BAL.minZ, cx = (BAL.minX + BAL.maxX) / 2, cz = (BAL.minZ + BAL.maxZ) / 2;
     const iron = std('#2b2522', { roughness: 0.45, metalness: 0.5 });
@@ -801,7 +804,7 @@ export function buildHome({ floor, makeSign }) {
       const ac = new THREE.Group();
       ac.add(at(rbox(0.85, 0.55, 0.32, 0.03, std('#f1efe9', { roughness: 0.5 })), 0, 0, 0));
       for (let i = 0; i < 7; i++) ac.add(at(box(0.6, 0.02, 0.02, std('#9a9890')), -0.05, -0.18 + i * 0.06, -0.165));
-      ac.add(at(new THREE.Mesh(new THREE.CircleGeometry(0.17, 20), std('#7a7870')), 0.24, 0, -0.165)).rotation.y = Math.PI;
+      ac.add(rot(at(new THREE.Mesh(new THREE.CircleGeometry(0.17, 20), std('#7a7870')), 0.24, 0, -0.165), 'y', Math.PI));
       for (const s of [-1, 1]) ac.add(at(box(0.04, 0.04, 0.4, iron), s * 0.35, -0.3, 0.05));
       ac.position.set(8.1, 0.6, R.minZ - 0.36);
       balcony.add(ac);
@@ -874,11 +877,17 @@ export function buildHome({ floor, makeSign }) {
       const w = BD.hw;
       for (const [fw, fh, fx, fy] of [[w, 0.07, w / 2, 0.035], [w, 0.07, w / 2, dh - 0.04], [0.06, dh, 0.03, dh / 2], [0.06, dh, w - 0.03, dh / 2], [w, 0.05, w / 2, 0.9]]) leaf.add(at(box(fw, fh, 0.05, doorWood), fx, fy, 0));
       leaf.add(at(new THREE.Mesh(new THREE.PlaneGeometry(w - 0.12, dh - 0.2), glassD), w / 2, dh / 2, 0));
-      // hinged at each side of the opening, both swung out towards the street
+      // hinged at each side of the opening; open, both swing out towards the street
       leaf.position.set(BD.x + s * BD.hw, 0, R.minZ - 0.2);
-      leaf.rotation.y = Math.PI / 2 - s * 0.3;
+      const open = Math.PI / 2 - s * 0.3, shut = s < 0 ? 0 : Math.PI;
+      leaf.rotation.y = open;
       balcony.add(leaf);
+      doorLeaves.push({ leaf, open, shut });
     }
+    // click a door to close them both (or open them again) — the doors themselves,
+    // so clicking through the open doorway still just walks you out
+    for (const { leaf } of doorLeaves) leaf.traverse(o => { if (o.isMesh) { o.userData = { kind: 'home-baldoor', label: 'The balcony doors — click to close them' }; balHits.push(o); } });
+    glassD.side = THREE.DoubleSide;
     for (const [w, h, x, y] of [[0.08, dh, BD.x - BD.hw, dh / 2], [0.08, dh, BD.x + BD.hw, dh / 2], [BD.hw * 2 + 0.16, 0.08, BD.x, dh]]) balcony.add(at(box(w, h, 0.22, wood), x, y, bz));
     // pots: basil, jasmine, a bougainvillea climbing the corner
     const potM = std('#b8683f', { roughness: 0.9 });
@@ -933,7 +942,7 @@ export function buildHome({ floor, makeSign }) {
     {
       const rack = new THREE.Group();
       for (const s of [-1, 1]) rack.add(at(box(0.03, 0.03, 0.55, iron), s * 0.8, 0, -0.27));
-      for (let i = 0; i < 4; i++) rack.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 1.6, 4), std('#dddddd')), 0, 0, -0.1 - i * 0.13)).rotation.z = Math.PI / 2;
+      for (let i = 0; i < 4; i++) rack.add(rot(at(new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 1.6, 4), std('#dddddd')), 0, 0, -0.1 - i * 0.13), 'z', Math.PI / 2));
       const clothes = ['#3f6a8a', '#f4ece0', '#d4678a', '#e8b44a', '#93ab8c', '#ffffff', '#c7605a'];
       for (let i = 0; i < 7; i++) {
         const w = 0.22 + (i % 3) * 0.08, h = 0.3 + (i % 2) * 0.18;
@@ -1106,8 +1115,9 @@ export function buildHome({ floor, makeSign }) {
     ...Object.values(DOORWAYS).map(d => ({ minX: d.x - 0.45, maxX: d.x + 0.45, minZ: d.z - d.hw + 0.2, maxZ: d.z + d.hw - 0.2 })),
     // the balcony, and the way out through its doors
     { minX: BAL.minX + 0.3, maxX: BAL.maxX - 0.3, minZ: BAL.minZ + 0.3, maxZ: BAL.maxZ - 0.12 },
-    { minX: BD.x - BD.hw + 0.2, maxX: BD.x + BD.hw - 0.2, minZ: BAL.maxZ - 0.3, maxZ: M.minZ + 0.4 },
   ];
+  // the way through the balcony doors — only while they're open
+  const DOORWAY_B = { minX: BD.x - BD.hw + 0.2, maxX: BD.x + BD.hw - 0.2, minZ: BAL.maxZ - 0.3, maxZ: M.minZ + 0.4 };
   // the spaces furniture can't block
   const CLEAR = [
     { minX: -0.75, maxX: 0.75, minZ: R.maxZ - 1.0, maxZ: R.maxZ + 1 },
@@ -1152,7 +1162,7 @@ export function buildHome({ floor, makeSign }) {
   function sync() {
     const fy = group.position.y;
     floor.colliders.length = 0;
-    floor.colliders.push({ type: 'room', fixed: true, walk: WALK }, ...base.colliders);
+    floor.colliders.push({ type: 'room', fixed: true, walk: doorOpen ? [...WALK, DOORWAY_B] : WALK }, ...base.colliders);
     floor.seats.length = 0;
     floor.seats.push(...base.seats);
     floor.surfaces.length = 0;
@@ -1435,6 +1445,12 @@ export function buildHome({ floor, makeSign }) {
   function updatePet(dt, t, { typist = null } = {}) {
     // the washing stirs in the breeze off the street
     for (const w of washing) w.g.rotation.x = Math.sin(t * 1.6 + w.ph) * 0.12 + 0.06;
+    // the balcony doors swinging to (or open)
+    const want = doorOpen ? 1 : 0;
+    if (doorK !== want) {
+      doorK = want > doorK ? Math.min(1, doorK + dt * 1.6) : Math.max(0, doorK - dt * 1.6);
+      for (const d of doorLeaves) d.leaf.rotation.y = d.shut + (d.open - d.shut) * (1 - (1 - doorK) * (1 - doorK));
+    }
     if (!cat) return;
     const c = cat, m = c.model;
     c.t -= dt;
@@ -1490,6 +1506,13 @@ export function buildHome({ floor, makeSign }) {
     // squashed against the wall looking down at the top of your head
     arrival: { x: 0, z: R.maxZ - 2.2, ry: Math.PI },
     bounds: R, ceilingLight, lampShade, sideLights, route, cameraBox, walls, onBalcony,
+    balconyDoorOpen: () => doorOpen,
+    setBalconyDoor(open, instant = false) {
+      doorOpen = !!open;
+      if (instant) { doorK = doorOpen ? 1 : 0; for (const d of doorLeaves) d.leaf.rotation.y = doorOpen ? d.open : d.shut; }
+      for (const m of balHits) if (m.userData.kind === 'home-baldoor') m.userData.label = doorOpen ? 'The balcony doors — click to close them' : 'The balcony doors — click to open them';
+      sync();
+    },
     setSnacks, setMovie, setGifts, setPet, updatePet, petCat, spotNear,
   };
 }
