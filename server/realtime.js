@@ -151,7 +151,7 @@ function attach(server, opts = {}) {
       if (m.t === 'room') {
         const room = typeof m.room === 'string' ? m.room : '';
         let ok = false;
-        try { ok = /^(main|garden|hall|common|group:\d+|home:\d+)$/.test(room) && await canEnter(entry.user.id, room); } catch (e) { ok = false; }
+        try { ok = /^(main|garden|hall|common|music|prayer|group:\d+|home:\d+)$/.test(room) && await canEnter(entry.user.id, room); } catch (e) { ok = false; }
         if (!ok) return send(ws, { t: 'room:denied', room });
         const from = entry.room;
         if (m.state) entry.state = cleanState(m.state);
@@ -160,6 +160,21 @@ function attach(server, opts = {}) {
         send(ws, { t: 'hello', you: entry.user.id, room, people: roster(room).filter(x => x.id !== entry.user.id) });
         send(ws, { t: 'games', games: gameList(room) });
         broadcast({ t: 'join', person: { ...entry.profile, state: entry.state } }, ws, room);
+        return;
+      }
+
+      // A note on an instrument in the Music Room: everyone else in there hears
+      // it. Up to a dozen or so a second (fast enough for a tune, not for spam).
+      if (m.t === 'play') {
+        if (entry.room !== 'music') return;
+        const now = Date.now();
+        entry.plays = (entry.plays || []).filter(t => now - t < 1000);
+        if (entry.plays.length >= 14) return;
+        entry.plays.push(now);
+        const RANGE = { piano: [36, 96], guitar: [0, 7], cajon: [0, 1] };
+        const r = RANGE[m.i], n = Math.round(Number(m.n));
+        if (!r || !(n >= r[0] && n <= r[1])) return;
+        broadcast({ t: 'play', id: entry.user.id, i: m.i, n, up: !!m.up }, ws, entry.room);
         return;
       }
 

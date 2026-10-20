@@ -23,6 +23,7 @@ import { createRadio, audioDuration } from './radio.js';
 import { createRegulars } from './regulars.js';
 import { createGames } from './games.js';
 import { createTour } from './tour.js';
+import { cairoPrayerDay } from './prayertimes.mjs';
 
 const $ = id => document.getElementById(id);
 // Came from an invite link? (/cafe?invite=<username>&table=<table>)
@@ -781,7 +782,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
   const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
-  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'common' ? world.common.bounds : ROOM;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'common' ? world.common.bounds : world.floor === 'music' ? world.music.bounds : world.floor === 'prayer' ? world.prayer.bounds : ROOM;
   camPos.x = Math.min(box.maxX - 0.25, Math.max(box.minX + 0.25, camPos.x));
   camPos.z = Math.min(box.maxZ - 0.25, Math.max(box.minZ + 0.25, camPos.z));
   camPos.y = Math.min(world.floorY + (inKitchen ? 3.2 : world.floorH) - 0.3, Math.max(world.floorY + 0.4, camPos.y));
@@ -869,7 +870,7 @@ function updatePeople(dt) {
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'common' ? ' · in the Common room' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'common' ? ' · in the Common room' : state.room === 'music' ? ' · in the Music Room' : state.room === 'prayer' ? ' · in the Prayer Room' : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
   $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
@@ -1004,10 +1005,17 @@ function handle(m) {
       addChat(m.msg);
       if (m.msg.userId !== state.me?.id) {
         const p = state.people.get(m.msg.userId);
-        if (p) bubble(p.av.group, m.msg.text);
+        if (p) bubble(p.av.group, onStage(p.state.seat) ? '🎤 ' + m.msg.text : m.msg.text);
         sound.chatGet();
       }
       break;
+    case 'play': {
+      if (state.room !== 'music') break;
+      soundOf(m.i, m.n, m.up);
+      const p = state.people.get(m.id);
+      if (p && performance.now() - (p.noteAt || 0) > 1500) { p.noteAt = performance.now(); bubble(p.av.group, m.i === 'cajon' ? '🥁' : '🎵', 'emote'); }
+      break;
+    }
     case 'chat:delete':
       document.querySelector(`#chatLog [data-id="${m.id}"]`)?.remove();
       break;
@@ -1123,6 +1131,7 @@ function placementFromHit(hit) {
 }
 
 function startPlacing() {
+  if (state.room === 'prayer') return toast('🤍 The Prayer Room is kept quiet — no notes on these walls.');
   closePanels();
   state.placing = true;
   $('placing').classList.remove('hidden');
@@ -1501,7 +1510,7 @@ $('chatForm').addEventListener('submit', async e => {
   try {
     const { msg } = await api('/chat', { method: 'POST', body: { text, room: state.room } });
     addChat(msg);
-    bubble(player.av.group, text);
+    bubble(player.av.group, onStage(player.seat && player.seat.id) ? '🎤 ' + text : text);
     sound.chatSend();
   } catch (err) { toast(err.message); input.value = text; }
 });
@@ -1684,6 +1693,15 @@ function click(x, y) {
   if (d.kind === 'hall-common') return walkToThing(h, () => goToRoom('common'));
   if (d.kind === 'common-out') return walkToThing(h, () => goToRoom('hall'));
   if (d.kind === 'common-tv') return openCommonTV();
+  if (d.kind === 'hall-music') return walkToThing(h, () => goToRoom('music'));
+  if (d.kind === 'hall-prayer') return walkToThing(h, () => goToRoom('prayer'));
+  if (d.kind === 'music-out' || d.kind === 'prayer-out') return walkToThing(h, () => goToRoom('hall'));
+  if (d.kind === 'music-piano') return openPiano();
+  if (d.kind === 'music-guitar') return openGuitar();
+  if (d.kind === 'music-cajon') return playInstrument('cajon', (cajonHit = 1 - cajonHit));
+  if (d.kind === 'music-records') return toggleRecords();
+  if (d.kind === 'prayer-times') return showPrayerTimes();
+  if (d.kind === 'prayer-read') return toast('🤍 The Quran on its rehal, and a few books for reflection. Sit a while — there is no hurry here.');
   if (d.kind === 'hall-door') {
     if (!d.ownerId) return walkToThing(h, () => { bubble(player.av.group, '🚪', 'emote'); toast("🚪 You knock softly — nobody answers. It's someone else's room."); });
     return walkToThing(h, () => goToRoom('home:' + d.ownerId));
@@ -1765,7 +1783,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
+const PANELS = ['pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2969,7 +2987,7 @@ $('talkForm').addEventListener('submit', async e => {
   try {
     const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
       player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
-    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.room === 'music' ? 'in the Music Room upstairs, by the piano and the little stage' : state.room === 'prayer' ? 'in the quiet Prayer Room upstairs' : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
@@ -3150,11 +3168,12 @@ async function goToRoom(room, group = null) {
   const isHome = !!homeData;
   const isHall = room === 'hall';
   const isCommon = room === 'common';
-  const up = room !== 'main' && !roof && !isHome && !isHall && !isCommon; // a group's room upstairs
+  const isMusic = room === 'music', isPrayer = room === 'prayer';
+  const up = room !== 'main' && !roof && !isHome && !isHall && !isCommon && !isMusic && !isPrayer; // a group's room upstairs
   state.room = room;
   state.roomName = up ? group.name : isHome ? homeData.room.name : null;
   state.home = isHome ? { ...homeData, ownerId: Number(room.slice(5)) } : null;
-  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? 'hall' : isCommon ? 'common' : up ? 'up' : 'main');
+  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? 'hall' : isCommon ? 'common' : isMusic ? 'music' : isPrayer ? 'prayer' : up ? 'up' : 'main');
   if (isHall) await loadHallDoors();
   if (isHome) {
     world.home.setRoom(homeData.room); world.home.setItems(homeData.items);
@@ -3177,7 +3196,7 @@ async function goToRoom(room, group = null) {
   }
   if (isHall) { // at the top of the stairs, or just out of the room you came from
     const h = world.hall;
-    const a = (from && from.startsWith('home:') && h.doorFront(from.slice(5))) || (from === 'garden' ? h.fromGarden : from === 'common' ? h.fromCommon : from && from.startsWith('group:') ? h.fromGroups : h.arrival);
+    const a = (from && from.startsWith('home:') && h.doorFront(from.slice(5))) || (from === 'garden' ? h.fromGarden : from === 'common' ? h.fromCommon : from === 'music' ? h.fromMusic : from === 'prayer' ? h.fromPrayer : from && from.startsWith('group:') ? h.fromGroups : h.arrival);
     player.pos.set(a.x, world.floorY, a.z);
     player.ry = a.ry;
     cam.yaw = a.ry + Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.0;
@@ -3187,6 +3206,12 @@ async function goToRoom(room, group = null) {
     player.pos.set(a.x, world.floorY, a.z);
     player.ry = a.ry;
     cam.yaw = 0; cam.pitch = 0.32; cam.dist = cam.targetDist = 3.4;
+  }
+  if (isMusic || isPrayer) { // just in from the door: the stage, or the qibla wall, ahead
+    const a = world[room].arrival;
+    player.pos.set(a.x, world.floorY, a.z);
+    player.ry = a.ry;
+    cam.yaw = 0; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.2;
   }
   camTarget.copy(player.pos).add(new THREE.Vector3(0, 1.45, 0));
 
@@ -3207,7 +3232,10 @@ async function goToRoom(room, group = null) {
     messages.forEach(addChat);
   } catch (e) { /* fine */ }
   if (isCommon) { world.common.setTV(state.content['common.tv']); setTimeout(() => commonTV(true), 900); }
-  sysChat(isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.' : isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs. Your door is the first on the left.' : 'You step out into the hallway.')
+  setQuietRoom(isPrayer);
+  sysChat(isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.'
+    : isMusic ? 'You open the doors to the Music Room. Someone has left the piano lid up.'
+    : isPrayer ? 'You slip off your shoes and step into the Prayer Room. It is very quiet in here.' : isHall ? (from === 'main' ? 'You climb the stairs to the hallway upstairs. Your door is the first on the left.' : 'You step out into the hallway.')
     : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
@@ -4107,6 +4135,150 @@ async function playPlaylist(list, room) {
   }, 10000);
 }
 
+// ── the Music Room: a piano, a guitar and a cajón anyone can play. Every
+// note goes to everyone else in the room too (realtime 'play') and sounds
+// from where the instrument stands. Sit on the stool on the stage and the
+// spotlight comes up; what you say from there shows with a 🎤.
+const STAGE_SEAT = 'music-stage';
+const onStage = seatId => seatId === STAGE_SEAT;
+const CHORDS = [
+  ['C', [48, 52, 55, 60, 64]], ['G', [43, 47, 50, 55, 59, 67]], ['Am', [45, 52, 57, 60, 64]], ['F', [41, 48, 53, 57, 60, 65]],
+  ['Em', [40, 47, 52, 55, 59, 64]], ['D', [50, 57, 62, 66]], ['Dm', [50, 57, 62, 65]], ['E', [40, 47, 52, 56, 59, 64]],
+];
+let cajonHit = 1;
+function soundOf(i, n, up) {
+  const at = world.music.soundAt[i];
+  if (i === 'piano') sound.piano(n, at);
+  else if (i === 'guitar' && CHORDS[n]) sound.strum(CHORDS[n][1], at, up);
+  else if (i === 'cajon') sound.cajon(n, at);
+}
+let noteBubbleAt = 0;
+function playInstrument(i, n, up = false) {
+  if (state.room !== 'music') return;
+  soundOf(i, n, up);
+  send({ t: 'play', i, n, up });
+  if (performance.now() - noteBubbleAt > 1500) { noteBubbleAt = performance.now(); bubble(player.av.group, i === 'cajon' ? '🥁' : '🎵', 'emote'); }
+}
+
+// the piano: an octave and a half on screen, and on the computer keyboard
+const piano = { base: 60 };
+const WHITE = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17];
+const BLACK = [[1, 0], [3, 1], [6, 3], [8, 4], [10, 5], [13, 7], [15, 8]]; // [semitone, the white key it follows]
+const PIANO_KEYS = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14, p: 15, ';': 16, "'": 17 };
+const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+function buildPiano() {
+  const el = $('pianoKeys');
+  el.replaceChildren();
+  const w = 100 / WHITE.length;
+  const keyFor = {};
+  const key = (semi, cls, left, width) => {
+    const k = document.createElement('button');
+    k.type = 'button'; k.className = cls;
+    k.style.left = left + '%'; k.style.width = width + '%';
+    const letter = Object.keys(PIANO_KEYS).find(x => PIANO_KEYS[x] === semi);
+    if (cls === 'w') k.innerHTML = `<span>${letter ? letter.toUpperCase() : ''}</span>`;
+    k.setAttribute('aria-label', NOTE_NAMES[(piano.base + semi) % 12]);
+    k.addEventListener('pointerdown', ev => { ev.preventDefault(); pressPiano(semi); });
+    el.appendChild(k); keyFor[semi] = k;
+  };
+  WHITE.forEach((semi, i) => key(semi, 'w', i * w, w));
+  BLACK.forEach(([semi, after]) => key(semi, 'b', (after + 1) * w - w * 0.3, w * 0.6));
+  piano.keys = keyFor;
+  $('pianoOct').textContent = `starting at ${NOTE_NAMES[piano.base % 12]}${Math.floor(piano.base / 12) - 1}`;
+}
+function pressPiano(semi) {
+  playInstrument('piano', piano.base + semi);
+  const k = piano.keys && piano.keys[semi];
+  if (k) { k.classList.add('on'); setTimeout(() => k.classList.remove('on'), 160); }
+}
+function openPiano() {
+  const bench = world.seats.find(x => x.id === 'music-piano');
+  if (bench && !(player.seat && player.seat.id === bench.id) && !seatTaken(bench)) goSit(bench);
+  buildPiano();
+  openPanel('pianoPanel');
+}
+$('pianoDown').onclick = () => { piano.base = Math.max(36, piano.base - 12); buildPiano(); };
+$('pianoUp').onclick = () => { piano.base = Math.min(72, piano.base + 12); buildPiano(); };
+
+// the guitar: eight chords to strum
+function openGuitar() {
+  const el = $('guitarChords');
+  el.replaceChildren();
+  CHORDS.forEach(([name], i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn ghost';
+    b.innerHTML = `${name}<small>${i + 1}</small>`;
+    b.addEventListener('pointerdown', ev => { ev.preventDefault(); strumChord(i, ev.shiftKey); });
+    el.appendChild(b);
+  });
+  openPanel('guitarPanel');
+}
+function strumChord(i, up) {
+  playInstrument('guitar', i, up);
+  const b = $('guitarChords').children[i];
+  if (b) { b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 200); }
+}
+// while the piano or guitar is open, the keys play it (and don't walk you about)
+window.addEventListener('keydown', e => {
+  const pianoOpen = !$('pianoPanel').classList.contains('hidden'), guitarOpen = !$('guitarPanel').classList.contains('hidden');
+  if ((!pianoOpen && !guitarOpen) || ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'escape') return;
+  if (pianoOpen && k in PIANO_KEYS) { if (!e.repeat) pressPiano(PIANO_KEYS[k]); }
+  else if (guitarOpen && /^[1-8]$/.test(k)) { if (!e.repeat) strumChord(Number(k) - 1, e.shiftKey); }
+  else if (!/^[a-z;'0-9 ]$/.test(k) && !k.startsWith('arrow')) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+}, true);
+
+// the record player plays the café radio
+function toggleRecords() {
+  if (!radio.state.tracks.length) return toast('📻 No records yet — the café radio has no songs. The owner can add some from 🎧.');
+  const on = !radio.state.listening;
+  radio.listen(on);
+  const t = radio.state.current;
+  toast(on ? `🎶 You lower the needle — ${t ? `“${t.title || 'a song'}”` : 'the café radio'} is playing.` : '⏸ You lift the needle. The record slows to a stop.');
+}
+
+// ── the Prayer Room is quiet: the café's music and murmur fade, the radio
+// pauses (and comes back on when you leave), and there's no chat and no notes
+const quietRoom = { on: false, radioWas: false, timesAt: 0 };
+function setQuietRoom(on) {
+  if (on === quietRoom.on) return;
+  quietRoom.on = on;
+  sound.setQuiet(on);
+  if (on) {
+    stopPlacing();
+    quietRoom.radioWas = !!radio.state.listening;
+    if (quietRoom.radioWas) radio.listen(false);
+    refreshPrayerTimes();
+  } else if (quietRoom.radioWas) { quietRoom.radioWas = false; radio.listen(true); }
+  $('chatInput').disabled = on;
+  $('chatForm').querySelector('button').disabled = on;
+  $('chatInput').placeholder = on ? 'A quiet room — no chat in here 🤍' : 'Say something softly…';
+}
+function refreshPrayerTimes() {
+  quietRoom.timesAt = Date.now();
+  quietRoom.day = cairoPrayerDay();
+  world.prayer.setTimes(quietRoom.day);
+}
+function showPrayerTimes() {
+  const day = quietRoom.day || cairoPrayerDay();
+  const next = day.list.find(p => p.key === day.next);
+  toast(`🕌 Today in Cairo: ${day.list.map(p => `${p.en} ${p.clock}`).join(' · ')}. Next: ${next.en} at ${next.clock}.`);
+}
+// the spotlight, the turntable, and the prayer times board keeping up
+let wasOnStage = false;
+setInterval(() => {
+  if (state.room === 'music') {
+    world.music.setSpinning(!!radio.state.playing);
+    const me = onStage(player.seat && player.seat.id);
+    world.music.setStage(me || [...state.people.values()].some(p => onStage(p.state.seat)));
+    if (me && !wasOnStage) sysChat('🎤 You take the stage. The spotlight comes up — say something, or play.');
+    wasOnStage = me;
+  } else wasOnStage = false;
+  if (state.room === 'prayer' && Date.now() - quietRoom.timesAt > 60e3) refreshPrayerTimes();
+}, 500);
+
 // ── the Common room TV: the café's playlist (site_content 'common.tv'), on for everyone
 function commonTV(autoplay) {
   const tv = state.content['common.tv'] || {};
@@ -4403,7 +4575,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents };
 
 // ───────────────────────────────────────── start
 

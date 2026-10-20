@@ -152,12 +152,12 @@ export function buildHall({ floor, makeSign }) {
 
   // a bench by the stairs, and a couple of plants, a window at the far end
   const bench = new THREE.Group();
-  bench.position.set(-13.2, 0, H.minZ + 0.32);
+  bench.position.set(-12.15, 0, H.minZ + 0.32);
   bench.add(at(rbox(1.5, 0.08, 0.44, 0.03, wood), 0, 0.45, 0));
   bench.add(at(rbox(1.42, 0.06, 0.4, 0.03, std('#e7b7c4', { roughness: 1 })), 0, 0.52, 0));
   for (const s of [-1, 1]) bench.add(at(box(0.06, 0.45, 0.4, wood), s * 0.66, 0.225, 0));
   group.add(bench);
-  for (const [i, x] of [-13.6, -12.8].entries()) seats.push({ id: `hall-bench-${i}`, label: 'the bench by the stairs', x, z: H.minZ + 0.55, y: group.position.y, h: 0.55, ry: 0 });
+  for (const [i, x] of [-12.55, -11.75].entries()) seats.push({ id: `hall-bench-${i}`, label: 'the bench by the stairs', x, z: H.minZ + 0.55, y: group.position.y, h: 0.55, ry: 0 });
   bench.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', label: 'Sit on the bench', seat: seats[0] }; interactables.push(o); } });
   const plant = (x, z) => {
     const p = new THREE.Group();
@@ -168,29 +168,40 @@ export function buildHall({ floor, makeSign }) {
     }
     group.add(at(p, x, 0, z));
   };
-  plant(-13.2, H.maxZ - 0.35); plant(14.6, H.minZ + 0.35);
+  plant(-11.6, H.maxZ - 0.35); plant(14.6, H.minZ + 0.35);
   // a round window above the bench by the stairs
   const win = new THREE.Mesh(new THREE.CircleGeometry(0.45, 32), new THREE.MeshBasicMaterial({ color: '#cfe6f5' }));
-  win.position.set(-13.2, 2.0, H.minZ + 0.01);
+  win.position.set(-12.15, 2.0, H.minZ + 0.01);
   group.add(win);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.04, 8, 40), wood);
-  ring.position.set(-13.2, 2.0, H.minZ + 0.03);
+  ring.position.set(-12.15, 2.0, H.minZ + 0.03);
   group.add(ring);
-  // the Common room: a wide double door on the north wall at the east end, opposite the study rooms
-  {
+  // the rooms everyone shares, each behind its own door at an end of the hallway:
+  // the Common room (north wall, east end), the Music Room (south wall, west
+  // end) and the Prayer Room (a single door, north wall, west end)
+  const sharedDoor = ({ x, side, double = true, color, glass = '#fff1d6', lines, bg, kind, label }) => {
     const g = new THREE.Group();
-    g.position.set(13.2, 0, H.minZ);
-    for (const s of [-1, 1]) g.add(at(rbox(0.7, DOOR_H + 0.1, 0.05, 0.015, std('#93ab8c', { roughness: 0.55 })), s * 0.36, (DOOR_H + 0.1) / 2, 0.025));
-    for (const s of [-1, 1]) g.add(at(new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.9), std('#fff1d6', { roughness: 0.1, emissive: '#ffd9a6', emissiveIntensity: 0.45 })), s * 0.36, 1.45, 0.055));
-    for (const [w, h, dx, y] of [[0.1, DOOR_H + 0.15, -0.77, (DOOR_H + 0.15) / 2], [0.1, DOOR_H + 0.15, 0.77, (DOOR_H + 0.15) / 2], [1.64, 0.1, 0, DOOR_H + 0.15]]) g.add(at(box(w, h, 0.08, wood), dx, y, 0.04));
-    const sign = makeSign([{ text: 'Common Room', size: 110, weight: '700' }, { text: 'sofas · the big TV · tea', size: 66 }], 1.1, 0.36, { bg: '#fbe3ea' });
+    g.position.set(x, 0, side < 0 ? H.minZ : H.maxZ);
+    g.rotation.y = side < 0 ? 0 : Math.PI; // facing into the corridor
+    const hw = double ? 0.77 : 0.55;
+    if (double) for (const s of [-1, 1]) g.add(at(rbox(0.7, DOOR_H + 0.1, 0.05, 0.015, std(color, { roughness: 0.55 })), s * 0.36, (DOOR_H + 0.1) / 2, 0.025));
+    else g.add(at(rbox(1.0, DOOR_H + 0.1, 0.05, 0.015, std(color, { roughness: 0.55 })), 0, (DOOR_H + 0.1) / 2, 0.025));
+    for (const s of double ? [-1, 1] : [0]) g.add(at(new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.9), std(glass, { roughness: 0.1, emissive: '#ffd9a6', emissiveIntensity: 0.45 })), s * 0.36, 1.45, 0.055));
+    for (const [w, h, dx, y] of [[0.1, DOOR_H + 0.15, -hw, (DOOR_H + 0.15) / 2], [0.1, DOOR_H + 0.15, hw, (DOOR_H + 0.15) / 2], [hw * 2 + 0.1, 0.1, 0, DOOR_H + 0.15]]) g.add(at(box(w, h, 0.08, wood), dx, y, 0.04));
+    const sign = makeSign(lines, 1.1, 0.36, { bg });
     sign.position.set(0, DOOR_H + 0.45, 0.03);
     g.add(sign);
-    const hit = at(new THREE.Mesh(new THREE.PlaneGeometry(1.5, DOOR_H + 0.1), new THREE.MeshBasicMaterial({ visible: false })), 0, DOOR_H / 2, 0.1);
-    hit.userData = { kind: 'hall-common', label: 'The Common room — sofas, the big TV, everyone who lives upstairs' };
+    const hit = at(new THREE.Mesh(new THREE.PlaneGeometry(hw * 2 - 0.05, DOOR_H + 0.1), new THREE.MeshBasicMaterial({ visible: false })), 0, DOOR_H / 2, 0.1);
+    hit.userData = { kind, label };
     g.add(hit); interactables.push(hit);
     group.add(g);
-  }
+  };
+  sharedDoor({ x: 13.2, side: -1, color: '#93ab8c', bg: '#fbe3ea', kind: 'hall-common', label: 'The Common room — sofas, the big TV, everyone who lives upstairs',
+    lines: [{ text: 'Common Room', size: 110, weight: '700' }, { text: 'sofas · the big TV · tea', size: 66 }] });
+  sharedDoor({ x: -13.2, side: 1, color: '#5b3a4a', glass: '#ffe0c0', bg: '#f3e1d0', kind: 'hall-music', label: 'The Music Room — a piano, a guitar and an open-mic stage',
+    lines: [{ text: 'Music Room', size: 110, weight: '700' }, { text: 'piano · guitar · open mic 🎶', size: 66 }] });
+  sharedDoor({ x: -13.95, side: -1, double: false, color: '#8a6a50', glass: '#f6efe3', bg: '#f6efe3', kind: 'hall-prayer', label: 'The Prayer Room — a quiet room for prayer and reflection',
+    lines: [{ text: 'Prayer Room', size: 110, weight: '700' }, { text: 'غرفة الصلاة · a quiet room', size: 66 }] });
 
   // ── the doors
   const doorAt = ({ x, side }, color) => {
@@ -269,7 +280,7 @@ export function buildHall({ floor, makeSign }) {
   }
 
   floor.colliders.push({ type: 'room', fixed: true, walk: [{ minX: H.minX + 0.35, maxX: H.maxX - 0.35, minZ: H.minZ + 0.3, maxZ: H.maxZ - 0.3 }] });
-  floor.colliders.push({ type: 'box', fixed: true, minX: -14.0, maxX: -12.4, minZ: H.minZ, maxZ: H.minZ + 0.56 });
+  floor.colliders.push({ type: 'box', fixed: true, minX: -12.95, maxX: -11.35, minZ: H.minZ, maxZ: H.minZ + 0.56 });
   floor.surfaces.push(...surfaces);
   floor.interactables.push(...interactables);
   floor.seats.push(...seats);
@@ -280,5 +291,7 @@ export function buildHall({ floor, makeSign }) {
     fromGarden: { x: H.maxX - 1.4, z: 0, ry: -Math.PI / 2 }, // down from the roof
     fromGroups: { x: 13.2, z: H.maxZ - 0.9, ry: Math.PI },
     fromCommon: { x: 13.2, z: H.minZ + 0.9, ry: 0 },       // out of the Common room's door
+    fromMusic: { x: -13.2, z: H.maxZ - 0.9, ry: Math.PI },
+    fromPrayer: { x: -13.95, z: H.minZ + 0.9, ry: 0 },
   };
 }

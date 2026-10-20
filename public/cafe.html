@@ -91,6 +91,16 @@
   }
   .btn:hover { transform: translateY(-2px); background: #c25579; }
   .btn:disabled { opacity: 0.6; transform: none; cursor: default; }
+  .piano { position: relative; height: 150px; margin-top: 12px; user-select: none; touch-action: none; }
+  .piano button { position: absolute; top: 0; padding: 0; border: 0; cursor: pointer; }
+  .piano .w { bottom: 0; background: #fffdf7; border: 1px solid #cdbfae; border-radius: 0 0 7px 7px; box-shadow: inset 0 -6px 0 #eee4d6; }
+  .piano .b { height: 60%; background: #2a1e1a; border-radius: 0 0 5px 5px; z-index: 1; box-shadow: inset 0 -5px 0 #4a3a32; }
+  .piano .w span { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 11px; color: #a3917e; }
+  .piano .on { background: #f6c1d1 !important; }
+  .chords { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .chords .btn { font-size: 18px; font-weight: 700; padding: 14px 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .chords .btn small { font-size: 10px; font-weight: 400; opacity: .6; }
+  .chords .btn.on { background: #f6c1d1; }
   .btn.ghost { background: transparent; color: var(--sakura-dark); box-shadow: none; border: 1.5px solid var(--line); }
   .btn.matcha { background: var(--matcha-dark); box-shadow: 0 8px 24px rgba(77,122,77,0.3); }
   .btn.wide { width: 100%; }
@@ -978,6 +988,24 @@
   <p class="fine hidden" id="snackEmpty">The shelf is empty — just crumbs and good intentions.</p>
 </div>
 
+<div id="pianoPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Music Room</p>
+  <h3>The piano 🎹</h3>
+  <p class="fine">Click the keys, or play on your keyboard: <b>A S D F G H J K L</b> are the white keys, <b>W E T Y U O P</b> the black ones. Everyone in the room hears you.</p>
+  <div class="piano" id="pianoKeys"></div>
+  <div class="row" style="margin-top:10px;gap:8px;align-items:center"><button class="btn ghost" id="pianoDown" type="button">◀ Lower</button><span class="fine" id="pianoOct" style="flex:1;text-align:center"></span><button class="btn ghost" id="pianoUp" type="button">Higher ▶</button></div>
+</div>
+
+<div id="guitarPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Music Room</p>
+  <h3>The guitar 🎸</h3>
+  <p class="fine">Pick a chord to strum it, or press <b>1–8</b> (hold Shift to strum up). Everyone in the room hears you.</p>
+  <div class="chords" id="guitarChords"></div>
+  <p class="fine" style="margin-top:8px">Try C · G · Am · F, round and round — it's half the songs ever written.</p>
+</div>
+
 <div id="ctvPanel" class="panel card hidden">
   <button class="x" data-close aria-label="Close">✕</button>
   <p class="eyebrow">The Common room</p>
@@ -1073,6 +1101,7 @@
     <li>Click <b>Hana or the counter</b> (or ☕ <b>Order</b>) for a drink — or a dessert from the <b>🍡 Desserts</b> tab. A plate goes in your other hand: <b>🍡 Take a bite</b>, or set it down next to your cup.</li>
     <li>Sitting at a table? Tick <b>🛎️ Bring it to my table</b> on the menu and Hana or Yuki will carry it over. <b>☕ Take a sip</b> (<kbd>C</kbd>) and <b>🍡 Take a bite</b> (<kbd>B</kbd>) work on what's in your hands — or on your table.</li>
     <li><b>🎧 The café radio</b> plays the songs the café chose — everyone hears the same song at the same moment. ▶ to listen, ⏸ to stop just for you.</li>
+    <li>At the other end of the hallway: the <b>Music Room</b> (a piano and a guitar anyone can play, a cajón, a record player and an open-mic stage — sit on the stool to take it) and the <b>Prayer Room</b>, a quiet room with prayer mats facing the qibla and today's prayer times for Cairo. There's no chat in there.</li>
     <li>Upstairs, the hallway's <b>Common Room</b> door (by the stairs to the roof) leads to the sofas and the big TV — it plays the café's playlist, and everyone watches together.</li>
     <li><b>🔗</b> at the top: invite a friend (they'll walk straight to your table) or take a 📸 photo of the café to share.</li>
     <li>Sitting at a table? Press <b>🎲 Games</b> to set out <b>tawla</b> or <b>chess</b> — play whoever sits across from you, or Yuto. Anyone can walk over and watch.</li>
