@@ -53,6 +53,7 @@
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .between { justify-content: space-between; }
   .msg { font-size: 13px; min-height: 1.2em; margin-top: 8px; }
+  .door-pick { width: auto; border: 1.5px solid var(--line); background: var(--field); color: var(--text); border-radius: 12px; padding: 6px 10px; font: inherit; font-size: 13px; }
   .msg.ok { color: var(--matcha-dark); } .msg.err { color: #b8405e; }
   table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
   th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -139,6 +140,12 @@
     <div class="scroll"><table><thead><tr><th>Email</th><th>Since</th></tr></thead><tbody id="subs"></tbody></table></div>
   </section>
 
+  <section class="card span12">
+    <div class="row between"><h2>Flats upstairs — the hallway doors</h2><span class="muted">Doors face each other in pairs: Room 01 is across from Room 02, 03 from 04, and so on. Moving a flat swaps it with whoever lives behind that door; nobody's furniture changes.</span></div>
+    <div class="scroll"><table><thead><tr><th>Door</th><th>Resident</th><th>Their room</th><th>Move to</th></tr></thead><tbody id="homes"></tbody></table></div>
+    <div class="msg" id="homesMsg"></div>
+  </section>
+
   <section class="card span6">
     <h2>Guests</h2>
     <div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Admin</th></tr></thead><tbody id="users"></tbody></table></div>
@@ -173,7 +180,7 @@
     $('gate').classList.add('hidden');
     $('app').classList.remove('hidden');
     $('who').textContent = 'signed in as ' + me.displayName;
-    await Promise.all([loadStats(), loadContent(), loadNotes(), loadGuestbook(), loadSubs(), loadUsers(), loadModeration()]);
+    await Promise.all([loadStats(), loadContent(), loadNotes(), loadGuestbook(), loadSubs(), loadUsers(), loadHomes(), loadModeration()]);
   }
 
   $('loginForm').addEventListener('submit', async e => {
@@ -311,6 +318,47 @@
     $('subs').replaceChildren(...subscribers.slice().reverse().map(s => {
       const tr = el('tr');
       tr.append(el('td', s.email, 'text'), el('td', date(s.createdAt)));
+      return tr;
+    }));
+  }
+
+  // the flats upstairs, each behind its own door in the hallway; move one to another door
+  const roomNo = d => (d == null ? 'no door' : 'Room ' + String(d + 1).padStart(2, '0'));
+  async function loadHomes() {
+    const { homes, doors } = await api('/admin/homes');
+    const byDoor = new Map(homes.filter(h => h.door != null).map(h => [h.door, h]));
+    $('homes').replaceChildren(...homes.map(h => {
+      const tr = el('tr');
+      const who = el('td', h.ownerName);
+      who.append(el('div', '@' + h.username, 'muted'));
+      const room = el('td', h.name, 'text');
+      room.append(el('div', `${h.items} thing${h.items === 1 ? '' : 's'} in it · door ${h.open ? 'open' : 'shut'}`, 'muted'));
+      const move = el('td');
+      const pick = document.createElement('select');
+      pick.className = 'door-pick';
+      for (let d = 0; d < doors; d++) {
+        const o = document.createElement('option');
+        const there = byDoor.get(d);
+        o.value = d;
+        o.textContent = `${roomNo(d)} — ${there ? (there.ownerId === h.ownerId ? 'here now' : there.ownerName + "'s (swap)") : 'free'}`;
+        if (d === h.door) o.selected = true;
+        pick.append(o);
+      }
+      const b = el('button', 'Move', 'btn ghost small');
+      b.onclick = async () => {
+        const door = Number(pick.value);
+        if (door === h.door) return;
+        b.disabled = true;
+        try {
+          const r = await api('/admin/home/' + h.ownerId + '/door', { method: 'PUT', body: { door } });
+          const other = r.swappedWith != null && homes.find(x => x.ownerId === r.swappedWith);
+          $('homesMsg').textContent = `🚪 ${h.ownerName}'s flat is now ${roomNo(door)}${other ? ` — ${other.ownerName}'s moved to ${roomNo(h.door)}` : ''}.`;
+          loadHomes();
+        } catch (e) { $('homesMsg').textContent = e.message; b.disabled = false; }
+      };
+      const row = el('div', '', 'row'); row.append(pick, b);
+      move.append(row);
+      tr.append(el('td', roomNo(h.door)), who, room, move);
       return tr;
     }));
   }

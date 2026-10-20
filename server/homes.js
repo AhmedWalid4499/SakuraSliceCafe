@@ -386,6 +386,16 @@ router.post('/tv/pos', auth.requireUser, smallLimit, wrap(async (req, res) => {
 
 // The Common room's TV: a playlist (or a video) the café's owner chooses,
 // on for everyone who comes in (site_content 'common.tv').
+// For the admin page: every flat, its door, whose it is, how much is in it.
+router.get('/admin/homes', auth.requireAdmin, wrap(async (_req, res) => {
+  const { rows } = await query(
+    `SELECT r.owner_id AS "ownerId", r.name, r.door, r.open, u.display_name AS "ownerName", u.username,
+            (SELECT count(*)::int FROM home_items i WHERE i.owner_id = r.owner_id) AS items
+     FROM home_rooms r JOIN users u ON u.id = r.owner_id
+     ORDER BY r.door NULLS LAST, r.created_at`);
+  res.json({ homes: rows, doors: DOORS });
+}));
+
 // The owner moves a flat to another door in the hallway (0–13); whoever lives
 // there swaps to the flat's old door.
 router.put('/admin/home/:ownerId(\\d+)/door', auth.requireAdmin, wrap(async (req, res) => {
