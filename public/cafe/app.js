@@ -643,6 +643,7 @@ function refreshActions() {
   $('decorAct').classList.toggle('hidden', !inMyRoom());
   $('roomAct').classList.toggle('hidden', !inMyRoom());
   $('studyAct').classList.toggle('hidden', !state.home);
+  $('doorsAct').classList.toggle('hidden', !(state.me && state.me.isAdmin && (state.room === 'hall' || state.room === 'hall2')));
   $('gameAct').classList.toggle('hidden', !(player.seat && player.seat.table && !/^bar-/.test(player.seat.table)));
 }
 
@@ -1802,7 +1803,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
+const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -3390,6 +3391,55 @@ async function resumePlace(p) {
 // Doors 0–13 are along the first hallway, 14–27 along the upper one.
 const hallFor = door => (door != null && door >= 14 ? 'hall2' : 'hall');
 const roomNo = door => `Room ${String(door + 1).padStart(2, '0')}`;
+// the owner's list of flats and their doors (the same as on /admin), right here in the hallway
+async function openDoors() {
+  openPanel('doorsPanel');
+  $('doorsMsg').textContent = 'Loading…';
+  let data;
+  try { data = await api('/admin/homes'); } catch (e) { $('doorsMsg').textContent = '⚠️ ' + e.message; return; }
+  const { homes, doors } = data;
+  $('doorsMsg').textContent = homes.length ? '' : 'Nobody has a flat yet.';
+  const byDoor = new Map(homes.filter(h => h.door != null).map(h => [h.door, h]));
+  const label = d => (d == null ? 'no door' : roomNo(d) + (d >= 14 ? ' (upper hallway)' : ''));
+  $('doorsList').replaceChildren(...homes.map(h => {
+    const card = document.createElement('div');
+    card.className = 'group-card';
+    const t = document.createElement('div');
+    const b = document.createElement('b'); b.textContent = `${label(h.door)} — ${h.ownerName}`;
+    const sm = document.createElement('small'); sm.className = 'fine';
+    sm.textContent = `@${h.username} · “${h.name}” · ${h.items} thing${h.items === 1 ? '' : 's'} in it · door ${h.open ? 'open' : 'shut'}`;
+    t.append(b, document.createElement('br'), sm);
+    const row = document.createElement('div'); row.className = 'row'; row.style.gap = '6px';
+    const pick = document.createElement('select');
+    for (let d = 0; d < doors; d++) {
+      const o = document.createElement('option');
+      const there = byDoor.get(d);
+      o.value = d;
+      o.textContent = `${label(d)} — ${there ? (there.ownerId === h.ownerId ? 'here now' : there.ownerName + "'s (swap)") : 'free'}`;
+      if (d === h.door) o.selected = true;
+      pick.append(o);
+    }
+    const go = document.createElement('button');
+    go.type = 'button'; go.className = 'btn ghost'; go.textContent = 'Move';
+    go.onclick = async () => {
+      const door = Number(pick.value);
+      if (door === h.door) return;
+      go.disabled = true;
+      try {
+        const r = await api('/admin/home/' + h.ownerId + '/door', { method: 'PUT', body: { door } });
+        const other = r.swappedWith != null && homes.find(x => x.ownerId === r.swappedWith);
+        await loadHallDoors();
+        await openDoors();
+        $('doorsMsg').textContent = `🚪 ${h.ownerName}'s flat is now ${label(door)}${other ? ` — ${other.ownerName}'s moved to ${label(h.door)}` : ''}.`;
+      } catch (e) { $('doorsMsg').textContent = '⚠️ ' + e.message; go.disabled = false; }
+    };
+    row.append(pick, go);
+    card.append(t, row);
+    return card;
+  }));
+}
+$('doorsAct').onclick = () => openDoors();
+
 // which door is yours, said the way you'd say it: the 2nd door on your right
 const ORD = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
 function yourDoor() {
