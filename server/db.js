@@ -57,13 +57,13 @@ async function migrate() {
 }
 
 // Every flat has its own door in the hallway upstairs, the same one for
-// everyone who walks along it (doors 0–13: public/cafe/hall.js SLOTS, two
+// everyone who walks along it (doors 0–27: public/cafe/hall.js SLOTS, two
 // to each spot, facing each other). Flats used to be shown with your own
 // always behind the first door, so everyone's looked like the same door.
 // Once, for the flats that don't have a door yet: the owner's (ADMIN_EMAIL)
 // is Room 01, Zanaty's the one across the hallway from it (Room 02), and
 // the rest take the next free door in the order they were made.
-const DOORS = 14;
+const DOORS = 28; // 14 along each hallway: the first (0–13) and the upper one (14–27)
 async function giveEveryFlatADoor() {
   const claim = (door, where, params) => pool.query(
     `UPDATE home_rooms SET door = ${door} WHERE door IS NULL AND NOT EXISTS (SELECT 1 FROM home_rooms WHERE door = ${door})

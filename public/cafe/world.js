@@ -350,8 +350,8 @@ export function buildWorld(renderer) {
     interactables: [], // meshes that respond to hover/click (userData.kind)
     group: new THREE.Group(),
   });
-  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor(), music: mkFloor(), prayer: mkFloor(), koshari: mkFloor() };
-  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group);
+  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor(), music: mkFloor(), prayer: mkFloor(), koshari: mkFloor(), hall2: mkFloor() };
+  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group);
   // the Common room (common.js), off the hallway, for everyone who lives upstairs
   floors.common.group.position.y = FLOOR2_Y;
   floors.common.group.visible = false;
@@ -363,6 +363,10 @@ export function buildWorld(renderer) {
   floors.hall.group.position.y = FLOOR2_Y;
   floors.hall.group.visible = false;
   let hall = null;
+  // and the upper hallway (Rooms 15–28), up the stairs at the east end of the first
+  floors.hall2.group.position.y = FLOOR2_Y;
+  floors.hall2.group.visible = false;
+  let hall2 = null;
   // someone's own room upstairs (home.js), at the same height as the group rooms
   floors.home.group.position.y = FLOOR2_Y;
   floors.home.group.visible = false;
@@ -2899,7 +2903,7 @@ export function buildWorld(renderer) {
     // the roof garden is open air: its lamps only really matter after dark
     gardenLamps.forEach(l => { l.light.intensity = 3.5 * lampK2 * (0.15 + night * 0.85); });
     if (home) { home.ceilingLight.intensity = 2.2 + night * 2.6; home.sideLights.forEach(l => { l.intensity = 1.6 + night * 1.8; }); }
-    if (hall) hall.lights.forEach(l => { l.intensity = 2.4 + night * 2.2; });
+    for (const h of [hall, hall2]) if (h) h.lights.forEach(l => { l.intensity = 2.4 + night * 2.2; });
     outside.setSky(hour, day, dusk, night);
     return { day, night, open };
   }
@@ -3478,6 +3482,8 @@ export function buildWorld(renderer) {
   home = buildHome({ floor: floors.home, makeSign });
   noFog(floors.home.group);
   hall = buildHall({ floor: floors.hall, makeSign });
+  hall2 = buildHall({ floor: floors.hall2, makeSign, wing: 2 });
+  noFog(floors.hall2.group);
   noFog(floors.hall.group);
   common = buildCommon({ floor: floors.common, makeSign });
   noFog(floors.common.group);
@@ -3487,7 +3493,7 @@ export function buildWorld(renderer) {
   noFog(floors.prayer.group);
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, common, music, prayer, koshari: outside.koshari,
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, koshari: outside.koshari,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setStreetSound: f => { outside.life.onSound = f; },
     adhan: () => outside.adhan(),
@@ -3502,8 +3508,8 @@ export function buildWorld(renderer) {
     const f = floors[name];
     Object.assign(api, {
       floor: name,
-      floorY: ['up', 'home', 'hall', 'common', 'music', 'prayer'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
-      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'koshari' ? KOSHARI.h : name === 'garden' ? 7 : ROOM.h,
+      floorY: ['up', 'home', 'hall', 'hall2', 'common', 'music', 'prayer'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
+      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'koshari' ? KOSHARI.h : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
   }

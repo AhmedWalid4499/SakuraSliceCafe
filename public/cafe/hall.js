@@ -47,10 +47,16 @@ function woodTex() {
   return t;
 }
 
-export function buildHall({ floor, makeSign }) {
+// wing 1: the hallway at the top of the café's stairs (Rooms 01–14, the shared
+// rooms off it); wing 2: the upper hallway, up the stairs at its east end
+// (Rooms 15–28), the same long corridor in green, with the stairs on up to the roof.
+export const DOORS_PER_HALL = SLOTS.length;
+export function buildHall({ floor, makeSign, wing = 1 }) {
+  const upper = wing === 2;
+  const FIRST = upper ? DOORS_PER_HALL : 0; // the first door's number along this hallway
   const group = floor.group;
   const W = H.maxX - H.minX, D = H.maxZ - H.minZ;
-  const wallM = std('#f1e7dc', { roughness: 0.95 });
+  const wallM = std(upper ? '#ece6d6' : '#f1e7dc', { roughness: 0.95 });
   const wood = std('#8a5a3c', { roughness: 0.6 });
   const surfaces = [], interactables = [], seats = [];
 
@@ -60,10 +66,10 @@ export function buildHall({ floor, makeSign }) {
   floorMesh.receiveShadow = true;
   group.add(floorMesh);
   floor.floorMesh = floorMesh;
-  const runner = new THREE.Mesh(new THREE.PlaneGeometry(W - 1.4, 1.3), std('#c4627f', { roughness: 1 }));
+  const runner = new THREE.Mesh(new THREE.PlaneGeometry(W - 1.4, 1.3), std(upper ? '#4f7a5a' : '#c4627f', { roughness: 1 }));
   runner.rotation.x = -Math.PI / 2; runner.position.y = 0.004; runner.receiveShadow = true;
   group.add(runner);
-  const inner = new THREE.Mesh(new THREE.PlaneGeometry(W - 1.6, 1.1), std('#e7b7c4', { roughness: 1 }));
+  const inner = new THREE.Mesh(new THREE.PlaneGeometry(W - 1.6, 1.1), std(upper ? '#a8c3a0' : '#e7b7c4', { roughness: 1 }));
   inner.rotation.x = -Math.PI / 2; inner.position.y = 0.006; inner.receiveShadow = true;
   group.add(inner);
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, D), std('#fbf3ea', { roughness: 1, side: THREE.DoubleSide }));
@@ -119,8 +125,8 @@ export function buildHall({ floor, makeSign }) {
     well.add(glow);
     group.add(well);
     const sign = makeSign(end < 0
-      ? [{ text: '⬇ The café', size: 110, weight: '700' }, { text: 'back downstairs', size: 70 }]
-      : [{ text: '⬆ Roof garden', size: 110, weight: '700' }, { text: 'up the stairs', size: 70 }], 1.0, 0.36);
+      ? (upper ? [{ text: '⬇ Downstairs', size: 110, weight: '700' }, { text: 'Rooms 01–14 · the café', size: 70 }] : [{ text: '⬇ The café', size: 110, weight: '700' }, { text: 'back downstairs', size: 70 }])
+      : (upper ? [{ text: '⬆ Roof garden', size: 110, weight: '700' }, { text: 'up the stairs', size: 70 }] : [{ text: '⬆ Upstairs', size: 110, weight: '700' }, { text: 'Rooms 15–28 · the roof', size: 70 }]), 1.0, 0.36);
     sign.position.set(x - end * 0.1, SH + 0.3, 0);
     sign.rotation.y = -end * Math.PI / 2;
     group.add(sign);
@@ -128,8 +134,8 @@ export function buildHall({ floor, makeSign }) {
     hit.position.set(x - end * 0.05, SH / 2, 0);
     hit.rotation.y = -end * Math.PI / 2;
     hit.userData = end < 0
-      ? { kind: 'hall-down', label: 'Down the stairs to the café' }
-      : { kind: 'hall-up', label: 'Up the stairs to the roof garden' };
+      ? { kind: 'hall-down', label: upper ? 'Down the stairs to the first hallway (Rooms 01–14) and the café' : 'Down the stairs to the café' }
+      : { kind: 'hall-up', label: upper ? 'Up the stairs to the roof garden' : 'Up the stairs: the upper hallway (Rooms 15–28) and the roof garden' };
     group.add(hit); interactables.push(hit);
   }
 
@@ -196,12 +202,27 @@ export function buildHall({ floor, makeSign }) {
     g.add(hit); interactables.push(hit);
     group.add(g);
   };
+  if (!upper) {
   sharedDoor({ x: 13.2, side: -1, color: '#93ab8c', bg: '#fbe3ea', kind: 'hall-common', label: 'The Common room — sofas, the big TV, everyone who lives upstairs',
     lines: [{ text: 'Common Room', size: 110, weight: '700' }, { text: 'sofas · the big TV · tea', size: 66 }] });
   sharedDoor({ x: -13.2, side: 1, color: '#5b3a4a', glass: '#ffe0c0', bg: '#f3e1d0', kind: 'hall-music', label: 'The Music Room — a piano, a guitar and an open-mic stage',
     lines: [{ text: 'Music Room', size: 110, weight: '700' }, { text: 'piano · guitar · open mic 🎶', size: 66 }] });
   sharedDoor({ x: -13.95, side: -1, double: false, color: '#8a6a50', glass: '#f6efe3', bg: '#f6efe3', kind: 'hall-prayer', label: 'The Prayer Room — a quiet room for prayer and reflection',
     lines: [{ text: 'Prayer Room', size: 110, weight: '700' }, { text: 'غرفة الصلاة · a quiet room', size: 66 }] });
+  } else {
+    // the upper hallway's ends: its name on the wall, plants, a window seat by the stairs
+    const name = makeSign([{ text: 'The upper hallway', size: 110, weight: '700' }, { text: 'Rooms 15–28', size: 70 }], 1.3, 0.42, { bg: '#e3eedf' });
+    name.position.set(13.2, 1.9, H.minZ + 0.01);
+    group.add(name);
+    const seatG = new THREE.Group();
+    seatG.add(at(rbox(1.6, 0.42, 0.5, 0.06, std('#4f7a5a', { roughness: 1 })), 0, 0.21, 0));
+    seatG.add(at(rbox(1.5, 0.12, 0.45, 0.05, std('#e7d3b0', { roughness: 1 })), 0, 0.48, 0));
+    seatG.position.set(13.2, 0, H.maxZ - 0.3);
+    group.add(seatG);
+    for (const [i, x] of [12.8, 13.6].entries()) seats.push({ id: `hall2-seat-${i}`, label: 'the seat at the end of the upper hallway', x, z: H.maxZ - 0.55, y: group.position.y, h: 0.5, ry: Math.PI });
+    seatG.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', label: 'Sit for a while', seat: seats[seats.length - 1] }; interactables.push(o); } });
+    floor.colliders.push({ type: 'box', fixed: true, minX: 12.35, maxX: 14.05, minZ: H.maxZ - 0.6, maxZ: H.maxZ });
+  }
 
   // ── the doors
   const doorAt = ({ x, side }, color) => {
@@ -230,7 +251,7 @@ export function buildHall({ floor, makeSign }) {
   };
   const doors = SLOTS.map((s, i) => doorAt(s, DOOR_COLORS[i % DOOR_COLORS.length]));
   // the group study rooms: a wide double door on the south wall at the east end
-  const groupDoor = (() => {
+  const groupDoor = upper ? null : (() => {
     const g = new THREE.Group();
     g.position.set(13.2, 0, H.maxZ); g.rotation.y = Math.PI;
     for (const s of [-1, 1]) g.add(at(rbox(0.7, DOOR_H + 0.1, 0.05, 0.015, std('#6e472e', { roughness: 0.55 })), s * 0.36, (DOOR_H + 0.1) / 2, 0.025));
@@ -249,19 +270,20 @@ export function buildHall({ floor, makeSign }) {
 
   // Who's behind which door. mine: { ownerId, name }; others: [{ ownerId, name, ownerName, here, invited, open }]
   const byOwner = new Map();
-  // Each flat has its own door (r.door, 0–13), the same for everyone: yours says
+  // Each flat has its own door (r.door: 0–13 here, 14–27 upstairs), the same for everyone: yours says
   // "Your room"; one you can go into (open, or you're invited) has its name; a
   // shut one just has its resident's name on it.
   function setDoors(mine, others = []) {
     byOwner.clear();
     doors.forEach((d, i) => {
-      const r = mine && mine.door === i ? { ...mine, mine: true, canEnter: true } : others.find(o => o.door === i) || null;
+      const num = FIRST + i;
+      const r = mine && mine.door === num ? { ...mine, mine: true, canEnter: true } : others.find(o => o.door === num) || null;
       if (d.plaque) { d.g.remove(d.plaque); d.plaque.material.map?.dispose(); d.plaque.material.dispose(); d.plaque.geometry.dispose(); d.plaque = null; }
-      const n = String(i + 1).padStart(2, '0');
-      const lines = !r ? [{ text: `Room ${n}`, size: 110, weight: '700' }]
-        : r.mine ? [{ text: 'Your room', size: 100, weight: '700' }, { text: `${r.name} · Room ${n}`, size: 62 }]
-        : r.canEnter ? [{ text: r.name, size: 100, weight: '700' }, { text: `${r.ownerName}'s · ${r.invited ? 'invited' : 'door open'}`, size: 62 }]
-        : [{ text: `Room ${n}`, size: 100, weight: '700' }, { text: `${r.ownerName}'s`, size: 62 }];
+      const n = String(num + 1).padStart(2, '0');
+      // the resident's name, big; the room number underneath
+      const lines = !r ? [{ text: `Room ${n}`, size: 100, weight: '700' }, { text: 'nobody lives here yet', size: 58 }]
+        : r.mine ? [{ text: '★ Your room', size: 100, weight: '700' }, { text: `Room ${n}`, size: 62 }]
+        : [{ text: `${r.ownerName}'s room`, size: 100, weight: '700' }, { text: `Room ${n} · ${r.canEnter ? (r.invited ? "you're invited in" : 'door open') : 'door shut'}`, size: 58 }];
       d.plaque = makeSign(lines, 0.78, 0.26, r && r.mine ? { bg: '#fbe3ea' } : {});
       d.plaque.position.set(0, DOOR_H + 0.3, 0.05);
       d.g.add(d.plaque);
