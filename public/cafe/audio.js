@@ -126,6 +126,35 @@ export class Soundscape {
   }
   ok() { return this.ctx && this.ctx.state === 'running'; }
 
+  // ───────────────────────────────────────── the street outside (cairo.js)
+  // honk: a car horn, two notes at once; toktok: a tuk-tuk's quick high beep-beep;
+  // hoof: one clip of the donkey's hooves on the tarmac
+  street(kind, pos) {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime, out = this.at(pos, 'murmur', 7);
+    if (kind === 'honk' || kind === 'toktok') {
+      const pairs = kind === 'honk' ? [[392, 0], [494, 0]] : [[1150, 0], [1150, 0.16]];
+      const len = kind === 'honk' ? 0.22 + Math.random() * 0.35 : 0.1;
+      const times = kind === 'honk' && Math.random() < 0.4 ? 2 : 1;
+      for (let k = 0; k < times; k++) {
+        const t0 = t + k * (len + 0.12);
+        pairs.forEach(([f, dt]) => {
+          const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * (0.97 + Math.random() * 0.06);
+          const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = kind === 'honk' ? 1800 : 3200;
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0, t0 + dt); g.gain.linearRampToValueAtTime(kind === 'honk' ? 0.05 : 0.03, t0 + dt + 0.01);
+          g.gain.setValueAtTime(kind === 'honk' ? 0.05 : 0.03, t0 + dt + len); g.gain.linearRampToValueAtTime(0, t0 + dt + len + 0.03);
+          o.connect(lp).connect(g).connect(out); o.start(t0 + dt); o.stop(t0 + dt + len + 0.05);
+        });
+      }
+    } else if (kind === 'hoof') {
+      const src = ctx.createBufferSource(); src.buffer = this.whiteBuffer(0.05);
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400 + Math.random() * 500; bp.Q.value = 6;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.14, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      src.connect(bp).connect(g).connect(out); src.start(t);
+    }
+  }
+
   // ───────────────────────────────────────── instruments (the Music Room)
 
   playAt(pos, ref = 3) {

@@ -1707,6 +1707,7 @@ function click(x, y) {
     return walkToThing(h, () => goToRoom('home:' + d.ownerId));
   }
   if (d.kind === 'home-bed') return goToBed(d.seat);
+  if (d.kind === 'home-basket') return lowerBasket();
   if (d.kind === 'home-desk') {
     // sit at a chair by the desk if there is one, then open the timer
     const c = new THREE.Vector3(); h.object.getWorldPosition(c);
@@ -4135,6 +4136,23 @@ async function playPlaylist(list, room) {
   }, 10000);
 }
 
+// ── the basket on the balcony's rope: down to the street, and back up with
+// something in it from the kiosk (the way Cairo has always done its shopping)
+const BASKET = [
+  'a loaf of warm aish baladi, wrapped in paper', 'a bottle of cold water, beaded with drops', 'a paper cone of roasted peanuts',
+  'two glasses of sugarcane juice', 'a bag of lemons and a bunch of mint', 'the evening paper, folded in half',
+  'a little bag of ful and taameya, still hot', 'a box of basbousa from the bakery on the corner',
+];
+let basketBusy = false;
+async function lowerBasket() {
+  if (basketBusy) return;
+  basketBusy = true;
+  toast('🧺 You let the basket down on its rope… "Ya Am Saied!" — the man at the kiosk waves.');
+  await wait(3500);
+  toast(`🧺 Up it comes: ${BASKET[Math.floor(Math.random() * BASKET.length)]}. You wave a thank-you down to the street.`);
+  basketBusy = false;
+}
+
 // ── the Music Room: a piano, a guitar and a cajón anyone can play. Every
 // note goes to everyone else in the room too (realtime 'play') and sounds
 // from where the instrument stands. Sit on the stool on the stage and the
@@ -4266,6 +4284,21 @@ function showPrayerTimes() {
   const next = day.list.find(p => p.key === day.next);
   toast(`🕌 Today in Cairo: ${day.list.map(p => `${p.en} ${p.clock}`).join(' · ')}. Next: ${next.en} at ${next.clock}.`);
 }
+// the street's honks and hooves, from wherever they happen (cairo.js)
+world.setStreetSound((kind, pos) => { if (!quietRoom.on) sound.street(kind, pos); });
+// the call to prayer: at each prayer time the minarets light up and someone says so
+const adhan = { last: null };
+function checkAdhan() {
+  if (!state.started) return;
+  const day = cairoPrayerDay(), now = Date.now();
+  const due = day.list.filter(p => p.key !== 'sunrise' && p.at.getTime() <= now && now - p.at.getTime() < 90e3);
+  const p = due[due.length - 1];
+  if (!p || adhan.last === p.key + p.clock) return;
+  adhan.last = p.key + p.clock;
+  world.adhan();
+  sysChat(`🕌 The call to prayer for ${p.en} rises from the minarets behind the back street, and for a moment the street goes quiet.`);
+}
+
 // the spotlight, the turntable, and the prayer times board keeping up
 let wasOnStage = false;
 setInterval(() => {
@@ -4277,6 +4310,7 @@ setInterval(() => {
     wasOnStage = me;
   } else wasOnStage = false;
   if (state.room === 'prayer' && Date.now() - quietRoom.timesAt > 60e3) refreshPrayerTimes();
+  if (Date.now() - (adhan.checked || 0) > 15e3) { adhan.checked = Date.now(); checkAdhan(); }
 }, 500);
 
 // ── the Common room TV: the café's playlist (site_content 'common.tv'), on for everyone
@@ -4557,7 +4591,16 @@ function frame() {
     staff.update(dt);
     regulars.update(dt);
     if (world.floor === 'main') world.updateDoors(dt, [player.pos, ...[...state.people.values()].map(p => p.pos), ...staff.positions(), ...regulars.positions()]);
-    if (world.floor === 'home') world.home.updatePet(dt, t, { typist: typist() });
+    if (world.floor === 'home') {
+      world.home.updatePet(dt, t, { typist: typist() });
+      // stepping out onto the balcony: the camera swings round to look back at you from over the street
+      const out = world.home.onBalcony(player.pos);
+      if (out !== state.onBalcony) {
+        state.onBalcony = out;
+        if (out) { cam.yaw = Math.PI; cam.pitch = 0.22; cam.dist = cam.targetDist = 2.8; }
+        else { cam.yaw = 0; cam.pitch = 0.42; cam.dist = cam.targetDist = 2.6; }
+      }
+    } else state.onBalcony = false;
     listenRoom(dt);
     updateCamera(dt);
     updateHover();
