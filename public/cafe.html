@@ -393,6 +393,12 @@
   .recipe .row { margin-top: 12px; gap: 8px; flex-wrap: wrap; }
   .recipe .btn { padding: 8px 14px; font-size: 12.5px; }
   .group-list { display: grid; gap: 8px; margin-top: 12px; }
+  #doorsList select { border: 1.5px solid var(--line); background: #fffaf6; color: inherit; border-radius: 12px; padding: 7px 10px; font: inherit; font-size: 13px; max-width: 100%; }
+  #doorsPanel { max-height: 80vh; overflow: auto; }
+  #doorsList .group-card { display: block; }
+  #doorsList .row { display: flex; flex-wrap: nowrap; margin-top: 6px; }
+  #doorsList select { flex: 1; min-width: 0; }
+  #doorsList .btn { flex: none; }
   .group { border: 1.5px solid var(--line); border-radius: 16px; padding: 12px 14px; background: var(--field); }
   .group .gname { font-weight: 700; display: flex; align-items: center; gap: 8px; }
   .group .gname i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
@@ -529,6 +535,7 @@
   <button id="gameAct" class="hidden" title="Play a game at this table"><span>🎲</span> <span class="t">Games</span></button>
   <button id="waveAct" title="Wave"><span>👋</span> <span class="t">Wave</span></button>
   <button id="emoteAct" title="Send a little something"><span>🌸</span></button>
+  <button id="doorsAct" class="hidden" title="Owner: who lives behind which door — move a flat"><span>🗝️</span> <span class="t">Flats &amp; doors</span></button>
   <button id="studyAct" class="hidden" title="Start a study session"><span>📚</span> <span class="t">Study</span></button>
   <button id="decorAct" class="hidden" title="Decorate your room"><span>🛠️</span> <span class="t">Decorate</span></button>
   <button id="roomAct" class="hidden" title="Your room: name, colours, who can come in"><span>🗝️</span> <span class="t">My room</span></button>
@@ -989,6 +996,15 @@
   <p class="lede" style="font-size:13.5px">Bring a pastry up from the counter downstairs and click the shelf to keep it for later.</p>
   <div id="snackList" class="group-list"></div>
   <p class="fine hidden" id="snackEmpty">The shelf is empty — just crumbs and good intentions.</p>
+</div>
+
+<div id="doorsPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">🗝️ For the café owner</p>
+  <h3>Flats &amp; hallway doors</h3>
+  <p class="fine">Every flat and its door. Rooms 01–14 are along this first hallway, 15–28 along the upper one. Doors face each other in pairs: Room 01 is across from Room 02, 03 from 04, and so on. Moving a flat swaps it with whoever's behind that door — nobody's furniture changes.</p>
+  <div id="doorsList" class="group-list"></div>
+  <p class="fine" id="doorsMsg" style="margin-top:8px"></p>
 </div>
 
 <div id="kosharyPanel" class="panel card hidden">
