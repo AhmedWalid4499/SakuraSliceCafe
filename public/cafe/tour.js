@@ -27,7 +27,7 @@ export function createTour({ world, stairs, player, $, bubble, sound, onDone, on
     },
     {
       title: 'Sit anywhere',
-      text: 'Click any chair to sit. Set your cup down, take a sip (C), a bite (B). Sitting at a table? Tick "bring it to my table" and we\'ll carry it over — or press 🎲 Games for tawla or chess.',
+      text: 'Click any chair to sit. Set your cup down, take a sip (C), a bite (B). Sitting at a table? Tick "bring it to my table" and we\'ll carry it over — or press 🎲 Games for tawla, chess, snakes and ladders or Sakura Eights.',
       say: 'Pick any seat you like.',
       look: () => { const t = find(u => u.tableId === 't3') || find(u => u.tableId); return at(t).add(new THREE.Vector3(0, 0.4, 0)); },
       dist: 4,

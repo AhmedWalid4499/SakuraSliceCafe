@@ -36,39 +36,58 @@ function roster(room) {
   return [...seen.values()].map(c => ({ ...c.profile, state: c.state }));
 }
 
-// ── games at the tables: chess and tawla, one game per table, played live.
-// The rules run in the players' browsers (chess.js, tawla.mjs); here we keep
-// the board, check it's the right person's turn, and tell the room.
+// ── games at the tables: chess, tawla, snakes and ladders and Sakura Eights,
+// one game per table, played live. The rules run in the players' browsers
+// (chess.js, tawla.mjs, snakes.mjs, eights.mjs); here we keep the board,
+// check it's the right person's turn, and tell the room. Seats are a, b, c…;
+// the team (Yuto, Hana, Yuki, Me3temed) can fill empty ones, and their turns
+// are played by the browser of whoever set the game out (seat a).
 const games = new Map(); // `${room}|${table}` → game
 const gameList = room => [...games.values()].filter(g => g.room === room);
+const SEATS = ['a', 'b', 'c', 'd', 'e', 'f'];
+const MAX_SEATS = { chess: 2, tawla: 2, snakes: 4, eights: 6 };
+const BOTS = { yuto: 'Yuto', hana: 'Hana', yuki: 'Yuki', me3temed: 'Me3temed' };
+const seatsOf = g => SEATS.slice(0, MAX_SEATS[g.kind]);
+const freeSeat = g => seatsOf(g).find(k => !g.players[k]);
 function handleGame(ws, entry, m) {
   const table = typeof m.table === 'string' ? m.table.slice(0, 24) : '';
   if (!/^[\w-]{1,24}$/.test(table)) return;
   const key = entry.room + '|' + table;
   const me = { id: entry.user.id, name: entry.profile.displayName };
   let g = games.get(key);
-  const isPlayer = g && [g.players.a, g.players.b].some(p => p && p.id === me.id);
+  const isPlayer = g && Object.values(g.players).some(p => p && p.id === me.id);
+  const isHost = g && g.players.a && g.players.a.id === me.id;
   const state = m.state && typeof m.state === 'object' ? m.state : null;
-  if (state && JSON.stringify(state).length > 1500) return;
+  if (state && JSON.stringify(state).length > 2400) return;
   if (m.action === 'start') {
     // a game is already going at this table (left alone for 10 minutes, it can be cleared for a new one)
     if (g && !g.over && !isPlayer && Date.now() - g.at < 10 * 60e3) return;
-    const kind = m.kind === 'tawla' ? 'tawla' : 'chess';
-    g = { table, room: entry.room, kind, players: { a: me, b: m.vs === 'yuto' ? { id: 'yuto', name: 'Yuto' } : null }, state, turn: 'a', over: null, at: Date.now(), moves: 0 };
+    const kind = MAX_SEATS[m.kind] ? m.kind : 'chess';
+    const players = { a: me };
+    if (kind === 'chess' || kind === 'tawla') players.b = m.vs === 'yuto' ? { id: 'yuto', name: 'Yuto' } : null;
+    else for (const b of (Array.isArray(m.bots) ? m.bots : []).filter(b => BOTS[b]).slice(0, MAX_SEATS[kind] - 1)) players[SEATS[Object.keys(players).length]] = { id: b, name: BOTS[b] };
+    g = { table, room: entry.room, kind, players, state, turn: 'a', over: null, at: Date.now(), moves: 0 };
     games.set(key, g);
   } else if (!g) return;
   else if (m.action === 'join') {
-    if (g.players.b || g.players.a.id === me.id) return;
-    g.players.b = me;
+    // a free seat, before the first move (two-player games: just the one across from you)
+    const seat = freeSeat(g);
+    if (isPlayer || !seat || (g.moves > 0 && MAX_SEATS[g.kind] > 2)) return;
+    g.players[seat] = me;
+  } else if (m.action === 'addbot') {
+    // whoever set the game out asks one of the team to join in
+    const seat = freeSeat(g);
+    if (!isHost || !seat || g.moves > 0 || !BOTS[m.bot] || Object.values(g.players).some(p => p && p.id === m.bot)) return;
+    g.players[seat] = { id: m.bot, name: BOTS[m.bot] };
   } else if (m.action === 'move') {
     if (g.over || !state) return;
     const mover = g.players[g.turn];
-    // your own turn — or Yuto's, played for him by the person who invited him
-    const ok = mover && (mover.id === me.id || (mover.id === 'yuto' && g.players.a.id === me.id));
+    // your own turn — or one of the team's, played for them by the person who set the game out
+    const ok = mover && (mover.id === me.id || (BOTS[mover.id] && isHost));
     if (!ok) return;
     g.state = state;
-    g.turn = m.turn === 'b' ? 'b' : 'a';
-    g.over = m.over ? { winner: m.over.winner === 'b' ? 'b' : m.over.winner === 'a' ? 'a' : null, why: String(m.over.why || '').slice(0, 60) } : null;
+    g.turn = seatsOf(g).includes(m.turn) && g.players[m.turn] ? m.turn : 'a';
+    g.over = m.over ? { winner: seatsOf(g).includes(m.over.winner) && g.players[m.over.winner] ? m.over.winner : null, why: String(m.over.why || '').slice(0, 60) } : null;
     g.moves++;
   } else if (m.action === 'end') {
     if (!isPlayer && !entry.user.is_admin) return;

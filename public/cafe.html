@@ -393,6 +393,26 @@
   .recipe .row { margin-top: 12px; gap: 8px; flex-wrap: wrap; }
   .recipe .btn { padding: 8px 14px; font-size: 12.5px; }
   .group-list { display: grid; gap: 8px; margin-top: 12px; }
+  /* games: snakes and ladders, Sakura Eights */
+  .multi-seats { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+  .multi-seats .seat { border: 2px solid var(--tok, #d4678a); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; background: #fffaf6; }
+  .multi-seats .seat.now { background: var(--tok, #d4678a); color: #fff; font-weight: 700; }
+  .snakes { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; margin: 6px auto; max-width: min(360px, 100%); }
+  #gamePanel { max-height: 88vh; overflow: auto; }
+  .snakes .sq { position: relative; aspect-ratio: 1; background: #fdf3e6; border-radius: 4px; font-size: 9px; overflow: hidden; }
+  .snakes .sq.alt { background: #fbe3ea; }
+  .snakes .sq.ladder { background: #f4e2c4; } .snakes .sq.snake { background: #dcebd5; }
+  .snakes .sq small { position: absolute; left: 2px; top: 1px; color: #8a6a5a; }
+  .snakes .sq em { position: absolute; right: 1px; bottom: 1px; font-style: normal; font-size: 8.5px; }
+  .snakes .sq .tok { position: absolute; width: 38%; height: 38%; border-radius: 50%; border: 1.5px solid #fff; left: 30%; top: 30%; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .snakes .sq .tok + .tok { left: 8%; top: 52%; } .snakes .sq .tok + .tok + .tok { left: 52%; top: 52%; }
+  .eights-table { display: flex; align-items: center; gap: 14px; margin: 8px 0; }
+  .hand { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .pcard { position: relative; width: 44px; height: 64px; border-radius: 8px; border: 3px solid #fffaf2; background: var(--c); box-shadow: 0 2px 6px rgba(0,0,0,.18); padding: 0; cursor: default; }
+  .pcard::after { content: attr(data-v); position: absolute; inset: 9px 6px; border-radius: 50%; background: #fffaf2; color: var(--c); font: 700 16px/40px sans-serif; text-align: center; }
+  .pcard.big { width: 66px; height: 96px; } .pcard.big::after { font-size: 22px; line-height: 70px; inset: 12px 8px; }
+  .hand .pcard { opacity: .55; } .hand .pcard.can { opacity: 1; cursor: pointer; transform: translateY(-3px); }
+  .hand .pcard.can:hover { transform: translateY(-7px); }
   #doorsList select { border: 1.5px solid var(--line); background: #fffaf6; color: inherit; border-radius: 12px; padding: 7px 10px; font: inherit; font-size: 13px; max-width: 100%; }
   #doorsPanel { max-height: 80vh; overflow: auto; }
   #doorsList .group-card { display: block; }
@@ -1138,7 +1158,7 @@
     <li>At the other end of the hallway: the <b>Music Room</b> (a piano and a guitar anyone can play, a cajón, a record player and an open-mic stage — sit on the stool to take it) and the <b>Prayer Room</b>, a quiet room with prayer mats facing the qibla and today's prayer times for Cairo. There's no chat in there.</li>
     <li>Upstairs, the hallway's <b>Common Room</b> door (by the stairs to the roof) leads to the sofas and the big TV — it plays the café's playlist, and everyone watches together.</li>
     <li><b>🔗</b> at the top: invite a friend (they'll walk straight to your table) or take a 📸 photo of the café to share.</li>
-    <li>Sitting at a table? Press <b>🎲 Games</b> to set out <b>tawla</b> or <b>chess</b> — play whoever sits across from you, or Yuto. Anyone can walk over and watch.</li>
+    <li>Sitting at a table? Press <b>🎲 Games</b> to set out <b>tawla</b> or <b>chess</b> (play whoever sits across from you, or Yuto), <b>snakes and ladders</b> (2–4 players) or <b>Sakura Eights</b>, the café's own card game (2–6). Friends at the table sit in; Yuto, Hana, Yuki and Me3temed fill any empty seats. Anyone can walk over and watch.</li>
     <li>Order at the counter and Hana <b>calls your name</b> when it's ready (if there's a line, you wait your turn). Every drink earns a stamp on your <b>🎟️ stamp card</b> — ten stamps and Yuto brings you a slice of the sakura cake.</li>
     <li>The <b>menu board</b> above the counter changes every day (click it to order); the <b>A-frame</b> by the counter has the week's specials. The <b>easel by the fire</b> says what's on — story evenings and book club.</li>
     <li>The café follows the calendar: spring bunting, a summer bowl of lemons, autumn leaves, winter candles and blankets — and lanterns and later hours in <b>Ramadan</b>.</li>
