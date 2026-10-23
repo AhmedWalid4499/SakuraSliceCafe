@@ -15,6 +15,7 @@ import { buildHall, HALL } from './hall.js';
 import { buildCommon, COMMON } from './common.js';
 import { buildMusic, MUSIC } from './music.js';
 import { buildPrayer, PRAYER } from './prayer.js';
+import { buildSleepover, SLEEPOVER } from './sleepover.js';
 import { buildCairoLife, stripedKerb } from './cairo.js';
 import { buildKoshari, KOSHARI } from './koshari.js';
 import { buildNile, NILE } from './nile.js';
@@ -350,15 +351,15 @@ export function buildWorld(renderer) {
     interactables: [], // meshes that respond to hover/click (userData.kind)
     group: new THREE.Group(),
   });
-  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor(), music: mkFloor(), prayer: mkFloor(), koshari: mkFloor(), hall2: mkFloor() };
-  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group);
+  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor(), music: mkFloor(), prayer: mkFloor(), koshari: mkFloor(), hall2: mkFloor(), sleepover: mkFloor() };
+  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group, floors.sleepover.group);
   // the Common room (common.js), off the hallway, for everyone who lives upstairs
   floors.common.group.position.y = FLOOR2_Y;
   floors.common.group.visible = false;
   let common = null;
   // the Music Room and the Prayer Room (music.js, prayer.js), off the hallway too
-  for (const k of ['music', 'prayer']) { floors[k].group.position.y = FLOOR2_Y; floors[k].group.visible = false; }
-  let music = null, prayer = null;
+  for (const k of ['music', 'prayer', 'sleepover']) { floors[k].group.position.y = FLOOR2_Y; floors[k].group.visible = false; }
+  let music = null, prayer = null, sleepover = null;
   // the hallway upstairs (hall.js), with everyone's doors off it
   floors.hall.group.position.y = FLOOR2_Y;
   floors.hall.group.visible = false;
@@ -3491,9 +3492,12 @@ export function buildWorld(renderer) {
   noFog(floors.music.group);
   prayer = buildPrayer({ floor: floors.prayer, makeSign });
   noFog(floors.prayer.group);
+  // the Sleepover Room, the second floor up from the upper hallway (sleepover.js)
+  sleepover = buildSleepover({ floor: floors.sleepover, makeSign, animate: f => animated.push(f) });
+  noFog(floors.sleepover.group);
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, koshari: outside.koshari,
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, sleepover, koshari: outside.koshari,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setStreetSound: f => { outside.life.onSound = f; },
     adhan: () => outside.adhan(),
@@ -3508,8 +3512,8 @@ export function buildWorld(renderer) {
     const f = floors[name];
     Object.assign(api, {
       floor: name,
-      floorY: ['up', 'home', 'hall', 'hall2', 'common', 'music', 'prayer'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
-      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'koshari' ? KOSHARI.h : name === 'garden' ? 7 : ROOM.h,
+      floorY: ['up', 'home', 'hall', 'hall2', 'common', 'music', 'prayer', 'sleepover'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
+      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'sleepover' ? SLEEPOVER.h : name === 'koshari' ? KOSHARI.h : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
   }

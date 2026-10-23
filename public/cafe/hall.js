@@ -210,6 +210,9 @@ export function buildHall({ floor, makeSign, wing = 1 }) {
   sharedDoor({ x: -13.95, side: -1, double: false, color: '#8a6a50', glass: '#f6efe3', bg: '#f6efe3', kind: 'hall-prayer', label: 'The Prayer Room — a quiet room for prayer and reflection',
     lines: [{ text: 'Prayer Room', size: 110, weight: '700' }, { text: 'غرفة الصلاة · a quiet room', size: 66 }] });
   } else {
+    // the stairs up to the second floor (the Sleepover Room), behind a door at the west end
+    sharedDoor({ x: -13.2, side: 1, color: '#4f7a5a', glass: '#e8e0ff', bg: '#f6eefa', kind: 'hall-sleepover', label: 'Up the stairs to the second floor — the Sleepover Room',
+      lines: [{ text: '⬆ Second floor', size: 104, weight: '700' }, { text: 'the Sleepover Room 🌙', size: 66 }] });
     // the upper hallway's ends: its name on the wall, plants, a window seat by the stairs
     const name = makeSign([{ text: 'The upper hallway', size: 110, weight: '700' }, { text: 'Rooms 15–28', size: 70 }], 1.3, 0.42, { bg: '#e3eedf' });
     name.position.set(13.2, 1.9, H.minZ + 0.01);
@@ -318,5 +321,6 @@ export function buildHall({ floor, makeSign, wing = 1 }) {
     fromCommon: { x: 13.2, z: H.minZ + 0.9, ry: 0 },       // out of the Common room's door
     fromMusic: { x: -13.2, z: H.maxZ - 0.9, ry: Math.PI },
     fromPrayer: { x: -13.95, z: H.minZ + 0.9, ry: 0 },
+    fromSleepover: { x: -13.2, z: H.maxZ - 0.9, ry: Math.PI }, // down from the second floor (the upper hallway)
   };
 }

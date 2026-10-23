@@ -666,6 +666,13 @@ function bed(c, def, h) {
   return g;
 }
 
+// One piece of furniture, built the same way as in the flats (for the shared
+// rooms that want a real bed or a toilet: the Sleepover Room, sleepover.js).
+export function furniturePiece(kind, color) {
+  const def = BY_KIND.get(kind);
+  return BUILD[kind](color || def.colors[0], def);
+}
+
 export function buildHome({ floor, makeSign }) {
   const { group } = floor;
   const W = R.maxX - R.minX, D = R.maxZ - R.minZ, H = R.h;
