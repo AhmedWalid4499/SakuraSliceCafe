@@ -25,6 +25,7 @@ import { createGames } from './games.js';
 import { createTour } from './tour.js';
 import { cairoPrayerDay } from './prayertimes.mjs';
 import { createArcade } from './arcade.js';
+import { createScreenLayer } from './tvscreen.js';
 
 // The rooms everyone shares on the second floor (off its landing) and the
 // cinema on the roof — each built by its own module into world.rooms[name].
@@ -98,7 +99,9 @@ const sound = new Soundscape();
 // ───────────────────────────────────────── renderer (smooth, never pixelated)
 
 const canvas = $('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+// (alpha: so a TV's screen can be see-through, and the film behind it shows — tvscreen.js)
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+renderer.setClearAlpha(1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -149,6 +152,7 @@ function makePost() {
 }
 
 const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 400);
+const tvLayer = createScreenLayer({ canvas, camera }); // films play on the TVs themselves
 
 // Fonts first — the signs and notes are drawn with them.
 await Promise.all([
@@ -170,6 +174,7 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
+  tvLayer.setSize(w, h);
   if (post.composer) { post.composer.setPixelRatio(renderer.getPixelRatio()); post.composer.setSize(w, h); }
   camera.aspect = w / h;
   camera.fov = w < 640 ? 65 : 55;
@@ -4289,26 +4294,48 @@ let movie = null, movieSkew = 0;
 function setMovie(m, now) {
   movie = m || null;
   if (now) movieSkew = Date.now() - now;
+  tvLayer.detach();
   if (state.room === 'sleepover') world.sleepover.setMovie(movie);
   else if (!['common', 'cinema', 'ahwa'].includes(state.room)) world.home.setMovie(movie);
   const box = $('cinema');
   stopPlaylist();
-  if (!movie) { box.classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; return; }
+  if (!movie) { box.classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; upClose = false; return; }
   if (movie.list) { // a playlist: played in order, everyone in step (see playPlaylist)
     $('cinemaTitle').textContent = movie.title;
     $('cinemaBy').textContent = movie.by ? `put on by ${movie.by}` : state.room === 'cinema' ? 'at the Rooftop Cinema' : state.room === 'ahwa' ? 'on the gramophone' : 'on the Common room TV';
     box.classList.remove('hidden', 'small');
+    putOnScreen();
     playPlaylist(movie.list, state.room);
     return;
   }
   const offset = Math.max(0, Math.floor((Date.now() - movieSkew - movie.startedAt) / 1000));
   $('cinemaTitle').textContent = movie.title;
   $('cinemaBy').textContent = movie.by ? `put on by ${movie.by}` : state.room === 'cinema' ? 'at the Rooftop Cinema' : state.room === 'ahwa' ? 'on the gramophone' : '';
-  $('cinemaFrame').src = `https://www.youtube-nocookie.com/embed/${movie.videoId}?autoplay=1&start=${offset}&rel=0&playsinline=1`;
   box.classList.remove('hidden', 'small');
+  putOnScreen();
+  $('cinemaFrame').src = `https://www.youtube-nocookie.com/embed/${movie.videoId}?autoplay=1&start=${offset}&rel=0&playsinline=1`;
 }
 // where this room's TV is set: your flat's, or the Sleepover Room's (anyone can)
 const movieAt = () => (state.room === 'sleepover' ? '/tv/sleepover/movie' : `/home/${state.home.ownerId}/movie`);
+// The TV in the room you're in, if it has one: the film plays on it, and the
+// little player in the corner is just its title bar (⛶ brings it up close).
+let upClose = false;
+function screenHere() {
+  if (state.room === 'common') return world.common.screen;
+  if (state.room === 'sleepover') return world.sleepover.screen;
+  if (state.room === 'cinema') return world.rooms.cinema.screen;
+  if (state.home) return world.home.screenMesh();
+  return null;
+}
+function putOnScreen() {
+  const scr = !upClose && screenHere();
+  const on = !!(scr && tvLayer.attach(scr, $('cinemaMedia')));
+  $('cinema').classList.toggle('onscreen', on);
+  $('cinemaUp').textContent = on ? '⛶' : '📺';
+  $('cinemaUp').title = on ? 'Watch it up close' : 'Back on the TV';
+  $('cinemaUp').classList.toggle('hidden', !screenHere());
+}
+$('cinemaUp').onclick = () => { upClose = !upClose; if (movie) setMovie(movie); };
 function openMovie() {
   $('movieNow').classList.toggle('hidden', !movie);
   $('movieNowTitle').textContent = movie ? `“${movie.title}”, put on by ${movie.by}` : '';
@@ -4327,7 +4354,7 @@ $('movieForm').addEventListener('submit', async e => {
 });
 $('movieStop').onclick = async () => { try { await api(movieAt(), { method: 'DELETE', body: {} }); closePanels(); setMovie(null); } catch (err) { toast(err.message); } };
 $('cinemaMin').onclick = () => $('cinema').classList.toggle('small');
-$('cinemaClose').onclick = () => { $('cinema').classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; stopPlaylist(); toast('📺 It goes on without you — click the TV to watch again.'); };
+$('cinemaClose').onclick = () => { $('cinema').classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; stopPlaylist(); tvLayer.detach(); toast('📺 It goes on without you — click the TV to watch again.'); };
 
 // ── playlists: YouTube's own player, so we can tell which video it's on and
 // how far in. Whoever's watching tells the café every few seconds; anyone
@@ -5262,13 +5289,15 @@ function frame() {
     camera.lookAt(0, 1.3, -2.8);
   }
   if (preview) preview.frame(dt);
-  if (post.on) post.composer.render(dt);
+  // (the softer, glowier picture can't show a film through a screen, so it rests while one is on)
+  if (post.on && !tvLayer.active) post.composer.render(dt);
   else renderer.render(scene, camera);
+  tvLayer.render();
   requestAnimationFrame(frame);
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie };
 
 // ───────────────────────────────────────── start
 

@@ -276,7 +276,7 @@ export function buildSleepover({ floor, makeSign, animate }) {
   floor.seats.push(...seats);
 
   return {
-    lights, bounds: R,
+    lights, bounds: R, screen,
     arrival: { x: 0, z: R.maxZ - 2.8, ry: Math.PI }, // a few steps in from the stairs, the TV ahead
     setMovie(m) {
       const old = screen.material.map;
