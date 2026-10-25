@@ -71,6 +71,32 @@ function bundle(root, keep) {
   });
 }
 
+// Soft textures, drawn once and shared: a fine knit for clothes (so they look
+// like cloth, not plastic) and strands for hair (so it reads as hair, not a hat).
+const sharedTex = {};
+function softTex(kind) {
+  if (sharedTex[kind]) return sharedTex[kind];
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  let s = kind === 'hair' ? 5 : 9; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 128, 128);
+  if (kind === 'knit') {
+    for (let y = 0; y < 128; y += 4) for (let x = 0; x < 128; x += 4) { g.fillStyle = `rgba(0,0,0,${0.03 + r() * 0.05})`; g.fillRect(x + ((y / 4) % 2) * 2, y, 2, 3); }
+  } else {
+    for (let i = 0; i < 90; i++) {
+      const x = r() * 128, w = 1 + r() * 2;
+      g.fillStyle = r() < 0.5 ? `rgba(0,0,0,${0.06 + r() * 0.12})` : `rgba(255,255,255,${0.08 + r() * 0.12})`;
+      g.fillRect(x, 0, w, 128);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(kind === 'hair' ? 6 : 4, kind === 'hair' ? 1 : 4);
+  t.userData.shared = true; // (never disposed with an avatar)
+  return (sharedTex[kind] = t);
+}
+
 function shade(hex, amt) {
   const c = new THREE.Color(hex);
   const hsl = {};
@@ -309,14 +335,14 @@ function buildAvatarParts(avatar, extra) {
   const skinM = mat(a.skin, { roughness: furry ? 0.95 : 0.55 });
   const outfitM = pj
     ? new THREE.MeshStandardMaterial({ color: '#ffffff', map: pjTexture(pj.pattern || 'stripes', a.outfit), roughness: 0.95 })
-    : mat(a.outfit, { roughness: 0.85 });
+    : furry ? mat(a.outfit, { roughness: 0.85 }) : new THREE.MeshStandardMaterial({ color: a.outfit, map: softTex('knit'), roughness: 0.9 });
   const accentM = mat(a.accent, { roughness: 0.95 });
   const darkM = mat('#2a1d1d', { roughness: 0.25 });
   const pawM = isFox ? mat('#3b2722', { roughness: 0.95 }) : skinM; // foxes wear dark "socks"
   const parts = {};
   const blinkers = [];
 
-  const HIP = 0.56, TORSO = 0.5, SHOULDER = 0.92, HEAD = 1.39;
+  const HIP = 0.56, TORSO = 0.5, SHOULDER = 0.92, HEAD = furry ? 1.39 : 1.43;
 
   // ── legs and shoes (or paws)
   if (!isOwl) {
@@ -325,10 +351,10 @@ function buildAvatarParts(avatar, extra) {
     for (const side of [-1, 1]) {
       const hip = new THREE.Group();
       hip.position.set(0.092 * side, HIP, 0);
-      const leg = capsule(0.078, 0.26, null, legM);
-      leg.position.y = -0.2;
-      const shoe = sphere(0.1, null, shoeM);
-      shoe.scale.set(pj ? 1.0 : 0.85, pj ? 0.66 : 0.58, pj ? 1.35 : 1.25);
+      const leg = capsule(furry ? 0.078 : 0.086, furry ? 0.26 : 0.24, null, legM);
+      leg.position.y = -0.19;
+      const shoe = sphere(furry ? 0.1 : 0.108, null, shoeM);
+      shoe.scale.set(pj ? 1.0 : 0.88, pj ? 0.66 : 0.62, pj ? 1.35 : 1.3);
       shoe.position.set(0, -0.47, 0.035);
       hip.add(leg, shoe);
       if (!furry) {
@@ -363,25 +389,48 @@ function buildAvatarParts(avatar, extra) {
     }
   } else {
     // he: a little broader across the shoulders; she: a softer waist
-    const sh = he ? 1.07 : she ? 0.95 : 1, wa = she ? 0.93 : 1;
-    const prof = [[0, 0], [0.19, 0], [0.215, 0.05], [0.223 * wa, 0.16], [0.216 * wa, 0.3], [0.2 * sh, 0.4], [0.15 * sh, 0.48], [0.07, 0.52], [0, 0.53]]
-      .map(([r, y]) => new THREE.Vector2(r, y));
-    torso = new THREE.Mesh(new THREE.LatheGeometry(prof, SEG), outfitM);
+    const sh = he ? 1.06 : she ? 0.96 : 1, wa = she ? 0.95 : 1;
+    // a soft, rounded little body — wider at the hem, round at the shoulders
+    const prof = furry
+      ? [[0, 0], [0.19, 0], [0.215, 0.05], [0.223 * wa, 0.16], [0.216 * wa, 0.3], [0.2 * sh, 0.4], [0.15 * sh, 0.48], [0.07, 0.52], [0, 0.53]]
+      : [[0, 0], [0.215, 0], [0.24, 0.035], [0.245 * wa, 0.14], [0.236 * wa, 0.28], [0.214 * sh, 0.4], [0.17 * sh, 0.48], [0.09, 0.525], [0, 0.54]];
+    const profile = prof.map(([r, y]) => new THREE.Vector2(r, y));
+    torso = new THREE.Mesh(new THREE.LatheGeometry(profile, SEG), outfitM);
     torso.castShadow = true;
     torso.position.y = TORSO;
     // collar and three buttons
     const collarM = mat(furry ? a.accent : shade(a.outfit, 0.25), { roughness: 0.85 });
-    for (const side of [-1, 1]) {
-      const flap = new THREE.Mesh(new THREE.CircleGeometry(0.06, 3), collarM);
-      flap.material.side = THREE.DoubleSide;
-      flap.position.set(0.045 * side, 1.0, 0.13);
-      flap.rotation.set(-0.55, 0, side * 0.5 + Math.PI);
-      rig.add(flap);
+    if (furry) {
+      for (const side of [-1, 1]) {
+        const flap = new THREE.Mesh(new THREE.CircleGeometry(0.06, 3), collarM);
+        flap.material.side = THREE.DoubleSide;
+        flap.position.set(0.045 * side, 1.0, 0.13);
+        flap.rotation.set(-0.55, 0, side * 0.5 + Math.PI);
+        rig.add(flap);
+      }
+    } else {
+      // a round, soft collar in the accent colour, and a band round the hem
+      const cm = mat(pj ? '#fffaf2' : a.accent, { roughness: 0.9 });
+      for (const side of [-1, 1]) {
+        const c = sphere(0.075, null, cm);
+        c.scale.set(1.1, 0.32, 0.85);
+        c.position.set(0.06 * side, 1.015, 0.085);
+        c.rotation.set(-0.35, side * 0.5, side * -0.35);
+        rig.add(c);
+      }
+      const hem = new THREE.Mesh(new THREE.TorusGeometry(0.236, 0.016, 8, SEG * 2), mat(shade(pj ? a.outfit : a.outfit, -0.12), { roughness: 0.9 }));
+      hem.rotation.x = Math.PI / 2; hem.position.y = TORSO + 0.03;
+      rig.add(hem);
+      if (!extra.apron && !pj) { // a little pocket
+        const pocket = new THREE.Mesh(new THREE.CircleGeometry(0.042, SEG, 0, Math.PI), mat(shade(a.outfit, -0.08), { roughness: 0.9 }));
+        pocket.rotation.z = Math.PI; pocket.position.set(-0.11, TORSO + 0.36, 0.2); pocket.rotation.y = -0.4;
+        rig.add(pocket);
+      }
     }
     if (!extra.apron) {
       for (let i = 0; i < 3; i++) {
-        const b = sphere(0.013, null, collarM);
-        b.position.set(0, 0.93 - i * 0.1, 0.205 + (i === 2 ? 0.012 : 0));
+        const b = sphere(furry ? 0.013 : 0.016, null, furry ? collarM : mat(pj ? '#fffaf2' : a.accent, { roughness: 0.6 }));
+        b.position.set(0, 0.93 - i * 0.1, (furry ? 0.205 : 0.218) + (i === 2 ? 0.014 : 0));
         rig.add(b);
       }
     }
@@ -464,16 +513,16 @@ function buildAvatarParts(avatar, extra) {
       }
     } else {
       shoulder.position.set(0.235 * side, SHOULDER, 0);
-      const arm = capsule(0.064, 0.25, null, outfitM);
-      arm.position.y = -0.17;
-      const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.017, 8, SEG), mat(furry ? a.accent : shade(a.outfit, 0.25)));
+      const arm = capsule(furry ? 0.064 : 0.072, furry ? 0.25 : 0.22, null, outfitM);
+      arm.position.y = -0.16;
+      const cuff = new THREE.Mesh(new THREE.TorusGeometry(furry ? 0.06 : 0.068, 0.017, 8, SEG), mat(furry ? a.accent : pj ? '#fffaf2' : shade(a.outfit, -0.12)));
       cuff.rotation.x = Math.PI / 2;
-      cuff.position.y = -0.33;
-      const hand = sphere(0.064, null, handM);
+      cuff.position.y = -0.31;
+      const hand = sphere(furry ? 0.064 : 0.068, null, handM);
       hand.scale.set(1, 1.05, 0.9);
-      hand.position.y = -0.41;
-      const thumb = sphere(0.026, null, handM);
-      thumb.position.set(-0.035 * side, -0.38, 0.045);
+      hand.position.y = -0.395;
+      const thumb = sphere(0.027, null, handM);
+      thumb.position.set(-0.038 * side, -0.365, 0.045);
       shoulder.add(arm, cuff, hand, thumb);
       shoulder.rotation.z = 0.09 * side;
     }
@@ -486,11 +535,11 @@ function buildAvatarParts(avatar, extra) {
   head.position.y = isOwl ? 0.97 : HEAD;
   rig.add(head);
   parts.head = head;
-  if (!isOwl) head.scale.setScalar(1.12); // a touch large, like a storybook — not a toy
+  if (!isOwl) head.scale.setScalar(furry ? 1.12 : 1.3); // big and friendly, like a storybook (people a little bigger still)
 
   const headR = isOwl ? 0.3 : 0.25;
   const skull = sphere(headR, null, skinM);
-  skull.scale.set(1, isFox ? 0.94 : 0.96, isOwl ? 0.95 : 0.96);
+  skull.scale.set(furry ? 1 : 1.04, isFox ? 0.94 : furry ? 0.96 : 0.95, isOwl ? 0.95 : 0.96);
   head.add(skull);
 
   // muzzle / snout / face disc
@@ -544,33 +593,52 @@ function buildAvatarParts(avatar, extra) {
     beak.position.set(0, -0.07, 0.31);
     head.add(beak);
   } else {
-    const nose = sphere(0.02, null, mat(shade(a.skin, -0.06), { roughness: 0.55 }));
-    nose.position.set(0, -0.03, 0.246);
+    const nose = sphere(0.016, null, mat(shade(a.skin, -0.05), { roughness: 0.55 }));
+    nose.scale.set(1.2, 0.8, 0.8);
+    nose.position.set(0, -0.045, 0.24);
     head.add(nose);
     for (const side of [-1, 1]) {
-      const ear = sphere(0.045, null, skinM);
-      ear.scale.set(0.5, 1, 0.8);
-      ear.position.set(0.245 * side, -0.01, 0);
+      const ear = sphere(0.042, null, skinM);
+      ear.scale.set(0.45, 0.9, 0.75);
+      ear.position.set(0.256 * side, -0.02, 0);
       head.add(ear);
     }
   }
 
   // eyes: glossy dark ovals with two catch-lights; they blink
-  const eyeY = isOwl ? 0.035 : 0.005;
-  const eyeX = isOwl ? 0.09 : 0.09;
-  const eyeZ = isOwl ? 0.285 : 0.214;
+  const person = !furry;
+  const eyeY = isOwl ? 0.035 : person ? -0.012 : 0.005;
+  const eyeX = isOwl ? 0.09 : person ? 0.092 : 0.09;
+  const eyeZ = isOwl ? 0.285 : person ? 0.218 : 0.214;
+  const irisM = mat(a.eyes || (person ? '#6b4532' : '#3a2a22'), { roughness: 0.25 });
   const shineM = mat('#ffffff', { emissive: '#ffffff', emissiveIntensity: 0.35 });
   for (const side of [-1, 1]) {
     const eye = new THREE.Group();
     eye.position.set(eyeX * side, eyeY, eyeZ);
     eye.rotation.y = side * (isOwl ? 0.32 : 0.4);
-    const ball = sphere(isOwl ? 0.058 : 0.03, null, darkM);
-    ball.scale.set(1, isOwl ? 1 : 1.15, 0.55);
-    const big = sphere(isOwl ? 0.016 : 0.0075, null, shineM);
-    big.position.set(isOwl ? 0.012 : 0.009, isOwl ? 0.02 : 0.013, isOwl ? 0.022 : 0.016);
-    const small = sphere(isOwl ? 0.008 : 0.0035, null, shineM);
-    small.position.set(-0.008, -0.011, isOwl ? 0.022 : 0.016);
-    eye.add(ball, big, small);
+    if (person) {
+      // a big glossy eye: dark outline, a warm iris, two catch-lights, a lash line over the top
+      const ball = sphere(0.043, null, darkM);
+      ball.scale.set(0.82, 1.12, 0.42);
+      const iris = sphere(0.031, null, irisM);
+      iris.scale.set(0.82, 1.0, 0.42);
+      iris.position.set(0, -0.008, 0.006);
+      const big = sphere(0.012, null, shineM);
+      big.position.set(0.011, 0.017, 0.017);
+      const small = sphere(0.0055, null, shineM);
+      small.position.set(-0.01, -0.019, 0.016);
+      const lash = new THREE.Mesh(new THREE.TorusGeometry(0.037, she ? 0.0075 : 0.0055, 6, 20, Math.PI), darkM);
+      lash.scale.set(0.95, 1.2, 1); lash.position.set(0, 0.002, 0.006);
+      eye.add(ball, iris, big, small, lash);
+    } else {
+      const ball = sphere(isOwl ? 0.058 : 0.03, null, darkM);
+      ball.scale.set(1, isOwl ? 1 : 1.15, 0.55);
+      const big = sphere(isOwl ? 0.016 : 0.0075, null, shineM);
+      big.position.set(isOwl ? 0.012 : 0.009, isOwl ? 0.02 : 0.013, isOwl ? 0.022 : 0.016);
+      const small = sphere(isOwl ? 0.008 : 0.0035, null, shineM);
+      small.position.set(-0.008, -0.011, isOwl ? 0.022 : 0.016);
+      eye.add(ball, big, small);
+    }
     if (isOwl) {
       // Me3temed's soft, half-open eyes: a lid over the top half
       const lid = new THREE.Mesh(new THREE.SphereGeometry(0.062, SEG, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), mat(shade(a.accent, -0.12), { roughness: 0.9 }));
@@ -584,7 +652,7 @@ function buildAvatarParts(avatar, extra) {
     }
     if (she && !isOwl) {
       // lashes, flicking out at the corner
-      for (const [x, y, r] of [[0.022, 0.027, -0.85], [0.013, 0.034, -0.45]]) {
+      for (const [x, y, r] of person ? [[0.034, 0.03, -1.0], [0.026, 0.04, -0.6]] : [[0.022, 0.027, -0.85], [0.013, 0.034, -0.45]]) {
         const lash = capsule(0.0035, 0.014, null, darkM);
         lash.position.set(x * side, y, 0.014);
         lash.rotation.z = r * side;
@@ -595,24 +663,27 @@ function buildAvatarParts(avatar, extra) {
     blinkers.push(eye);
     if (!isOwl) {
       // brows
-      const brow = capsule(he ? 0.011 : 0.008, 0.035, null, mat(furry ? shade(a.skin, -0.3) : a.hair, { roughness: 0.6 }));
-      brow.rotation.z = Math.PI / 2 + 0.18 * side;
-      brow.position.set(eyeX * side, eyeY + 0.062, eyeZ + 0.01);
-      brow.rotation.y = side * 0.4;
+      const browM = mat(furry ? shade(a.skin, -0.3) : shade(a.hair, -0.05), { roughness: 0.6 });
+      const brow = person
+        ? new THREE.Mesh(new THREE.TorusGeometry(0.032, he ? 0.009 : 0.0065, 6, 14, Math.PI * 0.6), browM)
+        : capsule(he ? 0.011 : 0.008, 0.035, null, browM);
+      if (person) { brow.rotation.z = Math.PI * 0.2; brow.position.set(eyeX * side, eyeY + 0.068, eyeZ + 0.004); brow.rotation.y = side * 0.4; }
+      else { brow.rotation.z = Math.PI / 2 + 0.18 * side; brow.position.set(eyeX * side, eyeY + 0.062, eyeZ + 0.01); brow.rotation.y = side * 0.4; }
       head.add(brow);
     }
-    const blush = new THREE.Mesh(new THREE.CircleGeometry(0.034, SEG),
-      new THREE.MeshBasicMaterial({ color: '#e8a0ab', transparent: true, opacity: furry ? 0.18 : 0.22, depthWrite: false }));
-    blush.position.set((eyeX + 0.065) * side, eyeY - 0.07, eyeZ - 0.035);
+    const blush = new THREE.Mesh(new THREE.CircleGeometry(person ? 0.038 : 0.034, SEG),
+      new THREE.MeshBasicMaterial({ color: '#f09aa8', transparent: true, opacity: furry ? 0.18 : 0.38, depthWrite: false }));
+    blush.scale.y = person ? 0.7 : 1;
+    blush.position.set((eyeX + (person ? 0.05 : 0.065)) * side, eyeY - (person ? 0.06 : 0.07), eyeZ - (person ? 0.02 : 0.035));
     blush.lookAt(blush.position.clone().multiplyScalar(3));
     head.add(blush);
   }
   // a small smile
   if (!isOwl) {
-    const smile = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.0045, 8, 18, Math.PI), mat(she ? '#b0566a' : '#7f4a46', { roughness: 0.5 }));
+    const smile = new THREE.Mesh(new THREE.TorusGeometry(person ? 0.024 : 0.02, person ? 0.0055 : 0.0045, 8, 18, Math.PI), mat(she ? '#b0566a' : '#8a4a46', { roughness: 0.5 }));
     smile.rotation.z = Math.PI;
-    const mz = isFox ? 0.33 : isCat ? 0.27 : isRabbit ? 0.237 : 0.232;
-    smile.position.set(0, isFox ? -0.115 : isRabbit ? -0.105 : -0.085, mz);
+    const mz = isFox ? 0.33 : isCat ? 0.27 : isRabbit ? 0.237 : 0.226;
+    smile.position.set(0, isFox ? -0.115 : isRabbit ? -0.105 : -0.095, mz);
     smile.rotation.x = isFox ? -0.25 : -0.15;
     head.add(smile);
   }
@@ -703,76 +774,94 @@ function buildAvatarParts(avatar, extra) {
     rig.add(puff);
   }
 
-  // hair (people only)
+  // hair (people only) — sculpted, smooth volumes that hug the head: a cap
+  // that follows the skull, a soft scalloped fringe, and the style's shape.
   if (a.body === 'person' && a.hairStyle !== 'none') {
-    const hairM = mat(a.hair, { roughness: 0.55 });
-    const capR = 0.262;
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(capR, SEG, SEG, 0, Math.PI * 2, 0, Math.PI * 0.56), hairM);
-    cap.rotation.x = -0.32;
-    cap.position.set(0, 0.012, -0.008);
-    cap.castShadow = true;
-    head.add(cap);
-    const fringe = (n, y, spread, len) => {
+    const hairM = new THREE.MeshStandardMaterial({ color: a.hair, map: softTex('hair'), roughness: 0.5 });
+    const R0 = 0.27;
+    // a piece of a sphere round the head: phi runs round (π/2 is the face), theta down from the crown
+    const shell = (r, phi0, phiLen, th0, thLen, m = hairM) => {
+      const g = new THREE.Mesh(new THREE.SphereGeometry(r, SEG * 2, SEG, phi0, phiLen, th0, thLen), m);
+      g.material.side = THREE.DoubleSide;
+      g.scale.set(1.05, 0.97, 1.0);
+      g.castShadow = true;
+      head.add(g);
+      return g;
+    };
+    // a soft lock sitting on the head's surface at (phi, theta), pointing down it
+    const lock = (phi, th, w, len, r = R0 + 0.004) => {
+      const l = sphere(0.06, null, hairM);
+      l.scale.set(w, len, 0.42);
+      // lie flat on the head: thin across its normal, long down the surface
+      const n = new THREE.Vector3(-Math.cos(phi) * Math.sin(th), Math.cos(th), Math.sin(phi) * Math.sin(th));
+      const down = new THREE.Vector3(Math.cos(phi) * Math.cos(th), Math.sin(th), -Math.sin(phi) * Math.cos(th));
+      const x = new THREE.Vector3().crossVectors(down, n);
+      l.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, down, n));
+      l.position.copy(n).multiplyScalar(r).multiply(new THREE.Vector3(1.05, 0.97, 1));
+      head.add(l);
+      return l;
+    };
+    const FACE = Math.PI / 2;
+    // the fringe: a smooth band over the forehead, its edge softly scalloped
+    const fringe = (n, spread, th, len, sweep = 0) => {
+      shell(R0 + 0.004, FACE - spread / 2 - 0.15 + sweep, spread + 0.3, Math.PI * 0.2, th - Math.PI * 0.2 - 0.06);
       for (let i = 0; i < n; i++) {
         const t = n === 1 ? 0 : i / (n - 1) - 0.5;
-        const lock = sphere(0.075, null, hairM);
-        lock.scale.set(1.15, len, 0.55);
-        lock.position.set(t * spread, y - Math.abs(t) * 0.03, 0.2 - Math.abs(t) * 0.06);
-        lock.rotation.set(-0.35, t * 0.9, t * 0.4);
-        head.add(lock);
+        lock(FACE + t * spread + sweep, th - Math.abs(t) * 0.12, 1.25 * spread / n * 2.4, len * 0.7);
       }
     };
+    // the cap: all round the back and sides, down to the hairline at the front
+    shell(R0, 0, Math.PI * 2, 0, Math.PI * 0.36);                   // crown, all round
+    shell(R0, FACE + 0.62, Math.PI * 2 - 1.24, Math.PI * 0.3, Math.PI * 0.26); // back and sides, clear of the face
     if (a.hairStyle === 'short') {
-      fringe(4, 0.14, 0.27, 0.65);
-      for (const side of [-1, 1]) {
-        const side_ = sphere(0.07, null, hairM);
-        side_.scale.set(0.5, 1, 0.9);
-        side_.position.set(0.235 * side, 0.06, -0.03);
-        head.add(side_);
-      }
+      fringe(5, 1.3, 0.95, 1.35, -0.12);
+      for (const side of [-1, 1]) lock(FACE + side * 1.2, 1.45, 0.9, 1.0); // neat sideburns
+      const tuft = sphere(0.12, null, hairM); tuft.scale.set(1.3, 0.5, 1.2); tuft.position.set(0.02, 0.235, 0.03); head.add(tuft);
     } else if (a.hairStyle === 'long') {
-      fringe(3, 0.14, 0.22, 0.7);
-      const back = capsule(0.21, 0.36, null, hairM);
-      back.scale.set(1.12, 1, 0.55);
-      back.position.set(0, -0.2, -0.12);
-      head.add(back);
-      for (const side of [-1, 1]) {
-        const lock = capsule(0.055, 0.32, null, hairM);
-        lock.position.set(0.215 * side, -0.14, 0.06);
-        lock.rotation.z = 0.08 * side;
-        head.add(lock);
-      }
+      fringe(4, 1.1, 0.95, 1.4);
+      // a smooth curtain down the back and over the shoulders
+      // (a cylinder's angle 0 faces forward: leave the face open)
+      const curtain = new THREE.Mesh(new THREE.CylinderGeometry(R0 * 1.02, R0 * 1.12, 0.42, SEG * 2, 1, true, 0.9, Math.PI * 2 - 1.8), hairM);
+      curtain.material.side = THREE.DoubleSide;
+      curtain.position.set(0, -0.16, -0.01);
+      curtain.scale.set(1.05, 1, 0.95);
+      head.add(curtain);
+      // (a torus starts at +x; turned, its angle π/2 faces forward)
+      const end = new THREE.Mesh(new THREE.TorusGeometry(R0 * 1.1, 0.035, 8, SEG * 2, Math.PI * 2 - 1.8), hairM);
+      end.rotation.set(Math.PI / 2, 0, FACE + 0.9);
+      end.position.y = -0.37; end.scale.set(1.05, 1, 0.95);
+      head.add(end);
+      for (const side of [-1, 1]) { const f = capsule(0.05, 0.3, null, hairM); f.scale.z = 0.6; f.position.set(0.24 * side, -0.14, 0.07); f.rotation.z = 0.06 * side; head.add(f); }
     } else if (a.hairStyle === 'bun') {
-      fringe(3, 0.15, 0.2, 0.55);
-      const bun = sphere(0.11, null, hairM);
-      bun.position.set(0, 0.22, -0.16);
-      const tie = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.016, 8, SEG), mat(a.accent === '#fef9f5' ? '#d4678a' : a.accent));
-      tie.position.set(0, 0.16, -0.12);
-      tie.rotation.x = -0.9;
+      fringe(4, 1.0, 0.95, 1.2, 0.1);
+      const bun = sphere(0.105, null, hairM);
+      bun.position.set(0, 0.25, -0.13);
+      const tie = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.018, 8, SEG), mat(a.accent === '#fef9f5' ? '#d4678a' : a.accent));
+      tie.position.set(0, 0.2, -0.1); tie.rotation.x = -0.9;
       head.add(bun, tie);
     } else if (a.hairStyle === 'curly') {
-      for (let i = 0; i < 18; i++) {
-        const ang = (i / 18) * Math.PI * 2;
-        const curl = sphere(0.075, null, hairM);
-        curl.position.set(Math.cos(ang) * 0.215, 0.1 + Math.sin(i * 1.7) * 0.04, Math.sin(ang) * 0.205 - 0.04);
-        if (Math.sin(ang) > 0.75) curl.position.y += 0.06; // keep the face clear
-        head.add(curl);
+      // soft round curls all over, clear of the face
+      for (let ring = 0; ring < 3; ring++) {
+        const th = 0.35 + ring * 0.45, n = 8 + ring * 3;
+        for (let i = 0; i < n; i++) {
+          const phi = (i / n) * Math.PI * 2 + ring * 0.3;
+          const d = Math.abs(((phi - FACE + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+          if (ring > 0 && d < 0.75) continue;
+          const c = sphere(ring === 2 ? 0.07 : 0.08, null, hairM);
+          c.position.set(-Math.cos(phi) * Math.sin(th) * (R0 + 0.02) * 1.05, Math.cos(th) * (R0 + 0.02), Math.sin(phi) * Math.sin(th) * (R0 + 0.02));
+          head.add(c);
+        }
       }
-      for (let i = 0; i < 6; i++) {
-        const curl = sphere(0.08, null, hairM);
-        curl.position.set(Math.cos(i) * 0.1, 0.24, Math.sin(i * 2.1) * 0.1 - 0.03);
-        head.add(curl);
-      }
+      fringe(4, 1.0, 0.85, 0.9);
     } else if (a.hairStyle === 'bob') {
-      // everything but the face (phi = π/2 faces forward)
-      const bob = new THREE.Mesh(new THREE.SphereGeometry(0.285, SEG, SEG, Math.PI / 2 + 0.75, Math.PI * 2 - 1.5, 0, Math.PI * 0.72), hairM);
-      bob.material.side = THREE.DoubleSide;
-      head.add(bob);
-      const bang = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.08, SEG, 1, true, -Math.PI * 0.3, Math.PI * 0.6), hairM);
-      bang.material.side = THREE.DoubleSide;
-      bang.position.y = 0.14;
-      bang.rotation.x = -0.12;
-      head.add(bang);
+      // a rounded bob: full at the sides, cut straight above the shoulders, with straight bangs
+      shell(R0 + 0.02, FACE + 0.7, Math.PI * 2 - 1.4, Math.PI * 0.2, Math.PI * 0.5);
+      // the ends, curled softly under, right at the bottom of the bob
+      const flick = new THREE.Mesh(new THREE.TorusGeometry((R0 + 0.02) * 0.79, 0.028, 8, SEG * 2, Math.PI * 2 - 1.4), hairM);
+      flick.rotation.set(Math.PI / 2, 0, FACE + 0.7);
+      flick.position.y = -0.16; flick.scale.set(1.05, 1, 1);
+      head.add(flick);
+      fringe(6, 1.25, 0.88, 1.0);
     }
   }
 
