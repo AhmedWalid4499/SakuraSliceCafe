@@ -337,7 +337,7 @@ export function buildCommon({ floor, makeSign }) {
   setTV(null);
 
   return {
-    setTV, lights, bounds: R,
+    setTV, lights, bounds: R, screen, // (the film plays on it: tvscreen.js)
     arrival: { x: 0, z: R.maxZ - 3.2, ry: Math.PI }, // a few steps in from the door, facing the TV
   };
 }

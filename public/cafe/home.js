@@ -1513,6 +1513,8 @@ export function buildHome({ floor, makeSign }) {
     // squashed against the wall looking down at the top of your head
     arrival: { x: 0, z: R.maxZ - 2.2, ry: Math.PI },
     bounds: R, ceilingLight, lampShade, sideLights, route, cameraBox, walls, onBalcony,
+    // the screen of the (first) TV in the room, for the film to play on (tvscreen.js)
+    screenMesh() { for (const e of items.values()) if (e.def.tv) { const s = e.group.getObjectByName('screen'); if (s) return s; } return null; },
     balconyDoorOpen: () => doorOpen,
     setBalconyDoor(open, instant = false) {
       doorOpen = !!open;

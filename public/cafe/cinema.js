@@ -71,10 +71,11 @@ export function buildCinema({ floor, makeSign }) {
 
   // ── the screen, with its curtains and its little stage
   const screenMat = new THREE.MeshBasicMaterial({ map: screenTex(null, null), toneMapped: false });
+  let screen;
   {
     const sw = 6.4, sh = 3.4, y = 2.25;
     group.add(at(box(sw + 0.3, sh + 0.3, 0.06, std('#0d0d10')), 0, y, R.minZ + 0.04));
-    const screen = at(new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), screenMat), 0, y, R.minZ + 0.08);
+    screen = at(new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), screenMat), 0, y, R.minZ + 0.08);
     group.add(screen);
     clickable(screen, { kind: 'cinema-screen', label: 'The screen — what’s on, and when 🎬' });
     const velvet = std('#7c1f2c', { roughness: 1 });
@@ -167,7 +168,7 @@ export function buildCinema({ floor, makeSign }) {
   floor.seats.push(...seats);
 
   return {
-    lights, bounds: R,
+    lights, bounds: R, screen,
     arrival: { x: -3.6, z: R.maxZ - 1.2, ry: Math.PI },
     // what's on: the film showing now (or null), and the programme
     setProgramme(film, list) {
