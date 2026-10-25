@@ -184,6 +184,14 @@ function attach(server, opts = {}) {
 
       // A note on an instrument in the Music Room: everyone else in there hears
       // it. Up to a dozen or so a second (fast enough for a tune, not for spam).
+      // the Laundry Room: someone puts a wash on, and everyone in there sees that machine go
+      if (m.t === 'machine') {
+        if (entry.room !== 'laundry') return;
+        const i = Math.round(Number(m.i));
+        if (!(i >= 0 && i < 7)) return;
+        broadcast({ t: 'machine', id: entry.user.id, i, by: entry.profile.displayName }, ws, entry.room);
+        return;
+      }
       if (m.t === 'play') {
         if (entry.room !== 'music') return;
         const now = Date.now();

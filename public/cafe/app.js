@@ -36,6 +36,14 @@ const ROOMS = {
     enter: () => 'You push open the doors to the Games Room. The click of pool balls, and somebody shouting “GOAL!” at the baby-foot table.' },
   library: { where: 'in the BookBeans Library', long: 'in the BookBeans Library on the second floor, among the books', pj: true,
     enter: () => 'You step into the BookBeans Library. It smells of old paper and fresh coffee, and somebody is typing in the writers’ nook.' },
+  bakery: { where: 'in the Kitchen, at the baking class', long: 'in the Kitchen on the second floor, baking something sweet', pj: true,
+    enter: () => 'You step into the Kitchen. It smells of butter and cardamom, and the ovens are warm.' },
+  gym: { where: 'in the Gym', long: 'in the Gym and Yoga Studio on the second floor',
+    enter: () => 'You come into the Gym. A treadmill hums; on the far side, the yoga mats are laid out in front of the mirror.' },
+  art: { where: 'in the Art Studio', long: 'in the Art Studio on the second floor, at an easel', pj: true,
+    enter: () => 'You step into the Art Studio. Light from the big windows, the smell of paint, and the gallery wall full of everyone’s pictures.' },
+  laundry: { where: 'in the Laundry Room', long: 'in the Laundry Room on the second floor, watching the machines go round', pj: true,
+    enter: () => 'You carry your basket into the Laundry Room. A dryer is tumbling somewhere, and it smells of clean washing.' },
   cinema: { where: 'at the Rooftop Cinema', long: 'up at the Rooftop Cinema on the roof, under its covered roof',
     enter: () => 'You step into the Rooftop Cinema. Red seats, the smell of popcorn, and a proper roof overhead — rain or shine, the film goes on 🎬' },
 };
@@ -773,7 +781,7 @@ function updatePlayer(dt) {
   const lying = !!player.seat?.lie;
   player.av.group.rotation.order = 'YXZ';
   player.av.group.rotation.x = lying ? -Math.PI / 2 : 0;
-  player.av.update(dt, { moving, sitting: !!player.seat && !lying, sitH: player.seat?.h ?? 0.54, waving: player.waving, asleep: lying, typing: !!player.seat?.work });
+  player.av.update(dt, { moving: moving || !!player.seat?.run, sitting: !!player.seat && !lying && !player.seat.run, sitH: player.seat?.h ?? 0.54, waving: player.waving, asleep: lying, typing: !!player.seat?.work });
   if (moving) sendMove();
 }
 
@@ -810,7 +818,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
   const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
-  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'hall2' ? world.hall2.bounds : world.floor === 'common' ? world.common.bounds : world.floor === 'koshari' ? world.koshari.bounds : world.floor === 'music' ? world.music.bounds : world.floor === 'prayer' ? world.prayer.bounds : world.floor === 'sleepover' ? world.sleepover.bounds : world.rooms[world.floor] ? world.rooms[world.floor].bounds : ROOM;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'hall2' ? world.hall2.bounds : world.floor === 'common' ? world.common.bounds : world.floor === 'koshari' ? world.koshari.bounds : world.floor === 'ahwa' ? world.ahwa.bounds : world.floor === 'music' ? world.music.bounds : world.floor === 'prayer' ? world.prayer.bounds : world.floor === 'sleepover' ? world.sleepover.bounds : world.rooms[world.floor] ? world.rooms[world.floor].bounds : ROOM;
   // Glide the walls in rather than snapping: walking through a doorway (into
   // your kitchen, bathroom, library or out on the balcony) changes the box, and
   // a hard switch used to jump the camera from one side of the wall to the other.
@@ -902,13 +910,13 @@ function updatePeople(dt) {
     p.av.group.rotation.order = 'YXZ';
     p.av.group.rotation.x = seat?.lie ? -Math.PI / 2 : 0;
     if (p.waving > 0) p.waving -= dt;
-    p.av.update(dt, { moving, sitting: !!seat && !seat.lie, sitH: seat?.h ?? 0.54, waving: p.waving || 0, asleep: !!seat?.lie, typing: !!seat?.work });
+    p.av.update(dt, { moving: moving || !!seat?.run, sitting: !!seat && !seat.lie && !seat.run, sitH: seat?.h ?? 0.54, waving: p.waving || 0, asleep: !!seat?.lie, typing: !!seat?.work });
   }
 }
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'hall2' ? ' · in the upper hallway' : state.room === 'common' ? ' · in the Common room' : state.room === 'koshari' ? ' · at Koshari Abu Saied, across the road' : state.room === 'music' ? ' · in the Music Room' : state.room === 'prayer' ? ' · in the Prayer Room' : state.room === 'sleepover' ? ' · in the Sleepover Room' : ROOMS[state.room] ? ' · ' + ROOMS[state.room].where : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'hall2' ? ' · in the upper hallway' : state.room === 'common' ? ' · in the Common room' : state.room === 'koshari' ? ' · at Koshari Abu Saied, across the road' : state.room === 'ahwa' ? ' · at Ahwet El-Sett, across the road' : state.room === 'music' ? ' · in the Music Room' : state.room === 'prayer' ? ' · in the Prayer Room' : state.room === 'sleepover' ? ' · in the Sleepover Room' : ROOMS[state.room] ? ' · ' + ROOMS[state.room].where : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
   $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
@@ -978,6 +986,12 @@ function handle(m) {
       break;
     case 'home:gifts':
       if (state.home && m.ownerId === state.home.ownerId) { state.home.gifts = m.gifts; world.home.setGifts(m.gifts, state.home.canEdit); }
+      break;
+    case 'machine':
+      runMachine(m.i, m.by);
+      break;
+    case 'art:gallery':
+      artGallery = m.paintings; world.rooms.art.setGallery(m.paintings);
       break;
     case 'arcade:scores':
       world.rooms.games.setScores(m.scores);
@@ -1305,7 +1319,9 @@ const drinkTemp = id => tempOf(menu().find(d => d.id === id) || {});
 const pastries = () => (Array.isArray(state.content['counter.pastries']) ? state.content['counter.pastries'] : []).filter(p => p && p.id && p.name);
 // a bowl from Koshari Abu Saied across the road counts as something to eat, like a pastry
 const KOSHARI_BOWLS = { 'koshari-s': 'a small koshari', 'koshari-m': 'a medium koshari', 'koshari-l': 'a large koshari' };
-const pastryOf = id => (KOSHARI_BOWLS[id] ? { id, name: KOSHARI_BOWLS[id], shape: 'koshari', by: 'abu-saied' } : null)
+// …and so does a glass of tea from the ahwa next door
+const AHWA_CUPS = { 'ahwa-shai': ['a glass of shai with mint', 'teaglass'], 'ahwa-qahwa': ['a little cup of Turkish coffee', 'coffeecup'], 'ahwa-sahlab': ['a cup of sahlab', 'sahlab'] };
+const pastryOf = id => (KOSHARI_BOWLS[id] ? { id, name: KOSHARI_BOWLS[id], shape: 'koshari', by: 'abu-saied' } : AHWA_CUPS[id] ? { id, name: AHWA_CUPS[id][0], shape: AHWA_CUPS[id][1], by: 'ahwa' } : null)
   || pastries().find(p => p.id === id) || { id, name: 'pastry', shape: 'daifuku', by: 'yuki' };
 const bakerOf = p => (p.by === 'hana' ? 'Hana' : 'Yuki');
 
@@ -1744,6 +1760,22 @@ function click(x, y) {
   if (d.kind === 'common-tv') return openCommonTV();
   if (d.kind === 'hall-music') return walkToThing(h, () => goToRoom('music'));
   if (d.kind === 'koshari-go') return goToRoom('koshari');
+  if (d.kind === 'ahwa-go') return goToRoom('ahwa');
+  if (d.kind === 'ahwa-out') return goToRoom('main');
+  if (d.kind === 'ahwa-order') return openAhwa();
+  if (d.kind === 'ahwa-gramophone') return walkToThing(h, playRecords);
+  if (d.kind === 'bake') return walkToThing(h, openBaking);
+  if (d.kind === 'bake-rack') return walkToThing(h, () => toast('🍰 Trays of konafa, basbousa and mochi, cooling. Hands off — they’re for the snack shelves upstairs!'));
+  if (d.kind === 'gym-run') { goSit(d.seat); return toast(d.seat.id.includes('bike') ? '🚴 You pedal away. Stand up when you’ve had enough.' : '🏃 You step on and start to run. Stand up to step off.'); }
+  if (d.kind === 'gym-weights') return walkToThing(h, () => { bubble(player.av.group, '💪', 'emote'); send({ t: 'emote', e: '💪' }); toast('💪 Ten curls each arm. You feel stronger already — or at least warmer.'); });
+  if (d.kind === 'gym-water') return walkToThing(h, () => { bubble(player.av.group, '💧', 'emote'); toast('💧 A cold cup of water from the cooler. Glug glug glug.'); });
+  if (d.kind === 'gym-yoga') { if (player.seat !== d.seat) goSit(d.seat); return openStretch(); }
+  if (d.kind === 'art-easel') { if (player.seat !== d.seat) goSit(d.seat); return openPaint(); }
+  if (d.kind === 'art-table') return walkToThing(h, () => toast('🎨 Pots of every colour, jars of brushes, and a lot of rags that have seen things. Take a stool at an easel to paint.'));
+  if (d.kind === 'art-gallery') return toast(d.painting ? `🖼️ “${d.painting.title}” by ${d.painting.by}.` : '🖼️ An empty frame on the gallery wall — paint something at an easel and hang it here.');
+  if (d.kind === 'laundry-machine') return walkToThing(h, () => startMachine(d.index));
+  if (d.kind === 'laundry-fold') return walkToThing(h, () => toast('👕 You fold a pile of warm T-shirts into neat squares. Very satisfying.'));
+  if (d.kind === 'laundry-basket') return walkToThing(h, () => toast('🧺 A basket of clean washing. Somebody’s pyjamas are in here — with stars on.'));
   if (d.kind === 'koshari-out') return goToRoom('main');
   if (d.kind === 'koshari-order') return openKoshari();
   if (d.kind === 'hall-prayer') return walkToThing(h, () => goToRoom('prayer'));
@@ -1855,7 +1887,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel'];
+const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -3090,7 +3122,7 @@ $('talkForm').addEventListener('submit', async e => {
   try {
     const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
       player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
-    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'hall2' ? 'in the upper hallway, one floor further up' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.room === 'koshari' ? 'across the road at Koshari Abu Saied, the koshari shop' : state.room === 'music' ? 'in the Music Room upstairs, by the piano and the little stage' : state.room === 'prayer' ? 'in the quiet Prayer Room upstairs' : state.room === 'sleepover' ? 'up on the second floor, in the Sleepover Room — beds everywhere, a film on the big TV' : ROOMS[state.room] ? ROOMS[state.room].long : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'hall2' ? 'in the upper hallway, one floor further up' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.room === 'koshari' ? 'across the road at Koshari Abu Saied, the koshari shop' : state.room === 'ahwa' ? 'across the road at Ahwet El-Sett, the old coffee house, over a glass of tea' : state.room === 'music' ? 'in the Music Room upstairs, by the piano and the little stage' : state.room === 'prayer' ? 'in the quiet Prayer Room upstairs' : state.room === 'sleepover' ? 'up on the second floor, in the Sleepover Room — beds everywhere, a film on the big TV' : ROOMS[state.room] ? ROOMS[state.room].long : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
@@ -3271,7 +3303,7 @@ async function goToRoom(room, group = null) {
   const isHome = !!homeData;
   const isHall = room === 'hall' || room === 'hall2';
   const isCommon = room === 'common';
-  const isMusic = room === 'music', isPrayer = room === 'prayer', isKoshari = room === 'koshari', isSleep = room === 'sleepover';
+  const isMusic = room === 'music', isPrayer = room === 'prayer', isKoshari = room === 'koshari' || room === 'ahwa', isSleep = room === 'sleepover';
   const extra = !!ROOMS[room]; // the landing, the rooms off it, the cinema (world.rooms)
   const up = room !== 'main' && !roof && !isHome && !isHall && !isCommon && !isMusic && !isPrayer && !isKoshari && !isSleep && !extra; // a group's room upstairs
   state.room = room;
@@ -3279,7 +3311,7 @@ async function goToRoom(room, group = null) {
   state.home = isHome ? { ...homeData, ownerId: Number(room.slice(5)) } : null;
   // into your pyjamas upstairs (or back into your day clothes)
   if (!!dressFor(state.me.avatar).pj !== wearingPJ) playerAvatar();
-  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? room : isCommon ? 'common' : isMusic ? 'music' : isPrayer ? 'prayer' : isSleep ? 'sleepover' : extra ? room : isKoshari ? 'koshari' : up ? 'up' : 'main');
+  world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? room : isCommon ? 'common' : isMusic ? 'music' : isPrayer ? 'prayer' : isSleep ? 'sleepover' : extra ? room : isKoshari ? room : up ? 'up' : 'main');
   if (isHall) await loadHallDoors();
   if (isHome) {
     world.home.setRoom(homeData.room); world.home.setItems(homeData.items);
@@ -3288,6 +3320,7 @@ async function goToRoom(room, group = null) {
     world.home.setGifts(homeData.gifts, homeData.canEdit);
     setMovie(homeData.movie, homeData.now);
   } else setMovie(null);
+  world.ahwa.setSpinning(false); // (the gramophone stops when you leave)
   // the Sleepover Room's TV: whatever's on, for everyone in there
   if (isSleep) api('/tv/sleepover/movie').then(r => { if (state.room === 'sleepover') setMovie(r.movie, r.now); }).catch(() => {});
   if (up) world.setUpstairsSign(group.name, group.description || 'upstairs at Sakura Slice', group.color);
@@ -3317,12 +3350,12 @@ async function goToRoom(room, group = null) {
     player.ry = a.ry;
     cam.yaw = 0; cam.pitch = 0.32; cam.dist = cam.targetDist = 3.4;
   }
-  if (room === 'main' && from === 'koshari') { // back across the road and in at the front door
+  if (room === 'main' && (from === 'koshari' || from === 'ahwa')) { // back across the road and in at the front door
     player.pos.set(0, 0, mapZ(3.8)); player.ry = Math.PI;
     cam.yaw = 0; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.6;
   }
   if (isKoshari) { // in from the street, the counter ahead
-    const a = world.koshari.arrival;
+    const a = world[room].arrival;
     player.pos.set(a.x, 0, a.z); player.ry = a.ry;
     cam.yaw = Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 2.8;
   }
@@ -3373,7 +3406,9 @@ async function goToRoom(room, group = null) {
   if (room === 'games') loadScores();
   if (room === 'library') { world.rooms.library.setBooks(authorBooks()); loadWords(); }
   if (room === 'cinema') refreshCinema(true);
+  if (room === 'art') loadGallery();
   sysChat(extra ? ROOMS[room].enter(from) : isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.'
+    : room === 'ahwa' ? 'You cross the road to Ahwet El-Sett. The click of tawla pieces, glasses of tea on brass trays, and the gramophone in the corner.'
     : isKoshari ? 'You cross the road — mind the tuk-tuk — to Koshari Abu Saied. The spoon rings on the steel bowls.'
     : isMusic ? 'You open the doors to the Music Room. Someone has left the piano lid up.'
     : isSleep ? 'You climb the stairs to the second floor — the Sleepover Room. Fairy lights, a dozen beds, and the big TV waiting for someone to put a film on 🌙'
@@ -3386,7 +3421,7 @@ async function goToRoom(room, group = null) {
     : roof && from === 'cinema' ? 'You step out of the cinema onto the roof garden, blinking.' : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
-    : up ? `You climb the spiral stairs to ${group.name}'s room.` : from === 'koshari' ? 'You cross back over the road and in at the café door. The bell chimes.' : 'You come back down into the café.');
+    : up ? `You climb the spiral stairs to ${group.name}'s room.` : from === 'koshari' || from === 'ahwa' ? 'You cross back over the road and in at the café door. The bell chimes.' : 'You come back down into the café.');
   if (isHome && homeData.focus) offerFocus(homeData.focus, homeData.now);
   updateOnline();
   await wait(120);
@@ -4255,20 +4290,20 @@ function setMovie(m, now) {
   movie = m || null;
   if (now) movieSkew = Date.now() - now;
   if (state.room === 'sleepover') world.sleepover.setMovie(movie);
-  else if (state.room !== 'common' && state.room !== 'cinema') world.home.setMovie(movie);
+  else if (!['common', 'cinema', 'ahwa'].includes(state.room)) world.home.setMovie(movie);
   const box = $('cinema');
   stopPlaylist();
   if (!movie) { box.classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; return; }
   if (movie.list) { // a playlist: played in order, everyone in step (see playPlaylist)
     $('cinemaTitle').textContent = movie.title;
-    $('cinemaBy').textContent = movie.by ? `put on by ${movie.by}` : state.room === 'cinema' ? 'at the Rooftop Cinema' : 'on the Common room TV';
+    $('cinemaBy').textContent = movie.by ? `put on by ${movie.by}` : state.room === 'cinema' ? 'at the Rooftop Cinema' : state.room === 'ahwa' ? 'on the gramophone' : 'on the Common room TV';
     box.classList.remove('hidden', 'small');
     playPlaylist(movie.list, state.room);
     return;
   }
   const offset = Math.max(0, Math.floor((Date.now() - movieSkew - movie.startedAt) / 1000));
   $('cinemaTitle').textContent = movie.title;
-  $('cinemaBy').textContent = movie.by ? `put on by ${movie.by}` : state.room === 'cinema' ? 'at the Rooftop Cinema' : '';
+  $('cinemaBy').textContent = movie.by ? `put on by ${movie.by}` : state.room === 'cinema' ? 'at the Rooftop Cinema' : state.room === 'ahwa' ? 'on the gramophone' : '';
   $('cinemaFrame').src = `https://www.youtube-nocookie.com/embed/${movie.videoId}?autoplay=1&start=${offset}&rel=0&playsinline=1`;
   box.classList.remove('hidden', 'small');
 }
@@ -4579,6 +4614,8 @@ setInterval(() => {
   } else wasOnStage = false;
   if (state.room === 'prayer' && Date.now() - quietRoom.timesAt > 60e3) refreshPrayerTimes();
   if (state.room === 'cinema' && Date.now() - (cinemaShow.at || 0) > 15e3) { cinemaShow.at = Date.now(); refreshCinema(); }
+  // the treadmills' belts and the bikes' wheels go round while somebody's on them
+  if (state.room === 'gym') world.rooms.gym.setBusy([player.seat && player.seat.id, ...[...state.people.values()].map(p => p.seat && p.seat.id)].filter(Boolean));
   if (Date.now() - (adhan.checked || 0) > 15e3) { adhan.checked = Date.now(); checkAdhan(); }
 }, 500);
 
@@ -4759,6 +4796,202 @@ $('cinAdd').onclick = () => {
   };
   $('cinTitle').value = ''; $('cinUrl').value = ''; $('cinNote').value = '';
   saveFilms([...(state.content['cafe.events'] || []), e]);
+};
+
+// ── the Kitchen: a baking class, a step at a time; it goes on your flat's snack shelf
+const RECIPES = {
+  konafa: { name: 'Konafa', pastry: 'hojicha-konafa', icon: '🍯', steps: ['Pull the kataifi pastry apart into fine threads', 'Toss it with melted butter until every thread shines', 'Press half into the tray, spoon in the cream, cover with the rest', 'Into the oven until it’s golden all over', 'Pour over the cold syrup — listen to it sizzle'] },
+  basbousa: { name: 'Basbousa', pastry: 'matcha-basbousa', icon: '🟩', steps: ['Mix the semolina, sugar and coconut', 'Stir in the yoghurt and melted butter', 'Spread it in the tray and score it into diamonds', 'An almond on every diamond, then into the oven', 'Soak it in syrup while it’s still hot'] },
+  mochi: { name: 'Sakura mochi', pastry: 'rosewater-daifuku', icon: '🌸', steps: ['Steam the sweet rice until it’s soft and glossy', 'Pound it, with a little rosewater, until it stretches', 'Roll balls of red bean paste', 'Wrap each one in a pink mochi round', 'Tuck a salted sakura leaf around each'] },
+};
+const baking = { recipe: null, step: 0, busy: false };
+function openBaking() {
+  baking.recipe = null; baking.step = 0;
+  renderBaking();
+  openPanel('bakePanel');
+}
+function renderBaking() {
+  const r = baking.recipe && RECIPES[baking.recipe];
+  $('bakePick').classList.toggle('hidden', !!r);
+  $('bakeSteps').classList.toggle('hidden', !r);
+  $('bakeErr').textContent = '';
+  if (!r) return;
+  $('bakeTitle').textContent = `${r.icon} ${r.name}`;
+  $('bakeList').replaceChildren(...r.steps.map((t, i) => {
+    const li = document.createElement('li');
+    li.textContent = (i < baking.step ? '✅ ' : i === baking.step ? '👉 ' : '◽ ') + t;
+    li.style.opacity = i <= baking.step ? 1 : 0.55;
+    return li;
+  }));
+  const done = baking.step >= r.steps.length;
+  $('bakeNext').textContent = done ? `🍽️ Put it on my flat’s snack shelf` : baking.busy ? '…' : `Do it: ${r.steps[baking.step].split(' ').slice(0, 3).join(' ')}…`;
+  $('bakeNext').disabled = baking.busy;
+}
+$('bakePick').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; baking.recipe = b.dataset.r; baking.step = 0; renderBaking(); };
+$('bakeNext').onclick = async () => {
+  const r = RECIPES[baking.recipe];
+  if (!r || baking.busy) return;
+  if (baking.step < r.steps.length) {
+    baking.busy = true; renderBaking();
+    if (r.steps[baking.step].includes('oven') || r.steps[baking.step].includes('Steam')) world.rooms.bakery.bake(5);
+    sound.cue('pin');
+    await wait(r.steps[baking.step].includes('oven') ? 2200 : 1100);
+    baking.busy = false; baking.step++; renderBaking();
+    if (baking.step === r.steps.length) { bubble(player.av.group, r.icon, 'emote'); send({ t: 'emote', e: r.icon }); toast(`${r.icon} Your ${r.name.toLowerCase()} is ready — and it smells wonderful.`); }
+    return;
+  }
+  // done: onto the snack shelf in your flat
+  try {
+    await api('/home');
+    await api(`/home/${state.me.id}/snacks`, { method: 'POST', body: { pastry: r.pastry } });
+    closePanels();
+    sound.counterBell(player.pos);
+    toast(`🍽️ Your ${r.name.toLowerCase()} is on the snack shelf in your flat — for you, or for whoever visits.`);
+    sysChat(`You baked ${r.name.toLowerCase()} and carried it up to your flat.`);
+  } catch (e) { $('bakeErr').textContent = e.message; }
+};
+
+// ── the yoga mats: a calm, guided stretch
+const STRETCH = [
+  ['Sit tall', 'Cross your legs, rest your hands on your knees. Let your shoulders drop away from your ears.'],
+  ['Breathe in for four', 'In through the nose… two… three… four. Out through the mouth… two… three… four.'],
+  ['Neck rolls', 'Let your chin fall to your chest, and roll your head slowly to one side, then the other.'],
+  ['Side stretch', 'Reach your right arm up and over to the left. Breathe. Then the other side.'],
+  ['Twist', 'Right hand behind you, left hand on your right knee — turn gently and look over your shoulder. Then swap.'],
+  ['Forward fold', 'Walk your hands out in front of you and let your head hang heavy. Nowhere to be.'],
+  ['Rest', 'Back to sitting tall. Notice how you feel. Thank you for taking this time. 🌸'],
+];
+const stretch = { timer: null, i: 0 };
+function openStretch() {
+  clearInterval(stretch.timer);
+  stretch.i = 0;
+  const show = () => {
+    const [t, d] = STRETCH[stretch.i];
+    $('stretchStep').textContent = `${stretch.i + 1} of ${STRETCH.length} · ${t}`;
+    $('stretchText').textContent = d;
+    $('stretchCircle').classList.remove('breathe'); void $('stretchCircle').offsetWidth; $('stretchCircle').classList.add('breathe');
+  };
+  show();
+  openPanel('stretchPanel');
+  stretch.timer = setInterval(() => {
+    if ($('stretchPanel').classList.contains('hidden')) { clearInterval(stretch.timer); return; }
+    if (stretch.i >= STRETCH.length - 1) { clearInterval(stretch.timer); sound.cue('heart'); return; }
+    stretch.i++; show();
+  }, 16000);
+}
+$('stretchNext').onclick = () => { if (stretch.i < STRETCH.length - 1) { stretch.i++; const [t, d] = STRETCH[stretch.i]; $('stretchStep').textContent = `${stretch.i + 1} of ${STRETCH.length} · ${t}`; $('stretchText').textContent = d; } };
+
+// ── the Art Studio: paint at an easel, hang it on the gallery wall (or in your flat)
+let artGallery = [];
+async function loadGallery() {
+  try { const r = await api('/art/paintings'); artGallery = r.paintings; world.rooms.art.setGallery(r.paintings); } catch (e) { /* the frames wait */ }
+}
+const paint = { color: '#2a2d33', size: 6, down: false, last: null, ready: false };
+const PAINT_COLORS = ['#2a2d33', '#fbf8f2', '#e58aa6', '#c94a4a', '#e07a2a', '#e2b04a', '#6f9f63', '#5f8fc4', '#7a3fa0', '#8a5a3c'];
+function openPaint() {
+  const cv = $('paintCanvas'), g = cv.getContext('2d');
+  if (!paint.ready) {
+    paint.ready = true;
+    g.fillStyle = '#fbf8f2'; g.fillRect(0, 0, cv.width, cv.height);
+    $('paintColors').replaceChildren(...PAINT_COLORS.map(c => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.style.background = c; b.style.width = b.style.height = '26px'; b.style.padding = '0'; b.dataset.c = c; b.title = c;
+      return b;
+    }));
+    $('paintColors').onclick = e => { const b = e.target.closest('[data-c]'); if (b) { paint.color = b.dataset.c; [...$('paintColors').children].forEach(x => x.style.outline = x === b ? '3px solid #c4627f' : ''); } };
+    const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+    const dot = (a, b) => { g.strokeStyle = paint.color; g.lineWidth = paint.size; g.lineCap = g.lineJoin = 'round'; g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.stroke(); };
+    cv.addEventListener('pointerdown', e => { paint.down = true; paint.last = pos(e); dot(paint.last, paint.last); cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointermove', e => { if (!paint.down) return; const p = pos(e); dot(paint.last, p); paint.last = p; });
+    cv.addEventListener('pointerup', () => { paint.down = false; });
+  }
+  $('paintErr').textContent = '';
+  openPanel('paintPanel');
+}
+$('paintSize').oninput = () => { paint.size = Number($('paintSize').value); };
+$('paintClear').onclick = () => { const cv = $('paintCanvas'), g = cv.getContext('2d'); g.fillStyle = '#fbf8f2'; g.fillRect(0, 0, cv.width, cv.height); };
+$('paintFill').onclick = () => { const cv = $('paintCanvas'), g = cv.getContext('2d'); g.fillStyle = paint.color; g.fillRect(0, 0, cv.width, cv.height); };
+$('paintHang').onclick = async () => {
+  $('paintErr').textContent = '';
+  try {
+    const r = await api('/art/paintings', { method: 'POST', body: { image: $('paintCanvas').toDataURL('image/jpeg', 0.85), title: $('paintTitle').value } });
+    artGallery = r.paintings; world.rooms.art.setGallery(r.paintings);
+    closePanels();
+    sound.cue('pin');
+    toast('🖼️ Hung on the gallery wall, for everyone to see.');
+    sysChat(`You hung “${$('paintTitle').value.trim() || 'Untitled'}” on the gallery wall.`);
+  } catch (e) { $('paintErr').textContent = e.message; }
+};
+$('paintHome').onclick = async () => {
+  $('paintErr').textContent = '';
+  try {
+    const blob = await new Promise(res => $('paintCanvas').toBlob(res, 'image/jpeg', 0.9));
+    const up = await fetch('/api/home/photo-upload', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'image/jpeg' }, body: blob }).then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error || 'That didn’t upload.'); return j; });
+    const mine = await api('/home/' + state.me.id);
+    const frame = (mine.items || []).find(it => /^frame-/.test(it.kind) && !it.imageId) || (mine.items || []).find(it => /^frame-/.test(it.kind));
+    if (!frame) { $('paintErr').textContent = 'There’s no picture frame in your flat yet — put one up (🛠️ Decorate → Frames), then hang it there.'; return; }
+    await api('/home/items/' + frame.id, { method: 'PATCH', body: { imageId: up.id, caption: ($('paintTitle').value.trim() || 'painted in the Art Studio').slice(0, 60) } });
+    closePanels();
+    toast('🖼️ It’s hanging in a frame in your flat now.');
+  } catch (e) { $('paintErr').textContent = e.message; }
+};
+
+// ── the Laundry Room: put a wash on; everyone in there sees the machine go
+function runMachine(i, by) {
+  const L = world.rooms.laundry;
+  const dry = L.kindOf(i) === 'dry';
+  return L.run(i, dry ? 16 : 20, () => {
+    const at = L.machineAt(i);
+    if (at) sound.counterBell(at);
+    if (!by) toast(dry ? '🧺 Ding! Your washing is dry and warm — fold it, or hang the rest on your balcony line.' : '🧺 Ding! Your wash is done. Into a dryer — or up to your balcony to hang it out in the sun.');
+  });
+}
+function startMachine(i) {
+  if (!runMachine(i, null)) return toast('🌀 That one’s already going — try the next machine.');
+  send({ t: 'machine', i });
+  sound.cue('pin');
+  toast(world.rooms.laundry.kindOf(i) === 'dry' ? '🌀 Into the dryer it goes. Tumble, tumble…' : '🫧 Soap in, door shut, and round it goes. Sit on the bench and watch, if you like.');
+}
+
+// ── Ahwet El-Sett: a glass of tea, and El-Sett on the gramophone
+function openAhwa() { $('ahwaErr').textContent = ''; openPanel('ahwaPanel'); }
+$('ahwaMenu').onclick = e => {
+  const b = e.target.closest('[data-id]');
+  if (!b) return;
+  closePanels();
+  if (player.dessert) return toast('🍵 Finish what you have first — or put it down on a table.');
+  const id = b.dataset.id, a = world.ahwa;
+  bubble(a.ahwagi.group, { 'ahwa-shai': 'Shai bel na3na3, ya basha! 🍵', 'ahwa-qahwa': 'Ahwa mazboot — coming up! ☕', 'ahwa-sahlab': 'Sahlab, with extra nuts 🥛' }[id], 'npc');
+  setTimeout(() => {
+    player.dessert = { id, bites: 0 };
+    player.av.setDessert(AHWA_CUPS[id][1], 0);
+    sound.cue('drink');
+    sendMove(true);
+    refreshActions();
+    toast(`🍵 Here’s ${AHWA_CUPS[id][0]}. Sit at a brass table — there’s a tawla board on every one (🎲 Games). Press B to sip.`);
+  }, 1800);
+};
+function playRecords() {
+  const rec = state.content['ahwa.records'] || {}, admin = !!(state.me && state.me.isAdmin);
+  const link = ytLink(rec.url);
+  if (link && !admin) { world.ahwa.setSpinning(true); setMovie({ ...link, title: rec.title || 'Umm Kulthum', by: null, startedAt: Date.now() }, Date.now()); toast('🎶 The needle drops… El-Sett begins to sing.'); return; }
+  $('gramoNow').textContent = link ? `🎶 On the gramophone: “${rec.title || 'Umm Kulthum'}”` : 'No record on the gramophone just yet.';
+  $('gramoPlay').classList.toggle('hidden', !link);
+  $('gramoOwner').classList.toggle('hidden', !admin);
+  if (admin) { $('gramoUrl').value = rec.url || ''; $('gramoTitle').value = rec.title || ''; }
+  $('gramoErr').textContent = '';
+  openPanel('gramoPanel');
+}
+$('gramoPlay').onclick = () => { const rec = state.content['ahwa.records'] || {}, link = ytLink(rec.url); if (!link) return; closePanels(); world.ahwa.setSpinning(true); setMovie({ ...link, title: rec.title || 'Umm Kulthum', by: null, startedAt: Date.now() }, Date.now()); };
+$('gramoSave').onclick = async () => {
+  const url = $('gramoUrl').value.trim();
+  if (url && !ytLink(url)) { $('gramoErr').textContent = 'Paste a YouTube link — a video or a playlist.'; return; }
+  const value = { url: url.slice(0, 300), title: $('gramoTitle').value.trim().slice(0, 80) };
+  try {
+    await api('/admin/content/ahwa.records', { method: 'PUT', body: { value, description: "The gramophone at Ahwet El-Sett (the coffee house across the road): a YouTube video or playlist of Umm Kulthum records — { url, title }." } });
+    state.content['ahwa.records'] = value;
+    toast('🎶 The record’s on the gramophone.');
+    playRecords();
+  } catch (e) { $('gramoErr').textContent = e.message; }
 };
 
 // ── presents
@@ -5035,7 +5268,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords };
 
 // ───────────────────────────────────────── start
 

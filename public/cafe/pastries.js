@@ -24,6 +24,24 @@ function sprinkle(g, n, r, y, color, size = 0.0035) {
 }
 
 const BUILD = {
+  teaglass(g) { // the ahwa's shai: a small glass of dark tea on a saucer, a sprig of mint
+    const saucer = disc(0.045, 0.004, '#f4f1ea', { roughness: 0.3 }); saucer.position.y = 0.002; g.add(saucer);
+    const glass = mesh(new THREE.CylinderGeometry(0.022, 0.018, 0.07, SEG, 1, true), '#e8f2f4', { transparent: true, opacity: 0.45, roughness: 0.05, side: THREE.DoubleSide });
+    glass.position.y = 0.039; g.add(glass);
+    const tea = disc(0.02, 0.055, '#7a2e12', { roughness: 0.2, transparent: true, opacity: 0.9 }); tea.position.y = 0.033; g.add(tea);
+    for (let i = 0; i < 3; i++) { const l = ball(0.006, '#4f8a3a'); l.scale.set(1.4, 0.4, 0.8); l.position.set(0.006 * i - 0.006, 0.073, 0.004 * i); g.add(l); }
+  },
+  coffeecup(g) { // ahwa mazboot: Turkish coffee in a little cup, the foam on top
+    const saucer = disc(0.04, 0.004, '#f4f1ea', { roughness: 0.3 }); saucer.position.y = 0.002; g.add(saucer);
+    const cup = mesh(new THREE.CylinderGeometry(0.022, 0.017, 0.04, SEG), '#f4f1ea', { roughness: 0.3 }); cup.position.y = 0.024; g.add(cup);
+    const foam = disc(0.02, 0.002, '#b8875a', { roughness: 0.9 }); foam.position.y = 0.045; g.add(foam);
+    const handle = mesh(new THREE.TorusGeometry(0.009, 0.003, 6, 12), '#f4f1ea'); handle.position.set(0.026, 0.026, 0); g.add(handle);
+  },
+  sahlab(g) { // sahlab: warm milk, cinnamon, coconut and pistachios
+    const cup = mesh(new THREE.CylinderGeometry(0.032, 0.026, 0.06, SEG), '#c4627f', { roughness: 0.5 }); cup.position.y = 0.03; g.add(cup);
+    const milk = disc(0.03, 0.002, '#f7efe2', { roughness: 0.8 }); milk.position.y = 0.061; g.add(milk);
+    sprinkle(g, 18, 0.026, 0.063, '#8a5a2a', 0.003); sprinkle(g, 8, 0.02, 0.064, '#7ab05a', 0.004);
+  },
   koshari(g) { // Koshari Abu Saied's: a steel bowl — rice and lentils, macaroni, tomato sauce, chickpeas, crispy onions
     const bowl = mesh(new THREE.CylinderGeometry(0.07, 0.045, 0.045, SEG, 1, true), '#c8ccd2', { metalness: 0.75, roughness: 0.25, side: THREE.DoubleSide });
     bowl.position.y = 0.024;

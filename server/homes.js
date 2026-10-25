@@ -360,9 +360,9 @@ router.delete('/home/:ownerId(\\d+)/movie', auth.requireUser, smallLimit, wrap(a
 // keeps the job while they're watching — and anyone who comes in later picks
 // it up from there. ('common' is the Common room; 'home:<id>' a resident's room.)
 const tvPos = new Map(); // room -> { list, index, t, at, by }
-const TV_ROOM = /^(common|sleepover|cinema|home:\d+)$/;
+const TV_ROOM = /^(common|sleepover|cinema|ahwa|home:\d+)$/;
 async function mayWatch(userId, room) {
-  if (room === 'common' || room === 'sleepover' || room === 'cinema') return true;
+  if (['common', 'sleepover', 'cinema', 'ahwa'].includes(room)) return true;
   const m = /^home:(\d+)$/.exec(room);
   return !!m && canEnterHome(userId, Number(m[1]));
 }

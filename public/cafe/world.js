@@ -20,6 +20,11 @@ import { buildLanding } from './landing.js';
 import { buildGameRoom } from './gameroom.js';
 import { buildLibrary } from './library.js';
 import { buildCinema } from './cinema.js';
+import { buildBakery } from './bakery.js';
+import { buildGym } from './gym.js';
+import { buildArt } from './art.js';
+import { buildLaundry } from './laundry.js';
+import { buildAhwa, AHWA } from './ahwa.js';
 import { buildCairoLife, stripedKerb } from './cairo.js';
 import { buildKoshari, KOSHARI } from './koshari.js';
 import { buildNile, NILE } from './nile.js';
@@ -355,13 +360,13 @@ export function buildWorld(renderer) {
     interactables: [], // meshes that respond to hover/click (userData.kind)
     group: new THREE.Group(),
   });
-  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor(), music: mkFloor(), prayer: mkFloor(), koshari: mkFloor(), hall2: mkFloor(), sleepover: mkFloor() };
+  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor(), music: mkFloor(), prayer: mkFloor(), koshari: mkFloor(), hall2: mkFloor(), sleepover: mkFloor(), ahwa: mkFloor() };
   // the rooms on the second floor, off its landing, and the cinema on the roof:
   // each a floor of its own, built by its module (ROOM_BUILDERS below)
-  const ROOM_BUILDERS = { landing: buildLanding, games: buildGameRoom, library: buildLibrary, cinema: buildCinema };
+  const ROOM_BUILDERS = { landing: buildLanding, games: buildGameRoom, library: buildLibrary, cinema: buildCinema, bakery: buildBakery, gym: buildGym, art: buildArt, laundry: buildLaundry };
   const ROOM_Y = name => (name === 'cinema' ? FLOOR3_Y : FLOOR2_Y);
   for (const k of Object.keys(ROOM_BUILDERS)) { floors[k] = mkFloor(); scene.add(floors[k].group); floors[k].group.position.y = ROOM_Y(k); floors[k].group.visible = false; }
-  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group, floors.sleepover.group);
+  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group, floors.sleepover.group, floors.ahwa.group);
   // the Common room (common.js), off the hallway, for everyone who lives upstairs
   floors.common.group.position.y = FLOOR2_Y;
   floors.common.group.visible = false;
@@ -2456,9 +2461,9 @@ export function buildWorld(renderer) {
   for (const f of Object.values(floors)) noFog(f.group);
 
   // ── outside: Cairo
-  const outside = buildCairo(scene, { kosharyFloor: floors.koshari });
+  const outside = buildCairo(scene, { kosharyFloor: floors.koshari, ahwaFloor: floors.ahwa });
   // from inside the café, through the front windows: the koshari shop across the road
-  floors.main.interactables.push(outside.koshari.goIn);
+  floors.main.interactables.push(outside.koshari.goIn, outside.ahwa.goIn);
 
   // ════════════════════════════════════════════════════════════════
   //  Built after the spread-out, in the café's real coordinates:
@@ -3524,7 +3529,7 @@ export function buildWorld(renderer) {
   for (const [k, build] of Object.entries(ROOM_BUILDERS)) { rooms[k] = build({ floor: floors[k], makeSign, animate: f => animated.push(f) }); noFog(floors[k].group); }
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, sleepover, rooms, gardenCinemaDoor, koshari: outside.koshari,
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, sleepover, rooms, gardenCinemaDoor, koshari: outside.koshari, ahwa: outside.ahwa,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setStreetSound: f => { outside.life.onSound = f; },
     adhan: () => outside.adhan(),
@@ -3535,12 +3540,12 @@ export function buildWorld(renderer) {
   // Show one floor and point colliders/seats/surfaces/interactables at it.
   function setFloor(name) {
     // (in the koshari shop the café is still there across the road)
-    for (const [k, f] of Object.entries(floors)) f.group.visible = k === name || (name === 'koshari' && k === 'main');
+    for (const [k, f] of Object.entries(floors)) f.group.visible = k === name || ((name === 'koshari' || name === 'ahwa') && k === 'main');
     const f = floors[name];
     Object.assign(api, {
       floor: name,
       floorY: ROOM_BUILDERS[name] ? ROOM_Y(name) : ['up', 'home', 'hall', 'hall2', 'common', 'music', 'prayer', 'sleepover'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
-      floorH: ROOM_BUILDERS[name] ? rooms[name].bounds.h : name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'sleepover' ? SLEEPOVER.h : name === 'koshari' ? KOSHARI.h : name === 'garden' ? 7 : ROOM.h,
+      floorH: ROOM_BUILDERS[name] ? rooms[name].bounds.h : name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'sleepover' ? SLEEPOVER.h : name === 'koshari' ? KOSHARI.h : name === 'ahwa' ? AHWA.h : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
   }
@@ -3572,7 +3577,7 @@ function softTexture(size, draw) {
   return t;
 }
 
-function buildCairo(scene, { kosharyFloor } = {}) {
+function buildCairo(scene, { kosharyFloor, ahwaFloor } = {}) {
   const animated = [];
   const nightMats = [];     // emissive things that glow after dark
   const lampGlows = [];
@@ -4115,7 +4120,7 @@ function buildCairo(scene, { kosharyFloor } = {}) {
     let pos = -along / 2;
     // gaps: the koshari shop opposite the front door (it builds itself), and
     // the road on to the Nile, out of the east side of the block
-    const gap = side === 's' ? [KOSHARI.minX - 0.1, KOSHARI.maxX + 0.1] : side === 'e' ? [NILE.walk.n - 0.3, NILE.walk.s + 0.3] : null;
+    const gap = side === 's' ? [KOSHARI.minX - 0.1, AHWA.maxX + 0.1] : side === 'e' ? [NILE.walk.n - 0.3, NILE.walk.s + 0.3] : null;
     while (pos < along / 2) {
       let w = 5 + r() * 4;
       if (gap && pos + w > gap[0] && pos < gap[1]) {
@@ -4306,6 +4311,8 @@ function buildCairo(scene, { kosharyFloor } = {}) {
   const life = buildCairoLife({ scene, r, STREET, nightMats, glowTex, makeSign, buildAvatar });
   // the koshari shop across the road (koshari.js), and the Nile at the end of the street (nile.js)
   const koshari = buildKoshari({ scene, floor: kosharyFloor || { colliders: [], seats: [], surfaces: [], interactables: [] }, makeSign, buildAvatar, nightMats });
+  // next door to it, the old coffee house (ahwa.js)
+  const ahwa = buildAhwa({ scene, floor: ahwaFloor || { colliders: [], seats: [], surfaces: [], interactables: [] }, makeSign, buildAvatar, nightMats });
   const nile = buildNile({ scene, r, nightMats, lampGlows, building, sand, paveMap: paveTex, roadMap: roadTex, glowTex, palm });
 
   // birds: a few soft V shapes gliding in slow circles
@@ -4334,7 +4341,7 @@ function buildCairo(scene, { kosharyFloor } = {}) {
     // the café has a roof — and so does the kitchen behind the back door
     while ((Math.abs(x) < 15.6 && Math.abs(z) < 11.6) || (x > -15.4 && x < -6.4 && z > -15 && z < -10.6)
       || (Math.abs(x) < 19 && Math.abs(z) < 1.6)   // the covered stairwells off the hallway upstairs
-      || (Math.abs(x) < 4.7 && z > 23.8 && z < 31)); // the koshari shop
+      || (x > -4.7 && x < AHWA.maxX + 0.2 && z > 23.8 && z < 31)); // the koshari shop and the ahwa
     rainSeed[i * 3] = x; rainSeed[i * 3 + 1] = y; rainSeed[i * 3 + 2] = z;
   }
   for (let i = 0; i < RAIN_N; i++) dropAt(i, Math.random() * 30);
@@ -4420,6 +4427,7 @@ function buildCairo(scene, { kosharyFloor } = {}) {
     animated.forEach(f => f(dt, t));
     life.update(dt, t);
     koshari.update(dt, t);
+    ahwa.update(dt, t);
     nile.update(dt, t);
     if (adhanK > 0) {
       adhanK = Math.max(0, adhanK - dt / 90);
@@ -4464,7 +4472,7 @@ function buildCairo(scene, { kosharyFloor } = {}) {
     });
   }
 
-  return { setSky, setWeather, setFlash, update, setClock, faceTex, life, koshari, adhan() { adhanK = 1; } };
+  return { setSky, setWeather, setFlash, update, setClock, faceTex, life, koshari, ahwa, adhan() { adhanK = 1; } };
 }
 
 function lerpAngleW(a, b, t) {

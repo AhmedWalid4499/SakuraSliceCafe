@@ -443,6 +443,9 @@
   .wx-select { border: 1.5px solid var(--line); background: var(--field); color: var(--text-dark); border-radius: 10px; padding: 6px 8px; font: inherit; font-size: 13px; margin-left: 6px; }
   .help-list { list-style: none; display: grid; gap: 8px; margin-top: 10px; font-size: 14px; color: var(--text-mid); }
   .help-list kbd { font-family: inherit; font-weight: 700; background: var(--sakura-light); color: var(--sakura-dark); border-radius: 6px; padding: 1px 7px; font-size: 12.5px; }
+  .stretch-circle { width: 90px; height: 90px; border-radius: 50%; margin: 8px auto 10px; background: radial-gradient(circle, #f6eefa, #c9a0d6); }
+  .stretch-circle.breathe { animation: breathe 8s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { transform: scale(0.7); opacity: 0.7; } 50% { transform: scale(1.15); opacity: 1; } }
 </style>
 </head>
 <body>
@@ -1139,6 +1142,81 @@
   </div>
 </div>
 
+<div id="bakePanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Kitchen · baking class</p>
+  <h3>Bake something sweet 🍰</h3>
+  <div id="bakePick">
+    <p class="lede" style="font-size:13.5px">What are we making today? It goes on the snack shelf in your flat when it’s done.</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn" type="button" data-r="konafa">🍯 Konafa</button>
+      <button class="btn" type="button" data-r="basbousa">🟩 Basbousa</button>
+      <button class="btn" type="button" data-r="mochi">🌸 Sakura mochi</button>
+    </div>
+  </div>
+  <div id="bakeSteps" class="hidden">
+    <p class="eyebrow" id="bakeTitle"></p>
+    <ol id="bakeList" class="fine" style="padding-left:4px;list-style:none;line-height:1.7"></ol>
+    <div class="row"><button class="btn" id="bakeNext" type="button">Next</button></div>
+  </div>
+  <div class="error" id="bakeErr"></div>
+</div>
+
+<div id="stretchPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Yoga Studio</p>
+  <h3>A calm stretch 🧘</h3>
+  <div id="stretchCircle" class="stretch-circle"></div>
+  <p class="eyebrow" id="stretchStep" style="text-align:center"></p>
+  <p class="lede" id="stretchText" style="font-size:14px;text-align:center;min-height:3.2em"></p>
+  <div class="row" style="justify-content:center"><button class="btn ghost" id="stretchNext" type="button">Next ›</button></div>
+</div>
+
+<div id="paintPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Art Studio</p>
+  <h3>At the easel 🎨</h3>
+  <canvas id="paintCanvas" width="400" height="300" style="display:block;width:100%;max-width:420px;margin:6px auto;border-radius:6px;border:6px solid #b58a63;touch-action:none;background:#fbf8f2;cursor:crosshair"></canvas>
+  <div id="paintColors" class="row" style="gap:6px;flex-wrap:wrap;justify-content:center"></div>
+  <div class="row" style="gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+    <label class="fine">Brush <input type="range" id="paintSize" min="2" max="30" value="6"></label>
+    <button class="btn ghost small" id="paintFill" type="button">Fill</button>
+    <button class="btn ghost small" id="paintClear" type="button">Clear</button>
+  </div>
+  <label class="field" style="margin-top:6px"><span>Its name</span><input type="text" id="paintTitle" maxlength="40" placeholder="Untitled"></label>
+  <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn" id="paintHang" type="button">🖼️ Hang it on the gallery wall</button><button class="btn ghost" id="paintHome" type="button">🏠 Hang it in my flat</button></div>
+  <div class="error" id="paintErr"></div>
+</div>
+
+<div id="ahwaPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Ahwet El-Sett · قهوة الست</p>
+  <h3>What’ll it be? 🍵</h3>
+  <div id="ahwaMenu" class="row" style="gap:8px;flex-wrap:wrap">
+    <button class="btn" type="button" data-id="ahwa-shai">🍵 Shai with mint</button>
+    <button class="btn" type="button" data-id="ahwa-qahwa">☕ Ahwa mazboot</button>
+    <button class="btn" type="button" data-id="ahwa-sahlab">🥛 Sahlab</button>
+  </div>
+  <p class="fine" style="margin-top:8px">No shisha here — just tea, tawla and El-Sett on the gramophone.</p>
+  <div class="error" id="ahwaErr"></div>
+</div>
+
+<div id="gramoPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Ahwet El-Sett</p>
+  <h3>The gramophone 🎶</h3>
+  <p class="lede" id="gramoNow" style="font-size:13.5px"></p>
+  <div class="row"><button class="btn hidden" id="gramoPlay" type="button">▶ Drop the needle</button></div>
+  <div id="gramoOwner" class="hidden up-more" style="margin-top:12px">
+    <p class="eyebrow">🗝️ The record</p>
+    <p class="fine" style="margin:4px 0 8px">Paste a YouTube video or playlist of Umm Kulthum (or anything you like). It plays for whoever drops the needle.</p>
+    <label class="field"><span>YouTube link</span><input type="text" id="gramoUrl" placeholder="https://www.youtube.com/playlist?list=…"></label>
+    <label class="field"><span>What it is</span><input type="text" id="gramoTitle" maxlength="80" placeholder="Umm Kulthum — Enta Omri"></label>
+    <div class="row"><button class="btn" id="gramoSave" type="button">Put the record on</button></div>
+    <div class="error" id="gramoErr"></div>
+  </div>
+</div>
+
 <div id="moviePanel" class="panel card hidden">
   <button class="x" data-close aria-label="Close">✕</button>
   <p class="eyebrow">Film night</p>
@@ -1224,6 +1302,8 @@
     <li>At the west end of the upper hallway, a door to the stairs up to the <b>second floor</b>: the <b>Sleepover Room</b> — bunk beds and beds for everyone (click one to lie down), a bathroom with toilets, showers and sinks, a midnight-snack corner, and a big TV that <b>anyone</b> can put a YouTube video or playlist on; everyone in the room watches together.</li>
     <li>The Sleepover Room is on the <b>second floor landing</b>, with its other rooms: the <b>Games Room</b> (pool, ping-pong and baby-foot — click a table to play, and your best goes on the high-score board — plus game tables for chess, tawla, snakes and ladders and Sakura Eights) and the <b>BookBeans Library</b> (armchairs, the author’s shelf of novellas, a coffee bar, and the writers’ nook: sit at a desk, start the timer and log your words on today’s board).</li>
     <li>On the roof, through the door in the side of the stair house: the <b>Rooftop Cinema</b> — covered, so the films go on rain or shine. When a film is on the programme, everyone in there watches it together.</li>
+    <li>Also on the second floor: the <b>Kitchen</b> (a baking class — konafa, basbousa or sakura mochi, a step at a time, and it goes on your flat’s snack shelf), the <b>Gym & Yoga Studio</b> (treadmills and bikes, dumbbells, mats for a calm guided stretch and a mirror wall), the <b>Art Studio</b> (paint at an easel, then hang it on the gallery wall or in a frame in your flat) and the <b>Laundry Room</b> (put a wash on and watch it spin).</li>
+    <li>Across the road, next to the koshari shop: <b>Ahwet El-Sett</b>, the old coffee house — shai with mint, Turkish coffee or sahlab at the counter, tawla at the brass tables (🎲 Games), and Umm Kulthum on the gramophone.</li>
     <li>Upstairs, your flat's <b>balcony doors</b> open and close — click them. And in the avatar maker you can pick <b>pyjamas</b> to wear in your room, the hallway, the Common room and the Music Room.</li>
     <li>At the other end of the hallway: the <b>Music Room</b> (a piano and a guitar anyone can play, a cajón, a record player and an open-mic stage — sit on the stool to take it) and the <b>Prayer Room</b>, a quiet room with prayer mats facing the qibla and today's prayer times for Cairo. There's no chat in there.</li>
     <li>Upstairs, the hallway's <b>Common Room</b> door (by the stairs to the roof) leads to the sofas and the big TV — it plays the café's playlist, and everyone watches together.</li>

@@ -4,7 +4,8 @@
 const express = require('express');
 const { query } = require('./db');
 const auth = require('./auth');
-const { rateLimit, wrap } = require('./util');
+const { rateLimit, wrap, cleanText } = require('./util');
+const kindness = require('./moderation');
 const realtime = require('./realtime');
 
 const router = express.Router();
@@ -65,6 +66,48 @@ router.post('/library/words', auth.requireUser, smallLimit, wrap(async (req, res
   const words = await wordsToday(req.user.id);
   realtime.broadcast({ t: 'library:words', words: { total: words.total, writers: words.writers } }, null, 'library');
   res.json({ words });
+}));
+
+// ── the Art Studio's gallery wall: paintings anyone signed in has hung there
+// (a small JPEG each, kept in media as kind 'painting')
+const ART_MAX = 150 * 1024;
+async function gallery() {
+  const { rows } = await query(
+    `SELECT m.id, m.name AS title, u.display_name AS by, m.created_by AS "byId" FROM media m JOIN users u ON u.id = m.created_by
+     WHERE m.kind = 'painting' ORDER BY m.id DESC LIMIT 11`);
+  return rows.map(r => ({ ...r, url: `/api/art/painting/${r.id}` }));
+}
+router.get('/art/paintings', auth.requireUser, wrap(async (_req, res) => {
+  res.json({ paintings: await gallery() });
+}));
+router.get('/art/painting/:id(\\d+)', auth.requireUser, wrap(async (req, res) => {
+  const { rows } = await query("SELECT mime, bytes FROM media WHERE id = $1 AND kind = 'painting'", [Number(req.params.id)]);
+  if (!rows[0]) return res.status(404).end();
+  res.set({ 'Content-Type': rows[0].mime, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+  res.end(rows[0].bytes);
+}));
+const artLimit = rateLimit({ windowMs: 10 * 60e3, max: 12, message: 'That is a lot of paintings — give the paint a few minutes to dry.' });
+router.post('/art/paintings', auth.requireUser, artLimit, wrap(async (req, res) => {
+  const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String((req.body || {}).image || ''));
+  if (!m) return res.status(400).json({ error: 'That painting didn’t come through — try again.' });
+  const bytes = Buffer.from(m[1], 'base64');
+  if (!bytes.length || bytes.length > ART_MAX) return res.status(413).json({ error: 'That painting is too big to hang.' });
+  const title = cleanText((req.body || {}).title, 40) || 'Untitled';
+  if (!(await kindness.guard(res, title, 'painting', req.user))) return;
+  const { rows } = await query(
+    "INSERT INTO media (kind, mime, name, size, bytes, created_by) VALUES ('painting', 'image/jpeg', $1, $2, $3, $4) RETURNING id",
+    [title, bytes.length, bytes, req.user.id]);
+  const paintings = await gallery();
+  realtime.broadcast({ t: 'art:gallery', paintings }, null, 'art');
+  res.json({ id: rows[0].id, paintings });
+}));
+// take one down: whoever painted it, or the owner
+router.delete('/art/painting/:id(\\d+)', auth.requireUser, wrap(async (req, res) => {
+  const { rows } = await query("DELETE FROM media WHERE id = $1 AND kind = 'painting' AND (created_by = $2 OR $3) RETURNING id", [Number(req.params.id), req.user.id, !!req.user.is_admin]);
+  if (!rows[0]) return res.status(404).json({ error: 'That one isn’t yours to take down.' });
+  const paintings = await gallery();
+  realtime.broadcast({ t: 'art:gallery', paintings }, null, 'art');
+  res.json({ paintings });
 }));
 
 module.exports = { router };
