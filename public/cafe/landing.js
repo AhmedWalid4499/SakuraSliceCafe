@@ -20,6 +20,14 @@ export const LANDING_DOORS = [
     lines: [{ text: 'Games Room', size: 110, weight: '700' }, { text: 'pool · ping-pong · baby-foot 🎱', size: 60 }] },
   { room: 'library', x: 4.0, side: -1, color: '#6e472e', glass: '#ffe9c4', bg: '#f3e1d0', label: 'The BookBeans Library — books, armchairs and the writers’ nook',
     lines: [{ text: 'BookBeans Library', size: 100, weight: '700' }, { text: 'books · armchairs · writers’ nook 📚', size: 56 }] },
+  { room: 'bakery', x: 9.6, side: -1, color: '#e8c98e', glass: '#fff6e6', bg: '#fbe3ea', label: 'The Kitchen — a baking class: konafa, basbousa, sakura mochi',
+    lines: [{ text: 'The Kitchen', size: 110, weight: '700' }, { text: 'baking class 🍰', size: 64 }] },
+  { room: 'gym', x: -6.4, side: 1, color: '#93ab8c', glass: '#eaf6ff', bg: '#e3eef0', label: 'The Gym and Yoga Studio — treadmills, bikes, mats and a mirror wall',
+    lines: [{ text: 'Gym & Yoga', size: 110, weight: '700' }, { text: 'run · ride · stretch 🧘', size: 62 }] },
+  { room: 'art', x: -0.6, side: 1, color: '#c94a4a', glass: '#fff1d6', bg: '#fbf8f2', label: 'The Art Studio — easels, paint, and the gallery wall',
+    lines: [{ text: 'Art Studio', size: 110, weight: '700' }, { text: 'paint · hang it up 🎨', size: 62 }] },
+  { room: 'laundry', x: 5.2, side: 1, color: '#9fb8d6', glass: '#eaf6ff', bg: '#e3eef0', label: 'The Laundry Room — washing machines and dryers',
+    lines: [{ text: 'Laundry', size: 110, weight: '700' }, { text: 'wash · dry · fold 🧺', size: 62 }] },
 ];
 
 export function buildLanding({ floor, makeSign }) {
