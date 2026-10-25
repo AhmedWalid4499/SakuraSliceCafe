@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 // Which version is running (Railway sets RAILWAY_GIT_COMMIT_SHA) — handy for
 // "is my update live yet?": open /version in the browser.
 const VERSION = {
-  release: 'the Ramadan Tent, and the cinema from the second floor',
+  release: 'hammam, studio, tea room, playroom, post room, and the felucca',
   commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
   started: new Date().toISOString(),
 };
@@ -36,6 +36,7 @@ app.get('/version', (_req, res) => res.set('Cache-Control', 'no-cache').json(VER
 // uploads come in raw (a song or a picture), so they go before the JSON-only API
 app.use('/api/admin/upload', require('./media').uploadRouter);
 app.use('/api/home/photo-upload', require('./homes').photoUpload);
+app.use('/api/studio/upload', require('./rooms').recUpload);
 app.use('/api', api);
 
 // Three.js comes from npm (version pinned in package.json), not a CDN.

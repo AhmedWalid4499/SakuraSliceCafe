@@ -19,9 +19,11 @@ const GROUP_FIELDS = `g.id, g.name, g.description, g.color, g.is_public AS "isPu
   g.owner_id AS "ownerId", (SELECT count(*)::int FROM group_members gm WHERE gm.group_id = g.id) AS members`;
 
 // The rooms everyone signed in can be in: the ground floor, the hallway upstairs and the roof garden.
+// (one list, used by the chat, the live room and saved places too — a room missing here can't be joined)
 const PUBLIC_ROOMS = ['main', 'garden', 'hall', 'common', 'music', 'prayer', 'koshari', 'hall2', 'sleepover',
-  'landing', 'games', 'library', 'cinema', 'bakery', 'gym', 'art', 'laundry', 'ahwa'];
-const ROOM_RE = /^(main|garden|hall|hall2|common|music|prayer|koshari|sleepover|landing|games|library|cinema|bakery|gym|art|laundry|ahwa|group:\d+|home:\d+)$/;
+  'landing', 'games', 'library', 'cinema', 'bakery', 'gym', 'art', 'laundry', 'ahwa', 'tent',
+  'hammam', 'studio', 'tearoom', 'playroom', 'post', 'felucca'];
+const ROOM_RE = new RegExp(`^(${PUBLIC_ROOMS.join('|')}|group:\\d+|home:\\d+)$`);
 
 // Is this user allowed in this room? The public rooms are open to everyone signed in.
 async function canEnter(userId, room) {

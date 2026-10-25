@@ -304,3 +304,13 @@ CREATE TABLE IF NOT EXISTS library_words (
   words   INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, day)
 );
+-- The Post Room's letters: one neighbour to another, waiting in a pigeonhole (server/rooms.js).
+CREATE TABLE IF NOT EXISTS letters (
+  id         SERIAL PRIMARY KEY,
+  from_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS letters_to_idx ON letters(to_id, created_at DESC);

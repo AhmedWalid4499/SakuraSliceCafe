@@ -448,6 +448,9 @@
   .wx-select { border: 1.5px solid var(--line); background: var(--field); color: var(--text-dark); border-radius: 10px; padding: 6px 8px; font: inherit; font-size: 13px; margin-left: 6px; }
   .help-list { list-style: none; display: grid; gap: 8px; margin-top: 10px; font-size: 14px; color: var(--text-mid); }
   .help-list kbd { font-family: inherit; font-weight: 700; background: var(--sakura-light); color: var(--sakura-dark); border-radius: 6px; padding: 1px 7px; font-size: 12.5px; }
+  #steamFog { position: fixed; inset: 0; z-index: 25; pointer-events: none; background: radial-gradient(ellipse at 50% 60%, rgba(255,255,255,.92), rgba(240,246,248,.75)); backdrop-filter: blur(6px); opacity: 0; transition: opacity 4s ease; }
+  #steamFog.on { opacity: 1; }
+  #steamFog.on.clear { opacity: 0; transition: opacity 3s ease; }
   .stretch-circle { width: 90px; height: 90px; border-radius: 50%; margin: 8px auto 10px; background: radial-gradient(circle, #f6eefa, #c9a0d6); }
   .stretch-circle.breathe { animation: breathe 8s ease-in-out infinite; }
   @keyframes breathe { 0%, 100% { transform: scale(0.7); opacity: 0.7; } 50% { transform: scale(1.15); opacity: 1; } }
@@ -1234,6 +1237,51 @@
   </div>
 </div>
 
+<div id="recPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Recording Studio</p>
+  <h3>On air 🎙️</h3>
+  <p class="lede" id="recState" style="font-size:13.5px"></p>
+  <div class="row" style="gap:8px"><button class="btn" id="recStart" type="button">⏺ Record</button></div>
+  <audio id="recListen" class="hidden" controls style="width:100%;margin-top:8px"></audio>
+  <div id="recShareRow" class="hidden" style="margin-top:8px">
+    <label class="field"><span>What is it?</span><input type="text" id="recTitle" maxlength="60" placeholder="A BookBeans book chat — The Little Prince"></label>
+    <div class="row"><button class="btn" id="recShare" type="button">📼 Put it on the studio shelf</button></div>
+  </div>
+  <div class="error" id="recErr"></div>
+  <p class="eyebrow" style="margin-top:14px">🎧 Recorded here</p>
+  <div id="recList"></div>
+</div>
+
+<div id="teaPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">茶室 · The Tea Room</p>
+  <h3>A bowl of matcha 🍵</h3>
+  <ol id="teaList" class="fine" style="padding-left:4px;list-style:none;line-height:1.7"></ol>
+  <div class="row"><button class="btn" id="teaNext" type="button">Next</button></div>
+</div>
+
+<div id="storyPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Hana’s story corner 📖</p>
+  <h3 id="storyTitle"></h3>
+  <p class="lede" id="storyText" style="font-size:17px;line-height:1.6;min-height:4.8em"></p>
+  <div class="row" style="justify-content:space-between;align-items:center"><span class="fine" id="storyPage"></span><button class="btn" id="storyNext" type="button">Turn the page ›</button></div>
+</div>
+
+<div id="postPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Post Room 💌</p>
+  <h3 id="postTitle">Write a letter</h3>
+  <div id="postLetters" class="hidden"></div>
+  <div id="postWrite">
+    <label class="field"><span>To</span><select id="postTo" class="wx-select"></select></label>
+    <label class="field"><span>Your letter</span><textarea id="postBody" rows="5" maxlength="1200" style="width:100%" placeholder="Dear neighbour…"></textarea></label>
+    <div class="row"><button class="btn" id="postSend" type="button">📮 Post it</button></div>
+  </div>
+  <div class="error" id="postErr"></div>
+</div>
+
 <div id="moviePanel" class="panel card hidden">
   <button class="x" data-close aria-label="Close">✕</button>
   <p class="eyebrow">Film night</p>
@@ -1274,6 +1322,7 @@
   <p class="fine" id="giftOpenWhere"></p>
 </div>
 
+<div id="steamFog" class="hidden" aria-hidden="true"></div>
 <div id="cinema" class="card hidden">
   <div class="bar"><span>📺</span><b id="cinemaTitle"></b><span class="fine" id="cinemaBy"></span><button type="button" id="cinemaUp" title="Watch it up close" aria-label="Watch it up close or on the TV">⛶</button><button type="button" id="cinemaMin" title="Smaller / bigger" aria-label="Smaller or bigger">↘</button><button type="button" id="cinemaClose" title="Stop watching" aria-label="Stop watching">✕</button></div>
   <div class="ratio" id="cinemaMedia"><iframe id="cinemaFrame" title="The film" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen src="about:blank"></iframe></div>
@@ -1322,6 +1371,8 @@
     <li>Also on the second floor: the <b>Kitchen</b> (a baking class — konafa, basbousa or sakura mochi, a step at a time, and it goes on your flat’s snack shelf), the <b>Gym & Yoga Studio</b> (treadmills and bikes, dumbbells, mats for a calm guided stretch and a mirror wall), the <b>Art Studio</b> (paint at an easel, then hang it on the gallery wall or in a frame in your flat) and the <b>Laundry Room</b> (put a wash on and watch it spin).</li>
     <li>Across the road, next to the koshari shop: <b>Ahwet El-Sett</b>, the old coffee house — shai with mint, Turkish coffee or sahlab at the counter, tawla at the brass tables (🎲 Games), and Umm Kulthum on the gramophone.</li>
     <li>Up on the roof, through the door on the other side of the stair house: the <b>Ramadan Tent</b> — khayamiya walls, lanterns, a sofra laid for iftar (dates, qamar el-din, qatayef), low tables for a game, the musaharati’s drum, and a board counting down to Maghrib in Ramadan (and to Ramadan the rest of the year). The cinema has a door on the second floor landing too.</li>
+    <li>More on the second floor: the <b>Hammam & Spa</b> (lie on the warm marble, take a steam — the screen fogs up — then a robe and a lounger), the <b>Recording Studio</b> (record a book chat or a story in the booth, and everyone in the studio can listen), the <b>Japanese Tea Room</b> (make matcha, step by step, on the tatami), the <b>Kids’ Playroom</b> (a ball pit, a tower of blocks, crayons, and Hana reading picture books) and the <b>Post Room</b> (a pigeonhole for every flat — write a letter to a neighbour and it waits for them).</li>
+    <li>By the café’s front door: the sign for the <b>felucca</b> on the Nile. It sails every few minutes from the landing, down past Cairo Tower and back — and carries everyone aboard with it.</li>
     <li>Upstairs, your flat's <b>balcony doors</b> open and close — click them. And in the avatar maker you can pick <b>pyjamas</b> to wear in your room, the hallway, the Common room and the Music Room.</li>
     <li>At the other end of the hallway: the <b>Music Room</b> (a piano and a guitar anyone can play, a cajón, a record player and an open-mic stage — sit on the stool to take it) and the <b>Prayer Room</b>, a quiet room with prayer mats facing the qibla and today's prayer times for Cairo. There's no chat in there.</li>
     <li>Upstairs, the hallway's <b>Common Room</b> door (by the stairs to the roof) leads to the sofas and the big TV — it plays the café's playlist, and everyone watches together.</li>
