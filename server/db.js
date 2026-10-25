@@ -45,6 +45,12 @@ async function migrate() {
   }
 
   await moveNotesToTheBiggerCafe();
+  // Emails and usernames are kept in lower case (sign-in ignores capitals); an
+  // account made with capitals before that is put right, unless it would clash.
+  await pool.query(`UPDATE users u SET username = lower(u.username) WHERE u.username <> lower(u.username)
+    AND NOT EXISTS (SELECT 1 FROM users o WHERE o.id <> u.id AND lower(o.username) = lower(u.username))`);
+  await pool.query(`UPDATE users u SET email = lower(u.email) WHERE u.email <> lower(u.email)
+    AND NOT EXISTS (SELECT 1 FROM users o WHERE o.id <> u.id AND lower(o.email) = lower(u.email))`);
   await giveEveryFlatADoor();
 
   // Promote the owner. Set ADMIN_EMAIL in Railway; whoever registers (or has
