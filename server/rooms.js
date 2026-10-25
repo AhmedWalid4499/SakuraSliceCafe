@@ -192,4 +192,39 @@ router.post('/post/letters', auth.requireUser, postLimit, wrap(async (req, res) 
   res.json({ ok: true });
 }));
 
+// ── the Escape Room: the Pharaoh's Study. One game at a time for everyone in
+// the room: the hourglass, and which of the four locks are open. (Kept here,
+// not in the page, so the answers aren't in it.)
+const ESCAPE_MS = 15 * 60e3;
+const LOCKS = { chest: '426', riddle: 'nile', name: 'sakura', year: '1952' };
+const escape = { startedAt: 0, solved: {}, escapedAt: 0, by: '' };
+const norm = v => String(v || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '');
+function escapeState() {
+  const now = Date.now();
+  const running = !!escape.startedAt && !escape.escapedAt && now - escape.startedAt < ESCAPE_MS;
+  const failed = !!escape.startedAt && !escape.escapedAt && !running;
+  return { running, failed, escaped: !!escape.escapedAt, startedAt: escape.startedAt, escapedAt: escape.escapedAt, limit: ESCAPE_MS, solved: { ...escape.solved }, by: escape.by, now };
+}
+router.get('/escape', auth.requireUser, wrap(async (_req, res) => res.json({ state: escapeState() })));
+router.post('/escape/start', auth.requireUser, smallLimit, wrap(async (req, res) => {
+  if (escapeState().running) return res.status(409).json({ error: 'The sand is already running — hurry!' });
+  Object.assign(escape, { startedAt: Date.now(), solved: {}, escapedAt: 0, by: req.user.display_name });
+  const state = escapeState();
+  realtime.broadcast({ t: 'escape', state, started: req.user.display_name }, null, 'escape');
+  res.json({ state });
+}));
+router.post('/escape/answer', auth.requireUser, smallLimit, wrap(async (req, res) => {
+  const lock = String((req.body || {}).lock || '');
+  if (!LOCKS[lock]) return res.status(400).json({ error: 'Which lock?' });
+  if (!escapeState().running) return res.status(409).json({ error: 'Turn the hourglass over first ⏳' });
+  const ok = norm((req.body || {}).answer) === LOCKS[lock];
+  if (ok) {
+    escape.solved[lock] = req.user.display_name;
+    if (Object.keys(LOCKS).every(k => escape.solved[k])) escape.escapedAt = Date.now();
+  }
+  const state = escapeState();
+  if (ok) realtime.broadcast({ t: 'escape', state, opened: lock, who: req.user.display_name }, null, 'escape');
+  res.json({ ok, state });
+}));
+
 module.exports = { router, recUpload };

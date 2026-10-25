@@ -451,6 +451,10 @@
   #steamFog { position: fixed; inset: 0; z-index: 25; pointer-events: none; background: radial-gradient(ellipse at 50% 60%, rgba(255,255,255,.92), rgba(240,246,248,.75)); backdrop-filter: blur(6px); opacity: 0; transition: opacity 4s ease; }
   #steamFog.on { opacity: 1; }
   #steamFog.on.clear { opacity: 0; transition: opacity 3s ease; }
+  .lock { margin: 8px 0; padding: 8px; border-radius: 10px; background: rgba(201,162,91,.12); }
+  .lock.open { background: rgba(111,159,99,.18); }
+  .lock.shake { animation: shake .35s; }
+  @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
   .stretch-circle { width: 90px; height: 90px; border-radius: 50%; margin: 8px auto 10px; background: radial-gradient(circle, #f6eefa, #c9a0d6); }
   .stretch-circle.breathe { animation: breathe 8s ease-in-out infinite; }
   @keyframes breathe { 0%, 100% { transform: scale(0.7); opacity: 0.7; } 50% { transform: scale(1.15); opacity: 1; } }
@@ -1302,6 +1306,29 @@
   <div class="error" id="partnerErr"></div>
 </div>
 
+<div id="escapePanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Pharaoh’s Study 🔐</p>
+  <h3>The golden door</h3>
+  <p class="lede" id="escapeState" style="font-size:13.5px"></p>
+  <div id="escapeLocks">
+    <form class="lock" id="lock-chest" data-lock="chest"><b>📦 The chest</b> <span class="fine"></span><div class="row" style="gap:6px"><input type="text" inputmode="numeric" maxlength="6" placeholder="3 numbers" style="flex:1"><button class="btn small" type="submit">Try</button></div></form>
+    <form class="lock" id="lock-riddle" data-lock="riddle"><b>🕰️ The riddle lock</b> <span class="fine"></span><div class="row" style="gap:6px"><input type="text" maxlength="20" placeholder="a word" style="flex:1"><button class="btn small" type="submit">Try</button></div></form>
+    <form class="lock" id="lock-name" data-lock="name"><b>🔶 The cartouche lock</b> <span class="fine"></span><div class="row" style="gap:6px"><input type="text" maxlength="20" placeholder="a name" style="flex:1"><button class="btn small" type="submit">Try</button></div></form>
+    <form class="lock" id="lock-year" data-lock="year"><b>📅 The year lock</b> <span class="fine"></span><div class="row" style="gap:6px"><input type="text" inputmode="numeric" maxlength="6" placeholder="4 numbers" style="flex:1"><button class="btn small" type="submit">Try</button></div></form>
+  </div>
+  <p class="fine" style="margin-top:8px">Stuck? Click everything in the room — the shelf, the desk, the clock, the sarcophagus, the wall, the rug, the photograph.</p>
+</div>
+
+<div id="scopePanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Observatory 🔭</p>
+  <h3 id="scopeTitle">Tonight’s sky</h3>
+  <canvas id="scopeCanvas" width="360" height="360" style="display:block;width:100%;max-width:360px;margin:6px auto"></canvas>
+  <div id="scopePick" class="chips" style="justify-content:center"></div>
+  <p class="fine" id="scopeText" style="text-align:center;margin-top:8px"></p>
+</div>
+
 <div id="moviePanel" class="panel card hidden">
   <button class="x" data-close aria-label="Close">✕</button>
   <p class="eyebrow">Film night</p>
@@ -1311,6 +1338,10 @@
     <div class="row" style="gap:6px;margin-top:8px"><button class="btn" id="movieWatch" type="button">▶ Watch</button><button class="btn ghost" id="movieStop" type="button">⏹ Turn it off</button></div>
   </div>
   <p class="lede" style="font-size:13.5px">Paste a YouTube link — a <b>video</b>, or a whole <b>playlist</b> to play one after another. Everyone in this room watches together, at the same moment.</p>
+  <div id="karaokeHelp" class="hidden" style="margin-bottom:8px">
+    <p class="fine">🎤 Find a karaoke version on YouTube, copy its link, and paste it below — it plays on the big screen for everyone.</p>
+    <form class="row" style="gap:6px" onsubmit="event.preventDefault();window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(this.q.value+' karaoke'),'_blank','noopener')"><input name="q" type="text" placeholder="a song — e.g. Bohemian Rhapsody" style="flex:1"><button class="btn ghost" type="submit">🔎 Find it</button></form>
+  </div>
   <form id="movieForm" class="row" style="gap:6px">
     <input type="text" id="movieUrl" placeholder="https://www.youtube.com/watch?v=… or /playlist?list=…" autocomplete="off" style="flex:1">
     <button class="btn" type="submit">Play for everyone</button>
@@ -1393,6 +1424,7 @@
     <li>Up on the roof, through the door on the other side of the stair house: the <b>Ramadan Tent</b> — khayamiya walls, lanterns, a sofra laid for iftar (dates, qamar el-din, qatayef), low tables for a game, the musaharati’s drum, and a board counting down to Maghrib in Ramadan (and to Ramadan the rest of the year). The cinema has a door on the second floor landing too.</li>
     <li>More on the second floor: the <b>Hammam & Spa</b> (lie on the warm marble, take a steam — the screen fogs up — then a robe and a lounger), the <b>Recording Studio</b> (record a book chat or a story in the booth, and everyone in the studio can listen), the <b>Japanese Tea Room</b> (make matcha, step by step, on the tatami), the <b>Kids’ Playroom</b> (a ball pit, a tower of blocks, crayons, and Hana reading picture books) and the <b>Post Room</b> (a pigeonhole for every flat — write a letter to a neighbour and it waits for them).</li>
     <li>By the café’s front door: the sign for the <b>felucca</b> on the Nile. It sails every few minutes from the landing, down past Cairo Tower and back — and carries everyone aboard with it.</li>
+    <li>Up again, the <b>third floor</b> (the stairs at the west end of the second floor landing): the <b>Karaoke Room</b> (put a karaoke video on the big screen, take the stage, sing), the <b>Escape Room</b> (the Pharaoh’s Study — fifteen minutes, four locks, solve it together), and the stairs up to the <b>rooftop pool</b> (swim, float on the ring, lie on a lounger, all of Cairo below) and the <b>Observatory</b> (tonight’s moon and constellations through the telescope).</li>
     <li>Upstairs, your flat's <b>balcony doors</b> open and close — click them. And in the avatar maker you can pick <b>pyjamas</b> to wear in your room, the hallway, the Common room and the Music Room.</li>
     <li>At the other end of the hallway: the <b>Music Room</b> (a piano and a guitar anyone can play, a cajón, a record player and an open-mic stage — sit on the stool to take it) and the <b>Prayer Room</b>, a quiet room with prayer mats facing the qibla and today's prayer times for Cairo. There's no chat in there.</li>
     <li>Upstairs, the hallway's <b>Common Room</b> door (by the stairs to the roof) leads to the sofas and the big TV — it plays the café's playlist, and everyone watches together.</li>

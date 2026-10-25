@@ -24,7 +24,7 @@ const box = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
 const rbox = (w, h, d, r, m) => new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2, h / 2, d / 2)), m);
 const cyl = (rt, rb, h, m, seg = 16) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m);
 
-const WATER_Y = -0.95;         // where the hull sits
+const WATER_Y = -0.2;          // where the hull sits: the river's surface is at y −0.03 (nile.js), so the hull floats with the deck well above it
 const DECK = 0.6;              // the deck, above that
 export const FELUCCA = { deckY: WATER_Y + DECK, h: 8 };
 // the timetable: tied up at the landing, then a sail round and back

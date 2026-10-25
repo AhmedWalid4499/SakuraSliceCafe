@@ -1,7 +1,9 @@
-// The second floor's landing: a corridor at the top of the stairs from the
-// upper hallway, with a door to each of the rooms everyone shares up here —
-// the Sleepover Room, the Games Room, the BookBeans Library and the rest.
-// The stairs come up at the west end; a window looks out at the east end.
+// The landings: corridors at the top of the stairs, with a door to each of
+// the rooms everyone shares up there. The second floor's (from the upper
+// hallway): the Sleepover Room, the Games Room, the BookBeans Library and the
+// rest, and the stairs on up to the third floor's — Karaoke, the Escape Room,
+// and the stairs up again to the rooftop pool and the observatory. The stairs
+// come up at the west end; a window looks out at the east end.
 //
 // Like music.js, world.js hands us a floor ({ group, colliders, seats,
 // surfaces, interactables }) and we fill its lists.
@@ -40,20 +42,44 @@ export const LANDING_DOORS = [
     lines: [{ text: 'Playroom', size: 110, weight: '700', color: '#5f8fc4' }, { text: 'ball pit · stories 🧸', size: 62 }] },
   { room: 'post', x: 8.2, side: 1, color: '#7a1f2c', glass: '#f4ecd8', bg: '#f4ecd8', label: 'The Post Room — pigeonholes for every flat, letters between neighbours',
     lines: [{ text: 'Post Room', size: 110, weight: '700' }, { text: 'letters · lost & found 💌', size: 60 }] },
+  { room: 'landing3', x: -9.4, side: 1, color: '#5f8fc4', glass: '#eaf6ff', bg: '#e3eef0', label: 'Up the stairs to the third floor — karaoke, the escape room, the pool and the observatory',
+    lines: [{ text: '⬆ Third floor', size: 104, weight: '700' }, { text: 'karaoke · escape · pool · stars', size: 54 }] },
+];
+// …and the third floor's
+export const LANDING3_DOORS = [
+  { room: 'karaoke', x: -5.0, side: -1, color: '#7a3fa0', glass: '#ffd0f0', bg: '#16131f', label: 'The Karaoke Room — the big screen, the mics and the disco lights 🎤',
+    lines: [{ text: 'Karaoke 🎤', size: 110, weight: '700', color: '#ff8ad0' }, { text: 'sing your heart out', size: 60, color: '#f4ece0' }] },
+  { room: 'escape', x: 1.6, side: -1, color: '#3a2a20', glass: '#e8c98e', bg: '#e8dcc4', label: 'The Escape Room — the Pharaoh’s Study: solve it before the sand runs out',
+    lines: [{ text: 'Escape Room', size: 110, weight: '700' }, { text: 'the Pharaoh’s Study 🔐', size: 60 }] },
+  { room: 'pool', x: -3.0, side: 1, color: '#2f8ab0', glass: '#d9f2ff', bg: '#dff1ff', label: 'Up the stairs to the rooftop pool — swim with all of Cairo below 🏊',
+    lines: [{ text: '⬆ Rooftop Pool', size: 104, weight: '700' }, { text: 'swim · sun · city views 🌴', size: 58 }] },
+  { room: 'observatory', x: 4.4, side: 1, color: '#1b2240', glass: '#c9d2f0', bg: '#1b2240', label: 'Up the stairs to the observatory — the telescope, the moon and the stars 🔭',
+    lines: [{ text: '⬆ Observatory', size: 104, weight: '700', color: '#ffe7a0' }, { text: 'telescope · tonight’s sky', size: 58, color: '#c9d2f0' }] },
 ];
 
-export function buildLanding({ floor, makeSign }) {
+export const buildLanding = args => makeLanding({
+  ...args, doors: LANDING_DOORS, prefix: 'landing',
+  down: { to: 'hall2', label: 'Down the stairs to the upper hallway', sign: 'the upper hallway · Rooms 15–28' },
+  title: [{ text: 'The second floor', size: 110, weight: '700' }, { text: 'everyone’s rooms 🌸', font: 'Dancing Script, cursive', size: 76, color: '#c4627f' }],
+});
+export const buildLanding3 = args => makeLanding({
+  ...args, doors: LANDING3_DOORS, prefix: 'landing3', runner: ['#2f6b8a', '#9fd0e0'], lowColor: '#2f6b8a',
+  down: { to: 'landing', label: 'Down the stairs to the second floor', sign: 'the second floor' },
+  title: [{ text: 'The third floor', size: 110, weight: '700' }, { text: 'sing · solve · swim · stargaze ✨', font: 'Dancing Script, cursive', size: 70, color: '#2f6b8a' }],
+});
+
+function makeLanding({ floor, makeSign, doors, down, title, prefix, runner: RUN = ['#7c5aa0', '#c9b2e0'], lowColor = '#c4627f' }) {
   const group = floor.group;
   const colliders = [], seats = [], interactables = [];
   const { surfaces } = shell({
     group, R, floor, floorMap: plankTex(R, [150, 108, 76], 91),
-    wallColor: '#f1e7dc', lowColor: '#c4627f', windows: { east: [0] },
+    wallColor: '#f1e7dc', lowColor, windows: { east: [0] },
   });
   // a long runner down the middle
-  const runner = new THREE.Mesh(new THREE.PlaneGeometry(R.maxX - R.minX - 2, 1.3), std('#7c5aa0', { roughness: 1 }));
+  const runner = new THREE.Mesh(new THREE.PlaneGeometry(R.maxX - R.minX - 2, 1.3), std(RUN[0], { roughness: 1 }));
   runner.rotation.x = -Math.PI / 2; runner.position.y = 0.004; runner.receiveShadow = true;
   group.add(runner);
-  const inner = new THREE.Mesh(new THREE.PlaneGeometry(R.maxX - R.minX - 2.2, 1.1), std('#c9b2e0', { roughness: 1 }));
+  const inner = new THREE.Mesh(new THREE.PlaneGeometry(R.maxX - R.minX - 2.2, 1.1), std(RUN[1], { roughness: 1 }));
   inner.rotation.x = -Math.PI / 2; inner.position.y = 0.006;
   group.add(inner);
 
@@ -67,17 +93,17 @@ export function buildLanding({ floor, makeSign }) {
     for (const z of [-SW / 2, SW / 2]) group.add(at(box(0.08, 2.4, 0.22, wood), x + 0.05, 1.2, z));
     group.add(at(box(0.08, 0.08, SW + 0.08, wood), x + 0.05, 2.4, 0));
     for (let i = 0; i < 5; i++) group.add(at(rbox(0.28, 0.06, SW - 0.1, 0.02, std('#b58a63', { roughness: 0.6 })), x + 0.25 + i * 0.28, 0.03 - i * 0.001, 0)); // the top steps
-    const sign = makeSign([{ text: '⬇ Downstairs', size: 110, weight: '700' }, { text: 'the upper hallway · Rooms 15–28', size: 62 }], 1.0, 0.36);
+    const sign = makeSign([{ text: '⬇ Downstairs', size: 110, weight: '700' }, { text: down.sign, size: 62 }], 1.0, 0.36);
     sign.position.set(x + 0.06, 2.75, 0); sign.rotation.y = Math.PI / 2;
     group.add(sign);
     const hit = new THREE.Mesh(new THREE.PlaneGeometry(SW, 2.4), new THREE.MeshBasicMaterial({ visible: false }));
     hit.position.set(x + 0.4, 1.2, 0); hit.rotation.y = Math.PI / 2;
-    hit.userData = { kind: 'room-out', to: 'hall2', label: 'Down the stairs to the upper hallway' };
+    hit.userData = { kind: 'room-out', to: down.to, label: down.label };
     group.add(hit); interactables.push(hit);
   }
 
   // the doors
-  for (const d of LANDING_DOORS) {
+  for (const d of doors) {
     sharedDoor({
       group, makeSign, interactables, x: d.x, z: d.side < 0 ? R.minZ : R.maxZ, ry: d.side < 0 ? 0 : Math.PI,
       color: d.color, glass: d.glass, bg: d.bg, lines: d.lines, data: { kind: 'room-door', to: d.room, label: d.label },
@@ -85,13 +111,13 @@ export function buildLanding({ floor, makeSign }) {
   }
 
   // the name of the floor, a board of what's where, a bench, plants, lamps
-  const name = makeSign([{ text: 'The second floor', size: 110, weight: '700' }, { text: 'everyone’s rooms 🌸', font: 'Dancing Script, cursive', size: 76, color: '#c4627f' }], 1.4, 0.44, { bg: '#f6eefa' });
-  name.position.set(R.minX + 2.6, 1.9, R.maxZ - 0.01); name.rotation.y = Math.PI;
+  const name = makeSign(title, 1.4, 0.44, { bg: '#f6eefa' });
+  name.position.set(R.maxX - 0.03, 2.9, -1.35); name.rotation.y = -Math.PI / 2; // (high on the end wall, over the board)
   group.add(name);
   const board = makeSign([
     { text: 'What’s up here', size: 92, weight: '700' },
-    ...LANDING_DOORS.map(d => ({ text: '· ' + d.lines[0].text, size: 60 })),
-  ], 1.0, 0.24 + LANDING_DOORS.length * 0.12, { bg: '#fbf3ea', border: '#7a4e33' });
+    ...doors.map(d => ({ text: '· ' + d.lines[0].text, size: 60 })),
+  ], 1.0, 0.24 + doors.length * 0.12, { bg: '#fbf3ea', border: '#7a4e33' });
   board.position.set(R.maxX - 0.03, 1.6, -1.35); board.rotation.y = -Math.PI / 2;
   group.add(board);
   {
@@ -103,7 +129,7 @@ export function buildLanding({ floor, makeSign }) {
     group.add(b);
     colliders.push({ type: 'box', fixed: true, minX: R.maxX - 0.62, maxX: R.maxX, minZ: 0.25, maxZ: 1.75 });
     [0.6, 1.4].forEach((z, i) => {
-      const s = { id: `landing-bench-${i}`, label: 'the bench by the window', x: R.maxX - 0.42, z, y: group.position.y, h: 0.52, ry: -Math.PI / 2 };
+      const s = { id: `${prefix}-bench-${i}`, label: 'the bench by the window', x: R.maxX - 0.42, z, y: group.position.y, h: 0.52, ry: -Math.PI / 2 };
       seats.push(s);
       if (!i) b.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat: s, label: 'Sit on the bench' }; interactables.push(o); } });
     });
@@ -122,7 +148,7 @@ export function buildLanding({ floor, makeSign }) {
     arrival: { x: R.minX + 1.4, z: 0.2, ry: Math.PI / 2 }, // at the top of the stairs
     // just outside a room's door, facing away from it
     doorFront(room) {
-      const d = LANDING_DOORS.find(d => d.room === room);
+      const d = doors.find(d => d.room === room);
       return d ? { x: d.x, z: d.side < 0 ? R.minZ + 0.9 : R.maxZ - 0.9, ry: d.side < 0 ? 0 : Math.PI } : null;
     },
   };

@@ -26,6 +26,7 @@ import { createTour } from './tour.js';
 import { cairoPrayerDay, ramadan } from './prayertimes.mjs';
 import { createArcade } from './arcade.js';
 import { createScreenLayer } from './tvscreen.js';
+import { moonTonight, constellationsTonight, SHAPES } from './observatory.js';
 
 // The rooms everyone shares on the second floor (off its landing) and the
 // cinema on the roof — each built by its own module into world.rooms[name].
@@ -45,6 +46,16 @@ const ROOMS = {
     enter: () => 'You step into the Art Studio. Light from the big windows, the smell of paint, and the gallery wall full of everyone’s pictures.' },
   laundry: { where: 'in the Laundry Room', long: 'in the Laundry Room on the second floor, watching the machines go round', pj: true,
     enter: () => 'You carry your basket into the Laundry Room. A dryer is tumbling somewhere, and it smells of clean washing.' },
+  landing3: { where: 'on the third floor landing', long: 'up on the third floor landing', pj: true,
+    enter: from => (from === 'landing' ? 'You climb on up to the third floor — karaoke, an escape room, and the stairs up to the pool and the observatory.' : 'You step back out onto the third floor landing.') },
+  karaoke: { where: 'in the Karaoke Room', long: 'in the Karaoke Room on the third floor, near the mic',
+    enter: () => 'You step into the Karaoke Room. The mirror ball is turning, the lights sweep the floor, and the microphone is waiting 🎤' },
+  escape: { where: 'in the Escape Room', long: 'in the Escape Room on the third floor, trying to get out of the Pharaoh’s Study',
+    enter: () => 'You step into the Pharaoh’s Study. Dust, old books, a sarcophagus — and a golden door with four locks. Turn the hourglass when you’re ready 🔐' },
+  pool: { where: 'at the rooftop pool', long: 'up at the rooftop pool, with all of Cairo below',
+    enter: () => 'You climb out onto the rooftop terrace. The pool glitters, the palms rustle, and all of Cairo spreads out below 🌴' },
+  observatory: { where: 'in the Observatory', long: 'in the Observatory up top, under the dome of stars',
+    enter: () => { const m = moonTonight(); return `You step under the dome. Stars painted all over it, and the big telescope pointing up at the open slot. Tonight: a ${m.name.toLowerCase()} 🔭`; } },
   hammam: { where: 'in the Hammam', long: 'in the Hammam and Spa on the second floor, warm and steamy',
     enter: () => 'You step into the Hammam. Warm air, the sound of water in the basins, and light through the stars in the dome ♨️' },
   studio: { where: 'in the Recording Studio', long: 'in the Recording Studio on the second floor, by the ON AIR light',
@@ -1017,7 +1028,7 @@ function handle(m) {
       world.rooms.library.setWords(m.words);
       break;
     case 'home:movie':
-      if (!state.home && state.room !== 'sleepover') break;
+      if (!state.home && state.room !== 'sleepover' && state.room !== 'karaoke') break;
       setMovie(m.movie, m.now);
       if (m.movie) sysChat(`📺 ${m.movie.by} put on “${m.movie.title}”.`);
       else if (m.by) sysChat(`📺 ${m.by} turned the film off.`);
@@ -1038,6 +1049,13 @@ function handle(m) {
     case 'partner:ended':
       toast(`${m.name} doesn't share the room with you any more.`);
       if (state.room === 'hall' || state.room === 'hall2') loadHallDoors();
+      break;
+    case 'escape':
+      escapeNow = m.state; escapeSkew = Date.now() - m.state.now; renderEscapeBoard();
+      if (m.started) sysChat(`⏳ ${m.started} turns the hourglass over. Fifteen minutes — go!`);
+      if (m.opened) { sysChat(`🔓 ${m.who} opened ${LOCK_NAMES[m.opened]}!`); sound.cue('pin'); }
+      if (m.state.escaped && m.opened) { sysChat(`🎉 The golden door swings open — you escaped in ${fmt((m.state.escapedAt - m.state.startedAt) / 1000)}!`); sound.cue('heart'); }
+      if (!$('escapePanel').classList.contains('hidden')) renderEscape();
       break;
     case 'letter':
       toast(`💌 ${m.from} wrote you a letter — it’s waiting in your pigeonhole in the Post Room (second floor).`);
@@ -1829,6 +1847,16 @@ function click(x, y) {
   if (d.kind === 'room-door' || d.kind === 'room-out') return walkToThing(h, () => goToRoom(d.to));
   if (d.kind === 'garden-cinema') return walkToThing(h, () => goToRoom('cinema'));
   if (d.kind === 'garden-tent') return walkToThing(h, () => goToRoom('tent'));
+  if (d.kind === 'karaoke-pick') return openMovie();
+  if (d.kind === 'karaoke-sing') { goSit(world.rooms.karaoke.singSeat); world.rooms.karaoke.setSinging(true); bubble(player.av.group, '🎤🎶', 'emote'); send({ t: 'emote', e: '🎤' }); return toast(movie ? '🎤 You take the stage and grab the mic. Everybody’s watching — sing!' : '🎤 You take the stage. Pick a song on the big screen first (click it) — then sing!'); }
+  if (d.kind === 'escape-start') return walkToThing(h, startEscape);
+  if (d.kind === 'escape-door') return walkToThing(h, openEscape);
+  if (d.kind === 'escape-clue') return walkToThing(h, () => showClue(d.clue));
+  if (d.kind === 'pool-swim') { const s = world.rooms.pool.swim.find(x => !seatTaken(x)); if (s) goSit(s); bubble(player.av.group, '💦', 'emote'); send({ t: 'emote', e: '💦' }); return toast('🏊 SPLASH! You dive in. The water is cool and blue. Stand up to climb out.'); }
+  if (d.kind === 'pool-ring') { goSit(d.seat); return toast('🛟 You climb onto the pink ring and float, looking up at the sky.'); }
+  if (d.kind === 'pool-lounge') { goSit(d.seat); return toast('☀️ You stretch out on a lounger with a towel. Bliss.'); }
+  if (d.kind === 'obs-scope') return walkToThing(h, openScope);
+  if (d.kind === 'obs-chart') return toast(`✨ Tonight over Cairo, look for ${constellationsTonight().join(', ')} — and a ${moonTonight().name.toLowerCase()}. The telescope will show you.`);
   if (d.kind === 'felucca-go') return goToRoom('felucca');
   if (d.kind === 'felucca-out') return goToRoom('main');
   if (d.kind === 'felucca-rais') return walkToThing(h, () => { const st = world.felucca.status(); bubble(world.felucca.group, st.sailing ? 'Ahlan! Look — Cairo Tower! ⛵' : 'Ahlan, ya basha! Sit down, we go soon ⛵', 'npc'); toast(st.sailing ? `⛵ We’re out on the river — back at the landing in ${Math.ceil(st.left)}s.` : `⛵ We push off in ${Math.ceil(st.left)}s. Find a cushion!`); });
@@ -1956,7 +1984,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel', 'recPanel', 'teaPanel', 'storyPanel', 'postPanel', 'partnerPanel'];
+const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel', 'recPanel', 'teaPanel', 'storyPanel', 'postPanel', 'partnerPanel', 'escapePanel', 'scopePanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -3393,7 +3421,7 @@ async function goToRoom(room, group = null) {
   } else setMovie(null);
   world.ahwa.setSpinning(false); // (the gramophone stops when you leave)
   // the Sleepover Room's TV: whatever's on, for everyone in there
-  if (isSleep) api('/tv/sleepover/movie').then(r => { if (state.room === 'sleepover') setMovie(r.movie, r.now); }).catch(() => {});
+  if (isSleep || room === 'karaoke') api(`/tv/${room}/movie`).then(r => { if (state.room === room) setMovie(r.movie, r.now); }).catch(() => {});
   if (up) world.setUpstairsSign(group.name, group.description || 'upstairs at Sakura Slice', group.color);
 
   // arrive at the top (or the foot) of the stairs, facing into the room
@@ -3432,7 +3460,7 @@ async function goToRoom(room, group = null) {
   }
   if (extra) { // in through its door (on the landing: out of the room you were in, or at the top of the stairs)
     const r = world.rooms[room];
-    const a = (room === 'landing' && from && r.doorFront(from)) || (room === 'cinema' && from === 'landing' && r.fromLanding) || r.arrival;
+    const a = (r.doorFront && from && r.doorFront(from)) || (room === 'cinema' && from === 'landing' && r.fromLanding) || r.arrival;
     player.pos.set(a.x, world.floorY, a.z);
     player.ry = a.ry;
     cam.yaw = a.ry + Math.PI; cam.pitch = 0.32; cam.dist = cam.targetDist = 3.2;
@@ -3481,6 +3509,8 @@ async function goToRoom(room, group = null) {
   if (room === 'tent') refreshTent(true);
   if (room === 'studio') loadRecordings();
   if (room === 'post') loadHoles();
+  if (room === 'escape') loadEscape();
+  if (room !== 'karaoke') world.rooms.karaoke.setSinging(false);
   sysChat(extra ? ROOMS[room].enter(from) : isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.'
     : room === 'felucca' ? feluccaGreeting()
     : room === 'ahwa' ? 'You cross the road to Ahwet El-Sett. The click of tawla pieces, glasses of tea on brass trays, and the gramophone in the corner.'
@@ -4410,7 +4440,8 @@ function setMovie(m, now) {
   if (now) movieSkew = Date.now() - now;
   tvLayer.detach();
   if (state.room === 'sleepover') world.sleepover.setMovie(movie);
-  else if (!['common', 'cinema', 'ahwa'].includes(state.room)) world.home.setMovie(movie);
+  else if (state.room === 'karaoke') world.rooms.karaoke.setMovie(movie);
+  else if (!['common', 'cinema', 'ahwa'].includes(state.room) && state.home) world.home.setMovie(movie);
   const box = $('cinema');
   stopPlaylist();
   if (!movie) { box.classList.add('hidden'); $('cinemaFrame').src = 'about:blank'; upClose = false; return; }
@@ -4430,7 +4461,7 @@ function setMovie(m, now) {
   $('cinemaFrame').src = `https://www.youtube-nocookie.com/embed/${movie.videoId}?autoplay=1&start=${offset}&rel=0&playsinline=1`;
 }
 // where this room's TV is set: your flat's, or the Sleepover Room's (anyone can)
-const movieAt = () => (state.room === 'sleepover' ? '/tv/sleepover/movie' : `/home/${state.home.ownerId}/movie`);
+const movieAt = () => (state.room === 'sleepover' || state.room === 'karaoke' ? `/tv/${state.room}/movie` : `/home/${state.home.ownerId}/movie`);
 // The TV in the room you're in, if it has one: the film plays on it, and the
 // little player in the corner is just its title bar (⛶ brings it up close).
 let upClose = false;
@@ -4438,6 +4469,7 @@ function screenHere() {
   if (state.room === 'common') return world.common.screen;
   if (state.room === 'sleepover') return world.sleepover.screen;
   if (state.room === 'cinema') return world.rooms.cinema.screen;
+  if (state.room === 'karaoke') return world.rooms.karaoke.screen;
   if (state.home) return world.home.screenMesh();
   return null;
 }
@@ -4451,6 +4483,7 @@ function putOnScreen() {
 }
 $('cinemaUp').onclick = () => { upClose = !upClose; if (movie) setMovie(movie); };
 function openMovie() {
+  $('karaokeHelp').classList.toggle('hidden', state.room !== 'karaoke');
   $('movieNow').classList.toggle('hidden', !movie);
   $('movieNowTitle').textContent = movie ? `“${movie.title}”, put on by ${movie.by}` : '';
   $('movieErr').textContent = '';
@@ -4756,6 +4789,7 @@ setInterval(() => {
   if (state.room === 'prayer' && Date.now() - quietRoom.timesAt > 60e3) refreshPrayerTimes();
   if (state.room === 'cinema' && Date.now() - (cinemaShow.at || 0) > 15e3) { cinemaShow.at = Date.now(); refreshCinema(); }
   if (state.room === 'tent' && Date.now() - (tentState.at || 0) > 20e3) refreshTent();
+  if (state.room === 'escape') renderEscapeBoard();
   // the treadmills' belts and the bikes' wheels go round while somebody's on them
   if (state.room === 'gym') world.rooms.gym.setBusy([player.seat && player.seat.id, ...[...state.people.values()].map(p => p.seat && p.seat.id)].filter(Boolean));
   if (Date.now() - (adhan.checked || 0) > 15e3) { adhan.checked = Date.now(); checkAdhan(); }
@@ -5414,6 +5448,103 @@ $('postSend').onclick = async () => {
   } catch (e) { $('postErr').textContent = e.message; }
 };
 
+// ── the Escape Room: the hourglass, the clues, the four locks (the answers live on the server)
+let escapeNow = null, escapeSkew = 0;
+const LOCK_NAMES = { chest: 'the chest', riddle: 'the riddle lock', name: 'the cartouche lock', year: 'the year lock' };
+const CLUES = {
+  shelf: '📚 Books everywhere — red ones, blue ones, green ones, all in a muddle. Somebody could count them…',
+  scroll: '📜 On the scroll, in faded ink: “The chest remembers the Nile at dawn — first the RED of the sun, then the BLUE of the water, then the GREEN of the fields. Count each, in that order.”',
+  clock: '🕰️ Scratched round the clock’s face: “I run but never walk, I have a mouth but never talk, a bed but never sleep — and Cairo sits on my banks. What am I?”',
+  cartouche: '🔶 A name, in a cartouche on the sarcophagus: six little pictures. The scribe’s key on the wall would read it…',
+  chart: '📋 The scribe’s key: every picture stands for a letter. (Eye, bird, reed, water, mouth, lion, mat, ankh.)',
+  rug: '🧶 You lift the corner of the rug. Scratched into the floorboards: “…52”.',
+  photo: '🖼️ On the back of the old photograph, in pencil: “The dig, Luxor, 19…” — the rest is smudged.',
+};
+function showClue(k) { toast(CLUES[k] || 'Hmm. Nothing here.'); }
+async function loadEscape() {
+  try { const r = await api('/escape'); escapeNow = r.state; escapeSkew = Date.now() - r.state.now; renderEscapeBoard(); } catch (e) { /* fine */ }
+}
+function escapeClock() {
+  const s = escapeNow;
+  if (!s || !s.startedAt) return { clock: '15:00', left: s ? s.limit : 0 };
+  const end = s.escapedAt || (s.startedAt + s.limit);
+  const left = s.escapedAt ? s.escapedAt - s.startedAt : Math.max(0, end - (Date.now() - escapeSkew));
+  return { clock: fmt(Math.ceil(left / 1000)), left };
+}
+function renderEscapeBoard() {
+  if (!escapeNow || !world.rooms) return;
+  const c = escapeClock();
+  const running = escapeNow.running && c.left > 0 && !escapeNow.escaped;
+  world.rooms.escape.setBoard({ running, failed: escapeNow.startedAt && !escapeNow.escaped && !running, escaped: escapeNow.escaped, clock: escapeNow.escaped ? fmt((escapeNow.escapedAt - escapeNow.startedAt) / 1000) : c.clock, open: Object.keys(escapeNow.solved || {}).length });
+}
+async function startEscape() {
+  try { const r = await api('/escape/start', { method: 'POST', body: {} }); escapeNow = r.state; escapeSkew = Date.now() - r.state.now; renderEscapeBoard(); toast('⏳ You turn the hourglass over. The sand starts to fall — fifteen minutes. Look at everything!'); }
+  catch (e) { toast(e.message); }
+}
+function openEscape() { renderEscape(); openPanel('escapePanel'); }
+function renderEscape() {
+  const s = escapeNow || { solved: {} };
+  $('escapeState').textContent = s.escaped ? `🎉 You got out! (${fmt((s.escapedAt - s.startedAt) / 1000)})` : s.running ? `⏳ ${escapeClock().clock} left — the locks open with what you find in the room.` : 'Turn the hourglass over (by the door) to start the clock.';
+  for (const k of Object.keys(LOCK_NAMES)) {
+    const open = !!(s.solved && s.solved[k]);
+    $('lock-' + k).classList.toggle('open', open);
+    $('lock-' + k).querySelector('input').disabled = open;
+    $('lock-' + k).querySelector('.fine').textContent = open ? `🔓 opened by ${s.solved[k]}` : '🔒';
+  }
+}
+document.querySelectorAll('#escapeLocks form').forEach(f => f.addEventListener('submit', async e => {
+  e.preventDefault();
+  const lock = f.dataset.lock, input = f.querySelector('input');
+  try {
+    const r = await api('/escape/answer', { method: 'POST', body: { lock, answer: input.value } });
+    escapeNow = r.state; escapeSkew = Date.now() - r.state.now;
+    if (!r.ok) { f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); toast('🔒 Click. Nothing. That’s not it.'); }
+    else input.value = '';
+    renderEscape(); renderEscapeBoard();
+  } catch (err) { toast(err.message); }
+}));
+
+// ── the observatory's telescope: tonight's moon, and what's up over Cairo
+function openScope() {
+  const m = moonTonight(), list = constellationsTonight();
+  $('scopeTitle').textContent = `${m.name} · ${Math.round(m.lit * 100)}% lit`;
+  $('scopePick').replaceChildren(...['Moon', ...list.filter(n => SHAPES[n])].map(n => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = n === 'Moon' ? '🌙 The moon' : `✨ ${n}`;
+    b.onclick = () => drawScope(n); return b;
+  }));
+  $('scopeText').textContent = `Up over Cairo this evening: ${list.join(', ')}.`;
+  openPanel('scopePanel');
+  drawScope('Moon');
+}
+function drawScope(what) {
+  const cv = $('scopeCanvas'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  g.save(); g.beginPath(); g.arc(W / 2, H / 2, W / 2 - 6, 0, Math.PI * 2); g.clip();
+  g.fillStyle = '#02040c'; g.fillRect(0, 0, W, H);
+  let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 160; i++) { g.fillStyle = `rgba(255,255,240,${0.3 + r() * 0.6})`; g.fillRect(r() * W, r() * H, 1.5, 1.5); }
+  if (what === 'Moon') {
+    const m = moonTonight(), cx = W / 2, cy = H / 2, rad = W * 0.3;
+    g.fillStyle = '#1a1a1e'; g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); g.fill();
+    // the lit part: a half disc and an ellipse that grows and shrinks with the phase
+    const waxing = m.f < 0.5, k = Math.cos(m.f * Math.PI * 2); // 1 new → −1 full → 1 new
+    g.fillStyle = '#f2eedc';
+    g.beginPath(); g.arc(cx, cy, rad, -Math.PI / 2, Math.PI / 2, !waxing); g.fill();
+    g.fillStyle = k > 0 ? '#1a1a1e' : '#f2eedc';
+    g.beginPath(); g.ellipse(cx, cy, Math.abs(k) * rad, rad, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(150,140,120,.25)'; for (const [x, y, rr] of [[-0.3, -0.2, 0.16], [0.2, 0.1, 0.12], [-0.1, 0.35, 0.1], [0.35, -0.3, 0.08]]) { g.beginPath(); g.arc(cx + x * rad, cy + y * rad, rr * rad, 0, Math.PI * 2); g.fill(); }
+    $('scopeText').textContent = `${m.name}, ${Math.round(m.age)} days old — ${Math.round(m.lit * 100)}% of it lit by the sun tonight.`;
+  } else {
+    const c = SHAPES[what], pad = W * 0.18, sz = W - pad * 2;
+    g.strokeStyle = 'rgba(160,200,255,.7)'; g.lineWidth = 2;
+    for (const [a, b] of c.lines) { g.beginPath(); g.moveTo(pad + c.stars[a][0] * sz, pad + c.stars[a][1] * sz); g.lineTo(pad + c.stars[b][0] * sz, pad + c.stars[b][1] * sz); g.stroke(); }
+    g.fillStyle = '#fff8e0'; for (const [x, y] of c.stars) { g.beginPath(); g.arc(pad + x * sz, pad + y * sz, 5, 0, Math.PI * 2); g.fill(); }
+    $('scopeText').textContent = `${what} — up in the sky over Cairo this time of year. Find it after dark, away from the city lights.`;
+  }
+  g.restore();
+  g.strokeStyle = '#c9a25b'; g.lineWidth = 10; g.beginPath(); g.arc(W / 2, H / 2, W / 2 - 6, 0, Math.PI * 2); g.stroke();
+}
+
 // ── presents
 const giftOf = id => (state.home && state.home.gifts || []).find(g => g.id === id);
 // somewhere clear for it in your room: the main room first, near the door
@@ -5691,7 +5822,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie, openTent, openTea, openStory, openLetter, openPostHole, takeSteam, openRecorder };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie, openTent, openTea, openStory, openLetter, openPostHole, takeSteam, openRecorder, openScope, openEscape, startEscape };
 
 // ───────────────────────────────────────── start
 

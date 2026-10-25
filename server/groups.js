@@ -22,7 +22,8 @@ const GROUP_FIELDS = `g.id, g.name, g.description, g.color, g.is_public AS "isPu
 // (one list, used by the chat, the live room and saved places too — a room missing here can't be joined)
 const PUBLIC_ROOMS = ['main', 'garden', 'hall', 'common', 'music', 'prayer', 'koshari', 'hall2', 'sleepover',
   'landing', 'games', 'library', 'cinema', 'bakery', 'gym', 'art', 'laundry', 'ahwa', 'tent',
-  'hammam', 'studio', 'tearoom', 'playroom', 'post', 'felucca'];
+  'hammam', 'studio', 'tearoom', 'playroom', 'post', 'felucca',
+  'landing3', 'karaoke', 'escape', 'pool', 'observatory'];
 const ROOM_RE = new RegExp(`^(${PUBLIC_ROOMS.join('|')}|group:\\d+|home:\\d+)$`);
 
 // Is this user allowed in this room? The public rooms are open to everyone signed in.
