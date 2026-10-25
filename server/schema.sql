@@ -288,3 +288,19 @@ CREATE TABLE IF NOT EXISTS home_stats (
   nights        INTEGER NOT NULL DEFAULT 0,
   last_slept    TIMESTAMPTZ
 );
+
+-- The Games Room's high scores: each player's best at each table (server/rooms.js).
+CREATE TABLE IF NOT EXISTS arcade_scores (
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  game       TEXT NOT NULL,
+  score      INTEGER NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, game)
+);
+-- The library's word count: words each writer logged on a (Cairo) day.
+CREATE TABLE IF NOT EXISTS library_words (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day     DATE NOT NULL,
+  words   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, day)
+);

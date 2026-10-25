@@ -268,7 +268,7 @@ export function buildSleepover({ floor, makeSign, animate }) {
     board.position.set(1.4, 1.55, R.maxZ - 0.03); board.rotation.y = Math.PI;
     group.add(board);
   }
-  doorOut({ group, R, makeSign, kind: 'sleep-out', interactables, color: '#4f7a5a' });
+  doorOut({ group, R, makeSign, interactables, color: '#4f7a5a', to: 'landing', sign: '⬅ The landing', label: 'Back out to the landing' });
 
   floor.colliders.push({ type: 'room', fixed: true, walk: [{ minX: R.minX + 0.35, maxX: R.maxX - 0.35, minZ: R.minZ + 0.35, maxZ: R.maxZ - 0.35 }] }, ...colliders);
   floor.surfaces.push(...surfaces);

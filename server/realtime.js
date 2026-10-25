@@ -170,7 +170,7 @@ function attach(server, opts = {}) {
       if (m.t === 'room') {
         const room = typeof m.room === 'string' ? m.room : '';
         let ok = false;
-        try { ok = /^(main|garden|hall|hall2|common|music|prayer|koshari|sleepover|group:\d+|home:\d+)$/.test(room) && await canEnter(entry.user.id, room); } catch (e) { ok = false; }
+        try { ok = /^(main|garden|hall|hall2|common|music|prayer|koshari|sleepover|landing|games|library|cinema|bakery|gym|art|laundry|ahwa|group:\d+|home:\d+)$/.test(room) && await canEnter(entry.user.id, room); } catch (e) { ok = false; }
         if (!ok) return send(ws, { t: 'room:denied', room });
         const from = entry.room;
         if (m.state) entry.state = cleanState(m.state);

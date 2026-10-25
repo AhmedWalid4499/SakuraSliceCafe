@@ -93,17 +93,19 @@ export function shell({ group, R, floor, floorMap, wallColor, lowColor, ceilColo
 }
 
 // The door back out to the hallway, in the middle of the south wall.
-export function doorOut({ group, R, makeSign, kind, interactables, color = '#6e472e' }) {
+// (`to`: the room it leads back to — then it's a 'room-out' door, and `sign`
+// is what it says over it.)
+export function doorOut({ group, R, makeSign, kind, interactables, color = '#6e472e', to = null, sign: text = '⬅ The hallway', label = 'Back out to the hallway' }) {
   const wood = std('#7a4e33', { roughness: 0.55 });
   const g = new THREE.Group();
   g.position.set(0, 0, R.maxZ); g.rotation.y = Math.PI;
   for (const s of [-1, 1]) g.add(at(rbox(0.7, 2.25, 0.05, 0.015, std(color, { roughness: 0.55 })), s * 0.36, 1.125, 0.025));
   for (const [w, h, dx, y] of [[0.1, 2.35, -0.77, 1.175], [0.1, 2.35, 0.77, 1.175], [1.64, 0.1, 0, 2.35]]) g.add(at(box(w, h, 0.08, wood), dx, y, 0.04));
-  const sign = makeSign([{ text: '⬅ The hallway', size: 100, weight: '700' }], 0.9, 0.24);
+  const sign = makeSign([{ text, size: 100, weight: '700' }], 0.9, 0.24);
   sign.position.set(0, 2.62, 0.04);
   g.add(sign);
   const hit = at(new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.3), new THREE.MeshBasicMaterial({ visible: false })), 0, 1.15, 0.1);
-  hit.userData = { kind, label: 'Back out to the hallway' };
+  hit.userData = to ? { kind: 'room-out', to, label } : { kind, label };
   g.add(hit); interactables.push(hit);
   group.add(g);
 }
@@ -128,4 +130,43 @@ export function pendant(group, R, x, z, { color = '#fff1d6', light = '#ffd9a6', 
   l.position.set(x, R.h - drop - 0.25, z);
   group.add(l);
   return l;
+}
+
+// A door in a wall, for the rooms everyone shares: double (or single) leaves
+// with glass, a frame and a sign over it. Placed at (x, z) facing `ry`
+// (0 faces +z, into a room whose wall is at minZ); `data` is what clicking it does.
+export function sharedDoor({ group, makeSign, interactables, x, z, ry, double = true, color, glass = '#fff1d6', lines, bg, data, h = 2.25 }) {
+  const wood = std('#7a4e33', { roughness: 0.55 });
+  const g = new THREE.Group();
+  g.position.set(x, 0, z); g.rotation.y = ry;
+  const hw = double ? 0.77 : 0.55;
+  if (double) for (const s of [-1, 1]) g.add(at(rbox(0.7, h + 0.1, 0.05, 0.015, std(color, { roughness: 0.55 })), s * 0.36, (h + 0.1) / 2, 0.025));
+  else g.add(at(rbox(1.0, h + 0.1, 0.05, 0.015, std(color, { roughness: 0.55 })), 0, (h + 0.1) / 2, 0.025));
+  for (const s of double ? [-1, 1] : [0]) g.add(at(new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.9), std(glass, { roughness: 0.1, emissive: '#ffd9a6', emissiveIntensity: 0.45 })), s * 0.36, 1.45, 0.055));
+  for (const [w, hh, dx, y] of [[0.1, h + 0.15, -hw, (h + 0.15) / 2], [0.1, h + 0.15, hw, (h + 0.15) / 2], [hw * 2 + 0.1, 0.1, 0, h + 0.15]]) g.add(at(box(w, hh, 0.08, wood), dx, y, 0.04));
+  if (lines) {
+    const sign = makeSign(lines, 1.1, 0.36, bg ? { bg } : undefined);
+    sign.position.set(0, h + 0.45, 0.03);
+    g.add(sign);
+  }
+  const hit = at(new THREE.Mesh(new THREE.PlaneGeometry(hw * 2 - 0.05, h + 0.1), new THREE.MeshBasicMaterial({ visible: false })), 0, h / 2, 0.1);
+  hit.userData = data;
+  g.add(hit); interactables.push(hit);
+  group.add(g);
+  return g;
+}
+
+// A chair (wooden, or `color` for the seat) facing `ry` — the seat's own record too.
+export function chair(group, seats, interactables, { id, label, x, z, ry, color = '#7a4e33', y0 = 0, table = null }) {
+  const dark = std('#2a1e1a', { roughness: 0.5 });
+  const c = new THREE.Group();
+  c.add(at(rbox(0.44, 0.06, 0.44, 0.02, std(color, { roughness: 0.6 })), 0, 0.46, 0));
+  c.add(at(rbox(0.44, 0.44, 0.05, 0.02, std(color, { roughness: 0.6 })), 0, 0.7, -0.2));
+  for (const a of [-1, 1]) for (const b of [-1, 1]) c.add(at(box(0.035, 0.46, 0.035, dark), a * 0.18, 0.23, b * 0.18));
+  c.position.set(x, 0, z); c.rotation.y = ry;
+  group.add(c);
+  const s = { id, label, x, z, y: y0, h: 0.48, ry, ...(table ? { table } : {}) };
+  seats.push(s);
+  c.traverse(o => { if (o.isMesh) { o.userData = { kind: 'seat', seat: s, label: `Sit on ${label}` }; interactables.push(o); } });
+  return s;
 }
