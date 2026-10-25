@@ -4303,7 +4303,7 @@ function setMovie(m, now) {
   }
   const offset = Math.max(0, Math.floor((Date.now() - movieSkew - movie.startedAt) / 1000));
   $('cinemaTitle').textContent = movie.title;
-  $('cinemaBy').textContent = movie.by ? `put on by ${movie.by}` : state.room === 'cinema' ? 'at the Rooftop Cinema' : '';
+  $('cinemaBy').textContent = movie.by ? `put on by ${movie.by}` : state.room === 'cinema' ? 'at the Rooftop Cinema' : state.room === 'ahwa' ? 'on the gramophone' : '';
   $('cinemaFrame').src = `https://www.youtube-nocookie.com/embed/${movie.videoId}?autoplay=1&start=${offset}&rel=0&playsinline=1`;
   box.classList.remove('hidden', 'small');
 }
