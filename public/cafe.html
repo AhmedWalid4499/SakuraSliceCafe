@@ -996,6 +996,9 @@
   <div class="opt-group" style="margin-top:12px"><span>Walls</span><div class="chips" id="roomWalls"></div></div>
   <div class="opt-group" style="margin-top:12px"><span>Floor</span><div class="chips" id="roomFloors"></div></div>
   <div class="opt-group" style="margin-top:12px"><span>Wallpaper</span><div class="chips" id="roomPaper"></div></div>
+  <p class="fine" id="roomPartnerLine" style="margin-top:12px"></p>
+  <button class="btn ghost" id="roomPartner" type="button" style="margin-top:6px">💞 Bedroom partner — share this room</button>
+  <div id="roomOwnerOnly">
   <div style="margin-top:16px">
     <p class="eyebrow">Your cat</p>
     <form id="petForm" class="row" style="gap:6px;align-items:center;flex-wrap:wrap">
@@ -1015,6 +1018,7 @@
       <button class="btn" type="submit">Let them in</button>
     </form>
     <div class="error" id="roomErr"></div>
+  </div>
   </div>
   <button class="btn ghost" id="roomGift" type="button" style="margin-top:14px">🎁 Send a friend a present</button>
   <p class="fine" id="roomStats" style="margin-top:14px"></p>
@@ -1280,6 +1284,22 @@
     <div class="row"><button class="btn" id="postSend" type="button">📮 Post it</button></div>
   </div>
   <div class="error" id="postErr"></div>
+</div>
+
+<div id="partnerPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Your room</p>
+  <h3>Bedroom partner 💞</h3>
+  <p class="lede" style="font-size:13.5px">Share your room with someone special — a partner, a best friend, a sister. They can come and go, decorate and sleep there, and both your names go on the door.</p>
+  <p id="partnerNow" style="margin:6px 0"></p>
+  <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn hidden" id="partnerGo" type="button">🚪 Go to our room</button><button class="btn ghost hidden" id="partnerEnd" type="button">Stop sharing</button></div>
+  <div id="partnerInvites" style="margin-top:8px"></div>
+  <form id="partnerAsk" class="row" style="gap:6px;margin-top:10px">
+    <input type="text" id="partnerUser" maxlength="40" placeholder="their username" autocomplete="off" autocapitalize="none" style="flex:1">
+    <button class="btn" type="submit">💌 Ask them</button>
+  </form>
+  <p class="fine" id="partnerSent"></p>
+  <div class="error" id="partnerErr"></div>
 </div>
 
 <div id="moviePanel" class="panel card hidden">

@@ -36,12 +36,30 @@ async function ensureRoom(user) {
 async function canEnterHome(userId, ownerId) {
   if (Number(userId) === Number(ownerId)) return true;
   const { rows } = await query(
-    `SELECT r.open, EXISTS (SELECT 1 FROM home_guests g WHERE g.owner_id = r.owner_id AND g.guest_id = $1) AS invited
+    `SELECT r.open, EXISTS (SELECT 1 FROM home_guests g WHERE g.owner_id = r.owner_id AND g.guest_id = $1)
+       OR EXISTS (SELECT 1 FROM home_partners p WHERE p.owner_id = r.owner_id AND p.partner_id = $1) AS invited
      FROM home_rooms r WHERE r.owner_id = $2`, [userId, ownerId]);
   return !!(rows[0] && (rows[0].open || rows[0].invited));
 }
+// Is this person the flat's bedroom partner (sharing it with its owner)?
+async function isPartner(ownerId, userId) {
+  const { rows } = await query('SELECT 1 FROM home_partners WHERE owner_id = $1 AND partner_id = $2', [Number(ownerId), Number(userId)]);
+  return rows.length > 0;
+}
+// May this person change this flat — its furniture, its name and colours? Its owner, or their partner.
+async function mayEdit(ownerId, userId) {
+  return Number(ownerId) === Number(userId) || isPartner(ownerId, userId);
+}
+// The flat a change is for: the one asked for (ownerId), if you may change it; otherwise your own.
+async function flatFor(req) {
+  const want = Number((req.body && req.body.ownerId) ?? (req.query && req.query.ownerId)) || req.user.id;
+  return want !== req.user.id && (await isPartner(want, req.user.id)) ? want : req.user.id;
+}
 
-const ROOM_FIELDS = `r.owner_id AS "ownerId", r.name, r.wall, r.wallpaper, r.floor, r.open, r.door, u.display_name AS "ownerName"`;
+// (a flat shared with a bedroom partner: their name too, and who they are)
+const ROOM_FIELDS = `r.owner_id AS "ownerId", r.name, r.wall, r.wallpaper, r.floor, r.open, r.door, u.display_name AS "ownerName",
+  (SELECT pu.display_name FROM home_partners hp JOIN users pu ON pu.id = hp.partner_id WHERE hp.owner_id = r.owner_id) AS "partnerName",
+  (SELECT hp.partner_id FROM home_partners hp WHERE hp.owner_id = r.owner_id) AS "partnerId"`;
 async function roomRow(ownerId) {
   const { rows } = await query(`SELECT ${ROOM_FIELDS} FROM home_rooms r JOIN users u ON u.id = r.owner_id WHERE r.owner_id = $1`, [ownerId]);
   return rows[0] || null;
@@ -86,15 +104,18 @@ router.get('/home', auth.requireUser, wrap(async (req, res) => {
   // every door along the hallway, each in its own place; you can go in where
   // the door's open or you're invited (a shut door just has its resident's name)
   const { rows } = await query(
-    `SELECT ${ROOM_FIELDS}, EXISTS (SELECT 1 FROM home_guests g WHERE g.owner_id = r.owner_id AND g.guest_id = $1) AS invited
+    `SELECT ${ROOM_FIELDS}, EXISTS (SELECT 1 FROM home_guests g WHERE g.owner_id = r.owner_id AND g.guest_id = $1)
+       OR EXISTS (SELECT 1 FROM home_partners p WHERE p.owner_id = r.owner_id AND p.partner_id = $1) AS invited,
+       EXISTS (SELECT 1 FROM home_partners p WHERE p.owner_id = r.owner_id AND p.partner_id = $1) AS shared
      FROM home_rooms r JOIN users u ON u.id = r.owner_id
      WHERE r.owner_id <> $1 AND r.door IS NOT NULL
      ORDER BY r.door`, [req.user.id]);
   const counts = realtime.roomCounts();
-  const here = r => ({ ...r, here: counts[roomOf(r.ownerId)] || 0 });
+  const both = r => (r.partnerName ? `${r.ownerName} & ${r.partnerName}` : r.ownerName);
+  const here = r => ({ ...r, ownerName: both(r), here: counts[roomOf(r.ownerId)] || 0 });
   const door = r => (r.open || r.invited
     ? { ...here(r), canEnter: true }
-    : { door: r.door, ownerName: r.ownerName, canEnter: false, here: 0 });
+    : { door: r.door, ownerName: both(r), canEnter: false, here: 0 });
   const { rows: g } = await query('SELECT count(*)::int AS n FROM home_gifts WHERE to_id = $1 AND opened_at IS NULL', [req.user.id]);
   res.json({ mine: here(mine), doors: rows.map(door), stats: await statsOf(req.user.id), giftsWaiting: g[0].n });
 }));
@@ -107,8 +128,9 @@ router.get('/home/:ownerId(\\d+)', auth.requireUser, wrap(async (req, res) => {
   if (!(await canEnterHome(req.user.id, ownerId))) return res.status(403).json({ error: "That room's door is closed — ask them to invite you." });
   const { rows: items } = await query(`SELECT ${ITEM_FIELDS} FROM home_items WHERE owner_id = $1 ORDER BY id`, [ownerId]);
   const mine = ownerId === req.user.id;
+  const partner = !mine && (await isPartner(ownerId, req.user.id)); // sharing it: you can change things too
   res.json({
-    room, items, canEdit: mine,
+    room, items, canEdit: mine || partner, shared: partner,
     pet: await petOf(ownerId), snacks: await snacksOf(ownerId), gifts: await giftsFor(ownerId), movie: movieIn(roomOf(ownerId)),
     guests: mine ? await guestsOf(ownerId) : undefined,
     focus: sharedIn(roomOf(ownerId)),
@@ -120,7 +142,8 @@ router.get('/home/:ownerId(\\d+)', auth.requireUser, wrap(async (req, res) => {
 router.patch('/home', auth.requireUser, smallLimit, wrap(async (req, res) => {
   const { WALLS, FLOORS, WALLPAPERS } = await catalogue();
   await ensureRoom(req.user);
-  const r = await roomRow(req.user.id);
+  const flat = await flatFor(req); // yours, or the one you share
+  const r = await roomRow(flat);
   const b = req.body || {};
   const name = b.name !== undefined ? cleanText(b.name, 40) : r.name;
   if (name.length < 2) return res.status(400).json({ error: 'Give your room a name.' });
@@ -130,10 +153,10 @@ router.patch('/home', auth.requireUser, smallLimit, wrap(async (req, res) => {
   const open = typeof b.open === 'boolean' ? b.open : r.open;
   const wallpaper = WALLPAPERS.includes(b.wallpaper) ? b.wallpaper : r.wallpaper;
   await query('UPDATE home_rooms SET name = $2, wall = $3, floor = $4, open = $5, wallpaper = $6, updated_at = now() WHERE owner_id = $1',
-    [req.user.id, name, wall, floor, open, wallpaper]);
-  const room = await roomRow(req.user.id);
-  realtime.broadcast({ t: 'home:room', room }, null, roomOf(req.user.id));
-  if (r.open && !open) await announceAccess(req.user.id);
+    [flat, name, wall, floor, open, wallpaper]);
+  const room = await roomRow(flat);
+  realtime.broadcast({ t: 'home:room', room }, null, roomOf(flat));
+  if (r.open && !open) await announceAccess(flat);
   res.json({ room });
 }));
 
@@ -156,7 +179,7 @@ async function cleanItem(b, userId, prev = {}) {
   if (def.picture && b.imageId !== undefined) {
     if (b.imageId === null) imageId = null;
     else {
-      const { rows } = await query("SELECT id FROM media WHERE id = $1 AND kind = 'photo' AND created_by = $2", [Number(b.imageId) || 0, userId]);
+      const { rows } = await query("SELECT id FROM media WHERE id = $1 AND kind = 'photo' AND created_by = ANY($2::int[])", [Number(b.imageId) || 0, [].concat(userId)]);
       if (!rows[0]) return { error: "That picture isn't one of yours." };
       imageId = rows[0].id;
     }
@@ -168,36 +191,39 @@ async function cleanItem(b, userId, prev = {}) {
 router.post('/home/items', auth.requireUser, editLimit, wrap(async (req, res) => {
   const { MAX_ITEMS } = await catalogue();
   await ensureRoom(req.user);
-  const it = await cleanItem(req.body || {}, req.user.id);
+  const flat = await flatFor(req);
+  const it = await cleanItem(req.body || {}, [req.user.id, flat]);
   if (it.error) return res.status(400).json({ error: it.error });
   if (it.caption && !(await kindness.guard(res, it.caption, 'frame', req.user))) return;
-  const { rows: c } = await query('SELECT count(*)::int AS n FROM home_items WHERE owner_id = $1', [req.user.id]);
+  const { rows: c } = await query('SELECT count(*)::int AS n FROM home_items WHERE owner_id = $1', [flat]);
   if (c[0].n >= MAX_ITEMS) return res.status(409).json({ error: `Your room is full (${MAX_ITEMS} things). Take something out first.` });
   const { rows } = await query(
     `INSERT INTO home_items (owner_id, kind, x, y, z, ry, color, image_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${ITEM_FIELDS}`,
-    [req.user.id, it.kind, it.x, it.y, it.z, it.ry, it.color, it.imageId, it.caption]);
-  await query('UPDATE home_rooms SET updated_at = now() WHERE owner_id = $1', [req.user.id]);
-  realtime.broadcast({ t: 'home:item', op: 'add', item: rows[0] }, null, roomOf(req.user.id));
+    [flat, it.kind, it.x, it.y, it.z, it.ry, it.color, it.imageId, it.caption]);
+  await query('UPDATE home_rooms SET updated_at = now() WHERE owner_id = $1', [flat]);
+  realtime.broadcast({ t: 'home:item', op: 'add', item: rows[0] }, null, roomOf(flat));
   res.json({ item: rows[0] });
 }));
 
 router.patch('/home/items/:id(\\d+)', auth.requireUser, editLimit, wrap(async (req, res) => {
-  const { rows: prev } = await query(`SELECT ${ITEM_FIELDS} FROM home_items WHERE id = $1 AND owner_id = $2`, [Number(req.params.id), req.user.id]);
-  if (!prev[0]) return res.status(404).json({ error: "That isn't in your room." });
-  const it = await cleanItem({ ...(req.body || {}), kind: prev[0].kind }, req.user.id, prev[0]);
+  const { rows: prev } = await query(`SELECT ${ITEM_FIELDS}, owner_id AS "ownerId" FROM home_items WHERE id = $1`, [Number(req.params.id)]);
+  if (!prev[0] || !(await mayEdit(prev[0].ownerId, req.user.id))) return res.status(404).json({ error: "That isn't in your room." });
+  const flat = prev[0].ownerId;
+  const it = await cleanItem({ ...(req.body || {}), kind: prev[0].kind }, [req.user.id, flat], prev[0]);
   if (it.error) return res.status(400).json({ error: it.error });
   if (it.captionChanged && it.caption && !(await kindness.guard(res, it.caption, 'frame', req.user))) return;
   const { rows } = await query(
     `UPDATE home_items SET x = $3, y = $4, z = $5, ry = $6, color = $7, image_id = $8, caption = $9 WHERE id = $1 AND owner_id = $2 RETURNING ${ITEM_FIELDS}`,
-    [prev[0].id, req.user.id, it.x, it.y, it.z, it.ry, it.color, it.imageId, it.caption]);
-  realtime.broadcast({ t: 'home:item', op: 'update', item: rows[0] }, null, roomOf(req.user.id));
+    [prev[0].id, flat, it.x, it.y, it.z, it.ry, it.color, it.imageId, it.caption]);
+  realtime.broadcast({ t: 'home:item', op: 'update', item: rows[0] }, null, roomOf(flat));
   res.json({ item: rows[0] });
 }));
 
 router.delete('/home/items/:id(\\d+)', auth.requireUser, editLimit, wrap(async (req, res) => {
-  const { rows } = await query('DELETE FROM home_items WHERE id = $1 AND owner_id = $2 RETURNING id', [Number(req.params.id), req.user.id]);
-  if (!rows[0]) return res.status(404).json({ error: "That isn't in your room." });
-  realtime.broadcast({ t: 'home:item', op: 'remove', item: { id: rows[0].id } }, null, roomOf(req.user.id));
+  const { rows: it } = await query('SELECT owner_id FROM home_items WHERE id = $1', [Number(req.params.id)]);
+  if (!it[0] || !(await mayEdit(it[0].owner_id, req.user.id))) return res.status(404).json({ error: "That isn't in your room." });
+  const { rows } = await query('DELETE FROM home_items WHERE id = $1 RETURNING id', [Number(req.params.id)]);
+  realtime.broadcast({ t: 'home:item', op: 'remove', item: { id: rows[0].id } }, null, roomOf(it[0].owner_id));
   res.json({ ok: true });
 }));
 
@@ -221,7 +247,13 @@ photoUpload.post('/', express.raw({ type: () => true, limit: PHOTO_MAX }), wrap(
 
 router.get('/home/photo/:id(\\d+)', auth.requireUser, wrap(async (req, res) => {
   const { rows } = await query("SELECT mime, created_by, bytes FROM media WHERE id = $1 AND kind = 'photo'", [Number(req.params.id)]);
-  if (!rows[0] || !(await canEnterHome(req.user.id, rows[0].created_by))) return res.status(404).end();
+  if (!rows[0]) return res.status(404).end();
+  let may = await canEnterHome(req.user.id, rows[0].created_by);
+  if (!may) { // (a partner's photo, hanging in the flat they share)
+    const { rows: hung } = await query('SELECT DISTINCT owner_id FROM home_items WHERE image_id = $1', [Number(req.params.id)]);
+    for (const h of hung) if (!may) may = await canEnterHome(req.user.id, h.owner_id);
+  }
+  if (!may) return res.status(404).end();
   res.set({ 'Content-Type': rows[0].mime, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
   res.end(rows[0].bytes);
 }));
@@ -592,6 +624,66 @@ router.post('/home/sleep', auth.requireUser, smallLimit, wrap(async (req, res) =
        ON CONFLICT (user_id) DO UPDATE SET nights = home_stats.nights + 1, last_slept = now()`, [req.user.id]);
   }
   res.json({ counted, stats: await statsOf(req.user.id) });
+}));
+
+// ── bedroom partners: ask someone to share your flat; they say yes (or no)
+async function partnership(userId) {
+  const { rows } = await query(
+    `SELECT p.owner_id AS "ownerId", p.partner_id AS "partnerId", o.display_name AS "ownerName", q.display_name AS "partnerName"
+     FROM home_partners p JOIN users o ON o.id = p.owner_id JOIN users q ON q.id = p.partner_id
+     WHERE p.owner_id = $1 OR p.partner_id = $1`, [userId]);
+  return rows[0] || null;
+}
+router.get('/home/partner', auth.requireUser, wrap(async (req, res) => {
+  const p = await partnership(req.user.id);
+  const { rows: invites } = await query(
+    `SELECT i.owner_id AS "ownerId", u.display_name AS "fromName", u.username FROM home_partner_invites i JOIN users u ON u.id = i.owner_id
+     WHERE i.to_id = $1 ORDER BY i.created_at DESC`, [req.user.id]);
+  const { rows: sent } = await query(
+    `SELECT i.to_id AS "toId", u.display_name AS "toName" FROM home_partner_invites i JOIN users u ON u.id = i.to_id WHERE i.owner_id = $1`, [req.user.id]);
+  res.json({
+    partner: p && (p.ownerId === req.user.id ? { id: p.partnerId, name: p.partnerName, flat: p.ownerId, role: 'owner' } : { id: p.ownerId, name: p.ownerName, flat: p.ownerId, role: 'partner' }),
+    invites, sent: sent[0] || null,
+  });
+}));
+router.post('/home/partner/invite', auth.requireUser, smallLimit, wrap(async (req, res) => {
+  const username = String((req.body || {}).username || '').trim().toLowerCase().replace(/^@/, '').slice(0, 24);
+  const { rows: to } = await query('SELECT id, display_name AS "displayName" FROM users WHERE lower(username) = $1', [username]);
+  if (!to[0]) return res.status(404).json({ error: "There's nobody here by that username." });
+  if (to[0].id === req.user.id) return res.status(400).json({ error: "That's you! Ask someone else to share your room 💞" });
+  if (await partnership(req.user.id)) return res.status(409).json({ error: 'You already share a room. End that first, from your room’s settings.' });
+  if (await partnership(to[0].id)) return res.status(409).json({ error: `${to[0].displayName} already shares a room with someone.` });
+  await ensureRoom(req.user);
+  await query('DELETE FROM home_partner_invites WHERE owner_id = $1', [req.user.id]); // one ask at a time
+  await query('INSERT INTO home_partner_invites (owner_id, to_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.user.id, to[0].id]);
+  realtime.sendToUser(to[0].id, { t: 'partner:invite', from: req.user.display_name, ownerId: req.user.id });
+  res.json({ ok: true, to: to[0] });
+}));
+router.post('/home/partner/accept', auth.requireUser, smallLimit, wrap(async (req, res) => {
+  const ownerId = Number((req.body || {}).ownerId);
+  const { rows } = await query('SELECT 1 FROM home_partner_invites WHERE owner_id = $1 AND to_id = $2', [ownerId, req.user.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'That invitation isn’t there any more.' });
+  if (await partnership(req.user.id)) return res.status(409).json({ error: 'You already share a room with someone.' });
+  if (await partnership(ownerId)) return res.status(409).json({ error: 'They’re already sharing their room with someone else.' });
+  await query('INSERT INTO home_partners (owner_id, partner_id) VALUES ($1, $2)', [ownerId, req.user.id]);
+  await query('DELETE FROM home_partner_invites WHERE owner_id IN ($1, $2) OR to_id IN ($1, $2)', [ownerId, req.user.id]);
+  realtime.sendToUser(ownerId, { t: 'partner:accepted', name: req.user.display_name });
+  res.json({ partner: await partnership(req.user.id) });
+}));
+router.post('/home/partner/decline', auth.requireUser, smallLimit, wrap(async (req, res) => {
+  const ownerId = Number((req.body || {}).ownerId);
+  const { rows } = await query('DELETE FROM home_partner_invites WHERE owner_id = $1 AND to_id = $2 RETURNING owner_id', [ownerId, req.user.id]);
+  if (rows[0]) realtime.sendToUser(ownerId, { t: 'partner:declined', name: req.user.display_name });
+  res.json({ ok: true });
+}));
+router.delete('/home/partner', auth.requireUser, smallLimit, wrap(async (req, res) => {
+  const p = await partnership(req.user.id);
+  await query('DELETE FROM home_partner_invites WHERE owner_id = $1', [req.user.id]); // (and any ask you'd sent)
+  if (!p) return res.json({ ok: true });
+  await query('DELETE FROM home_partners WHERE owner_id = $1', [p.ownerId]);
+  const other = p.ownerId === req.user.id ? p.partnerId : p.ownerId;
+  realtime.sendToUser(other, { t: 'partner:ended', name: req.user.display_name });
+  res.json({ ok: true });
 }));
 
 module.exports = { router, photoUpload, canEnterHome, roomOf };

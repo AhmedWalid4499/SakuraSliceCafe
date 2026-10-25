@@ -285,14 +285,15 @@ export function buildHall({ floor, makeSign, wing = 1 }) {
       const n = String(num + 1).padStart(2, '0');
       // the resident's name, big; the room number underneath
       const lines = !r ? [{ text: `Room ${n}`, size: 100, weight: '700' }, { text: 'nobody lives here yet', size: 58 }]
-        : r.mine ? [{ text: '★ Your room', size: 100, weight: '700' }, { text: `Room ${n}`, size: 62 }]
+        : r.mine ? [{ text: r.partnerName ? '★ Your shared room' : '★ Your room', size: 96, weight: '700' }, { text: r.partnerName ? `Room ${n} · with ${r.partnerName}` : `Room ${n}`, size: 58 }]
+        : r.shared ? [{ text: '💞 Your shared room', size: 96, weight: '700' }, { text: `Room ${n} · ${r.ownerName}`, size: 58 }]
         : [{ text: `${r.ownerName}'s room`, size: 100, weight: '700' }, { text: `Room ${n} · ${r.canEnter ? (r.invited ? "you're invited in" : 'door open') : 'door shut'}`, size: 58 }];
-      d.plaque = makeSign(lines, 0.78, 0.26, r && r.mine ? { bg: '#fbe3ea' } : {});
+      d.plaque = makeSign(lines, 0.78, 0.26, r && (r.mine || r.shared) ? { bg: '#fbe3ea' } : {});
       d.plaque.position.set(0, DOOR_H + 0.3, 0.05);
       d.g.add(d.plaque);
       d.under.visible = !!(r && r.here);
       d.hit.userData = r && r.canEnter
-        ? { kind: 'hall-door', ownerId: r.ownerId, label: r.mine ? `Your room — ${r.name}` : `Knock on ${r.ownerName}'s door${r.here ? ` · ${r.here} in there` : ''}` }
+        ? { kind: 'hall-door', ownerId: r.ownerId, label: r.mine ? `Your room — ${r.name}` : r.shared ? `Your shared room — ${r.name}` : `Knock on ${r.ownerName}'s door${r.here ? ` · ${r.here} in there` : ''}` }
         : { kind: 'hall-door', ownerId: null, label: r ? `Room ${n} — ${r.ownerName}'s room; the door is shut` : `Room ${n} — nobody lives here yet` };
       if (r && r.canEnter) byOwner.set(Number(r.ownerId), i);
     });
