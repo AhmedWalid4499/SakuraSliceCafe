@@ -16,6 +16,10 @@ import { buildCommon, COMMON } from './common.js';
 import { buildMusic, MUSIC } from './music.js';
 import { buildPrayer, PRAYER } from './prayer.js';
 import { buildSleepover, SLEEPOVER } from './sleepover.js';
+import { buildLanding } from './landing.js';
+import { buildGameRoom } from './gameroom.js';
+import { buildLibrary } from './library.js';
+import { buildCinema } from './cinema.js';
 import { buildCairoLife, stripedKerb } from './cairo.js';
 import { buildKoshari, KOSHARI } from './koshari.js';
 import { buildNile, NILE } from './nile.js';
@@ -352,6 +356,11 @@ export function buildWorld(renderer) {
     group: new THREE.Group(),
   });
   const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor(), music: mkFloor(), prayer: mkFloor(), koshari: mkFloor(), hall2: mkFloor(), sleepover: mkFloor() };
+  // the rooms on the second floor, off its landing, and the cinema on the roof:
+  // each a floor of its own, built by its module (ROOM_BUILDERS below)
+  const ROOM_BUILDERS = { landing: buildLanding, games: buildGameRoom, library: buildLibrary, cinema: buildCinema };
+  const ROOM_Y = name => (name === 'cinema' ? FLOOR3_Y : FLOOR2_Y);
+  for (const k of Object.keys(ROOM_BUILDERS)) { floors[k] = mkFloor(); scene.add(floors[k].group); floors[k].group.position.y = ROOM_Y(k); floors[k].group.visible = false; }
   scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group, floors.sleepover.group);
   // the Common room (common.js), off the hallway, for everyone who lives upstairs
   floors.common.group.position.y = FLOOR2_Y;
@@ -1627,6 +1636,7 @@ export function buildWorld(renderer) {
   root = floors.garden.group;
   FY = FLOOR3_Y;
   const gardenLamps = [];
+  const gardenCinemaDoor = { x: 0, z: 0, ry: 0 }; // where you come out of the cinema
   const gardenBeds = new Map(); // id -> { soil, plants, hover, spot, label }
   {
     const W3 = ROOM.maxX - ROOM.minX, D3 = ROOM.maxZ - ROOM.minZ;
@@ -1772,6 +1782,21 @@ export function buildWorld(renderer) {
       hover.userData = { kind: 'stairs-down', label: 'Down the stairs to the hallway' };
       interactables.push(hover);
       root.add(hover);
+      // on its east side, the door to the Rooftop Cinema (cinema.js): a few
+      // steps up and in, under its own roof
+      {
+        const cx = hx + hw / 2, door = new THREE.Group();
+        door.position.set(cx, 0, hz); door.rotation.y = Math.PI / 2;
+        for (const s of [-1, 1]) door.add(at(rbox(0.6, 2.1, 0.05, 0.015, std('#7c1f2c', { roughness: 0.55 })), s * 0.31, 1.05, 0.03));
+        for (const [w, h, dx, y] of [[0.1, 2.2, -0.66, 1.1], [0.1, 2.2, 0.66, 1.1], [1.42, 0.1, 0, 2.2]]) door.add(at(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.1), frameM), dx, y, 0.05));
+        const cs = makeSign([{ text: '🎬 Rooftop Cinema', size: 100, weight: '700', color: '#ffd98a' }, { text: 'covered · rain or shine', size: 64, color: '#f4ece0' }], 1.05, 0.34, { bg: '#16131f', border: '#e2b04a' });
+        cs.position.set(0, 2.5, 0.06); door.add(cs);
+        const ch = at(new THREE.Mesh(new THREE.PlaneGeometry(1.3, 2.2), new THREE.MeshBasicMaterial({ visible: false })), 0, 1.1, 0.12);
+        ch.userData = { kind: 'garden-cinema', label: 'The Rooftop Cinema — what’s on tonight? 🎬' };
+        door.add(ch); interactables.push(ch);
+        root.add(door);
+        gardenCinemaDoor.x = cx + 0.9; gardenCinemaDoor.z = hz; gardenCinemaDoor.ry = Math.PI / 2;
+      }
     }
 
     // a garden sign over the stair house
@@ -3495,9 +3520,11 @@ export function buildWorld(renderer) {
   // the Sleepover Room, the second floor up from the upper hallway (sleepover.js)
   sleepover = buildSleepover({ floor: floors.sleepover, makeSign, animate: f => animated.push(f) });
   noFog(floors.sleepover.group);
+  const rooms = {};
+  for (const [k, build] of Object.entries(ROOM_BUILDERS)) { rooms[k] = build({ floor: floors[k], makeSign, animate: f => animated.push(f) }); noFog(floors[k].group); }
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, sleepover, koshari: outside.koshari,
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, sleepover, rooms, gardenCinemaDoor, koshari: outside.koshari,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setStreetSound: f => { outside.life.onSound = f; },
     adhan: () => outside.adhan(),
@@ -3512,8 +3539,8 @@ export function buildWorld(renderer) {
     const f = floors[name];
     Object.assign(api, {
       floor: name,
-      floorY: ['up', 'home', 'hall', 'hall2', 'common', 'music', 'prayer', 'sleepover'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
-      floorH: name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'sleepover' ? SLEEPOVER.h : name === 'koshari' ? KOSHARI.h : name === 'garden' ? 7 : ROOM.h,
+      floorY: ROOM_BUILDERS[name] ? ROOM_Y(name) : ['up', 'home', 'hall', 'hall2', 'common', 'music', 'prayer', 'sleepover'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
+      floorH: ROOM_BUILDERS[name] ? rooms[name].bounds.h : name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'sleepover' ? SLEEPOVER.h : name === 'koshari' ? KOSHARI.h : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
   }

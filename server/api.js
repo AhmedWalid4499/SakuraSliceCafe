@@ -75,7 +75,7 @@ function cleanPrefs(p) {
   if (typeof p.quality === 'string' && ['high', 'balanced', 'gentle'].includes(p.quality)) out.quality = p.quality;
   if (typeof p.toured === 'boolean') out.toured = p.toured; // has had the welcome tour
   // where you were last, so the café opens there next time
-  if (p.place && typeof p.place === 'object' && /^(main|garden|hall|common|music|prayer|koshari|hall2|sleepover|group:\d{1,9}|home:\d{1,9})$/.test(p.place.room)) {
+  if (p.place && typeof p.place === 'object' && /^(main|garden|hall|common|music|prayer|koshari|hall2|sleepover|landing|games|library|cinema|bakery|gym|art|laundry|ahwa|group:\d{1,9}|home:\d{1,9})$/.test(p.place.room)) {
     const n = (v, m) => (Number.isFinite(Number(v)) ? clamp(Number(v), -m, m) : 0);
     out.place = {
       room: p.place.room, x: n(p.place.x, 60), z: n(p.place.z, 60), ry: n(p.place.ry, 7),
@@ -503,6 +503,7 @@ admin.delete('/chat/:id', wrap(async (req, res) => {
 api.use(groups.router);
 api.use(require('./garden').router);
 api.use(require('./homes').router);
+api.use(require('./rooms').router);
 api.use(require('./media').router);
 api.use(npc);
 api.use('/admin', admin);

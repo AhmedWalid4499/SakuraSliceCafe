@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 // Which version is running (Railway sets RAILWAY_GIT_COMMIT_SHA) — handy for
 // "is my update live yet?": open /version in the browser.
 const VERSION = {
-  release: 'the Sleepover Room, and a smoother flat camera',
+  release: 'the second floor: Games Room, BookBeans Library, Rooftop Cinema',
   commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
   started: new Date().toISOString(),
 };

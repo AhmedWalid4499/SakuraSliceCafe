@@ -1072,6 +1072,73 @@
   </div>
 </div>
 
+<div id="arcadePanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Games Room</p>
+  <h3 id="arcadeTitle">🎱 Pool</h3>
+  <p class="fine" id="arcadeHow"></p>
+  <canvas id="arcadeCanvas" width="340" height="440" style="display:block;width:100%;max-width:440px;margin:8px auto;border-radius:12px;touch-action:none;background:#16131f"></canvas>
+  <p class="lede" id="arcadeStatus" style="font-size:14px;min-height:1.4em;text-align:center"></p>
+  <div class="row" style="justify-content:center"><button class="btn hidden" id="arcadeAgain" type="button">↻ Play again</button></div>
+  <p class="eyebrow" style="margin-top:10px">🏆 The best here</p>
+  <ol id="arcadeBoard" class="fine" style="margin:4px 0 0;padding-left:4px;list-style:none"></ol>
+</div>
+
+<div id="authorPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The BookBeans Library</p>
+  <h3>The author’s shelf 📖</h3>
+  <p class="lede" style="font-size:13.5px">Novellas by the café’s own author. Pick one up — they’re all on Kindle.</p>
+  <div id="authorList"></div>
+  <div id="authorOwner" class="hidden up-more" style="margin-top:14px">
+    <p class="eyebrow">🗝️ Your books</p>
+    <p class="fine" style="margin:4px 0 8px">One book per line: <b>Title | Kindle link | a line about it</b> (up to six). They go on the shelf face out, for everyone.</p>
+    <textarea id="authorEdit" rows="6" style="width:100%" placeholder="My First Novella | https://www.amazon.com/dp/… | A quiet story about…"></textarea>
+    <div class="row" style="margin-top:6px"><button class="btn" id="authorSave" type="button">Put them on the shelf</button></div>
+    <div class="error" id="authorErr"></div>
+  </div>
+</div>
+
+<div id="writePanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The writers’ nook</p>
+  <h3>Sit and write ✍️</h3>
+  <p class="lede" style="font-size:13.5px">Start the study timer and write — then log how many words you wrote. Everyone’s go on the board for today.</p>
+  <p class="fine" id="writeMine"></p>
+  <div class="row" style="margin:8px 0"><button class="btn ghost" id="writeTimer" type="button">⏱️ Start the timer</button></div>
+  <form id="writeForm" class="row" style="gap:6px">
+    <input type="number" id="writeWords" min="1" max="20000" placeholder="words written" style="flex:1">
+    <button class="btn" type="submit">Log my words</button>
+  </form>
+  <div class="error" id="writeErr"></div>
+</div>
+
+<div id="cinemaPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Up on the roof · covered, rain or shine</p>
+  <h3>The Rooftop Cinema 🎬</h3>
+  <p class="lede" id="cinNow" style="font-size:13.5px"></p>
+  <div class="row" style="margin:6px 0 10px"><button class="btn hidden" id="cinWatch" type="button">▶ Watch</button></div>
+  <p class="fine">When a film is on, everyone in the cinema watches it together, from the moment it started. Films also go up on the events board downstairs.</p>
+  <div id="cinList"></div>
+  <div id="cinOwner" class="hidden up-more" style="margin-top:14px">
+    <p class="eyebrow">🗝️ Put a film on the programme</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <label class="field" style="flex:2;min-width:160px"><span>Film</span><input type="text" id="cinTitle" maxlength="80" placeholder="e.g. Spirited Away"></label>
+      <label class="field" style="flex:3;min-width:200px"><span>YouTube link</span><input type="text" id="cinUrl" placeholder="https://www.youtube.com/watch?v=…"></label>
+    </div>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <label class="field" style="flex:1;min-width:120px"><span>When</span><select id="cinRepeat" class="wx-select"><option value="once">Once</option><option value="0">Every Sunday</option><option value="1">Every Monday</option><option value="2">Every Tuesday</option><option value="3">Every Wednesday</option><option value="4">Every Thursday</option><option value="5">Every Friday</option><option value="6">Every Saturday</option></select></label>
+      <label class="field" id="cinDateRow" style="flex:1;min-width:120px"><span>Date</span><input type="date" id="cinDate"></label>
+      <label class="field" style="flex:1;min-width:90px"><span>Time (Cairo)</span><input type="time" id="cinTime" value="21:00"></label>
+      <label class="field" style="flex:1;min-width:80px"><span>Minutes</span><input type="number" id="cinMinutes" value="120" min="10" max="300"></label>
+    </div>
+    <label class="field"><span>A line about it (optional)</span><input type="text" id="cinNote" maxlength="140"></label>
+    <div class="row" style="margin-top:6px"><button class="btn" id="cinAdd" type="button">Add to the programme</button></div>
+    <div class="error" id="cinErr"></div>
+  </div>
+</div>
+
 <div id="moviePanel" class="panel card hidden">
   <button class="x" data-close aria-label="Close">✕</button>
   <p class="eyebrow">Film night</p>
@@ -1155,6 +1222,8 @@
     <li>Across the road, right opposite the front door: <b>Koshari Abu Saied</b>. Click the shop through the front windows to cross over, order a bowl at the counter, and sit at a marble table. And at the end of the street (best seen from the roof garden): the Nile, with feluccas, Gezira and Cairo Tower.</li>
     <li>Every flat has its own door: Rooms 01–14 along the hallway at the top of the café's stairs, and Rooms 15–28 along the <b>upper hallway</b>, up the stairs at its far end (they carry on up to the roof garden).</li>
     <li>At the west end of the upper hallway, a door to the stairs up to the <b>second floor</b>: the <b>Sleepover Room</b> — bunk beds and beds for everyone (click one to lie down), a bathroom with toilets, showers and sinks, a midnight-snack corner, and a big TV that <b>anyone</b> can put a YouTube video or playlist on; everyone in the room watches together.</li>
+    <li>The Sleepover Room is on the <b>second floor landing</b>, with its other rooms: the <b>Games Room</b> (pool, ping-pong and baby-foot — click a table to play, and your best goes on the high-score board — plus game tables for chess, tawla, snakes and ladders and Sakura Eights) and the <b>BookBeans Library</b> (armchairs, the author’s shelf of novellas, a coffee bar, and the writers’ nook: sit at a desk, start the timer and log your words on today’s board).</li>
+    <li>On the roof, through the door in the side of the stair house: the <b>Rooftop Cinema</b> — covered, so the films go on rain or shine. When a film is on the programme, everyone in there watches it together.</li>
     <li>Upstairs, your flat's <b>balcony doors</b> open and close — click them. And in the avatar maker you can pick <b>pyjamas</b> to wear in your room, the hallway, the Common room and the Music Room.</li>
     <li>At the other end of the hallway: the <b>Music Room</b> (a piano and a guitar anyone can play, a cajón, a record player and an open-mic stage — sit on the stool to take it) and the <b>Prayer Room</b>, a quiet room with prayer mats facing the qibla and today's prayer times for Cairo. There's no chat in there.</li>
     <li>Upstairs, the hallway's <b>Common Room</b> door (by the stairs to the roof) leads to the sofas and the big TV — it plays the café's playlist, and everyone watches together.</li>
