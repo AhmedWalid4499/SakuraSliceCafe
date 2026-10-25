@@ -26,6 +26,12 @@ import { buildArt } from './art.js';
 import { buildLaundry } from './laundry.js';
 import { buildAhwa, AHWA } from './ahwa.js';
 import { buildTent } from './tent.js';
+import { buildHammam } from './hammam.js';
+import { buildStudio } from './studio.js';
+import { buildTearoom } from './tearoom.js';
+import { buildPlayroom } from './playroom.js';
+import { buildPostOffice } from './postoffice.js';
+import { buildFelucca, FELUCCA } from './felucca.js';
 import { buildCairoLife, stripedKerb } from './cairo.js';
 import { buildKoshari, KOSHARI } from './koshari.js';
 import { buildNile, NILE } from './nile.js';
@@ -361,13 +367,14 @@ export function buildWorld(renderer) {
     interactables: [], // meshes that respond to hover/click (userData.kind)
     group: new THREE.Group(),
   });
-  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor(), music: mkFloor(), prayer: mkFloor(), koshari: mkFloor(), hall2: mkFloor(), sleepover: mkFloor(), ahwa: mkFloor() };
+  const floors = { main: mkFloor(), up: mkFloor(), garden: mkFloor(), home: mkFloor(), hall: mkFloor(), common: mkFloor(), music: mkFloor(), prayer: mkFloor(), koshari: mkFloor(), hall2: mkFloor(), sleepover: mkFloor(), ahwa: mkFloor(), felucca: mkFloor() };
   // the rooms on the second floor, off its landing, and the cinema on the roof:
   // each a floor of its own, built by its module (ROOM_BUILDERS below)
-  const ROOM_BUILDERS = { landing: buildLanding, games: buildGameRoom, library: buildLibrary, cinema: buildCinema, bakery: buildBakery, gym: buildGym, art: buildArt, laundry: buildLaundry, tent: buildTent };
+  const ROOM_BUILDERS = { landing: buildLanding, games: buildGameRoom, library: buildLibrary, cinema: buildCinema, bakery: buildBakery, gym: buildGym, art: buildArt, laundry: buildLaundry, tent: buildTent,
+    hammam: buildHammam, studio: buildStudio, tearoom: buildTearoom, playroom: buildPlayroom, post: buildPostOffice };
   const ROOM_Y = name => (name === 'cinema' || name === 'tent' ? FLOOR3_Y : FLOOR2_Y); // (the cinema and the tent are on the roof)
   for (const k of Object.keys(ROOM_BUILDERS)) { floors[k] = mkFloor(); scene.add(floors[k].group); floors[k].group.position.y = ROOM_Y(k); floors[k].group.visible = false; }
-  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group, floors.sleepover.group, floors.ahwa.group);
+  scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group, floors.sleepover.group, floors.ahwa.group, floors.felucca.group);
   // the Common room (common.js), off the hallway, for everyone who lives upstairs
   floors.common.group.position.y = FLOOR2_Y;
   floors.common.group.visible = false;
@@ -2479,9 +2486,16 @@ export function buildWorld(renderer) {
   for (const f of Object.values(floors)) noFog(f.group);
 
   // ── outside: Cairo
-  const outside = buildCairo(scene, { kosharyFloor: floors.koshari, ahwaFloor: floors.ahwa });
+  const outside = buildCairo(scene, { kosharyFloor: floors.koshari, ahwaFloor: floors.ahwa, feluccaFloor: floors.felucca });
   // from inside the café, through the front windows: the koshari shop across the road
   floors.main.interactables.push(outside.koshari.goIn, outside.ahwa.goIn);
+  // by the front door, inside: the sign for the felucca on the Nile (felucca.js)
+  {
+    const sign = makeSign([{ text: '⛵ Sail on the Nile', size: 100, weight: '700' }, { text: 'the café felucca · click to go aboard', size: 56 }], 1.2, 0.4, { bg: '#e3eef0', border: '#2f6b8a' });
+    sign.position.set(-3.2, 2.5, ROOM.maxZ - 0.08); sign.rotation.y = Math.PI;
+    sign.userData = { kind: 'felucca-go', label: 'The café felucca, on the Nile at the end of the street — go aboard ⛵' };
+    floors.main.group.add(sign); floors.main.interactables.push(sign);
+  }
 
   // ════════════════════════════════════════════════════════════════
   //  Built after the spread-out, in the café's real coordinates:
@@ -3544,10 +3558,10 @@ export function buildWorld(renderer) {
   sleepover = buildSleepover({ floor: floors.sleepover, makeSign, animate: f => animated.push(f) });
   noFog(floors.sleepover.group);
   const rooms = {};
-  for (const [k, build] of Object.entries(ROOM_BUILDERS)) { rooms[k] = build({ floor: floors[k], makeSign, animate: f => animated.push(f) }); noFog(floors[k].group); }
+  for (const [k, build] of Object.entries(ROOM_BUILDERS)) { rooms[k] = build({ floor: floors[k], makeSign, animate: f => animated.push(f), buildAvatar }); noFog(floors[k].group); }
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, sleepover, rooms, gardenCinemaDoor, gardenTentDoor, koshari: outside.koshari, ahwa: outside.ahwa,
+    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, sleepover, rooms, gardenCinemaDoor, gardenTentDoor, koshari: outside.koshari, ahwa: outside.ahwa, felucca: outside.felucca,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setStreetSound: f => { outside.life.onSound = f; },
     adhan: () => outside.adhan(),
@@ -3558,12 +3572,12 @@ export function buildWorld(renderer) {
   // Show one floor and point colliders/seats/surfaces/interactables at it.
   function setFloor(name) {
     // (in the koshari shop the café is still there across the road)
-    for (const [k, f] of Object.entries(floors)) f.group.visible = k === name || ((name === 'koshari' || name === 'ahwa') && k === 'main');
+    for (const [k, f] of Object.entries(floors)) f.group.visible = k === name || (['koshari', 'ahwa', 'felucca'].includes(name) && k === 'main');
     const f = floors[name];
     Object.assign(api, {
       floor: name,
-      floorY: ROOM_BUILDERS[name] ? ROOM_Y(name) : ['up', 'home', 'hall', 'hall2', 'common', 'music', 'prayer', 'sleepover'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
-      floorH: ROOM_BUILDERS[name] ? rooms[name].bounds.h : name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'sleepover' ? SLEEPOVER.h : name === 'koshari' ? KOSHARI.h : name === 'ahwa' ? AHWA.h : name === 'garden' ? 7 : ROOM.h,
+      floorY: name === 'felucca' ? FELUCCA.deckY : ROOM_BUILDERS[name] ? ROOM_Y(name) : ['up', 'home', 'hall', 'hall2', 'common', 'music', 'prayer', 'sleepover'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
+      floorH: name === 'felucca' ? FELUCCA.h : ROOM_BUILDERS[name] ? rooms[name].bounds.h : name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'sleepover' ? SLEEPOVER.h : name === 'koshari' ? KOSHARI.h : name === 'ahwa' ? AHWA.h : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
   }
@@ -3595,7 +3609,7 @@ function softTexture(size, draw) {
   return t;
 }
 
-function buildCairo(scene, { kosharyFloor, ahwaFloor } = {}) {
+function buildCairo(scene, { kosharyFloor, ahwaFloor, feluccaFloor } = {}) {
   const animated = [];
   const nightMats = [];     // emissive things that glow after dark
   const lampGlows = [];
@@ -4331,6 +4345,7 @@ function buildCairo(scene, { kosharyFloor, ahwaFloor } = {}) {
   const koshari = buildKoshari({ scene, floor: kosharyFloor || { colliders: [], seats: [], surfaces: [], interactables: [] }, makeSign, buildAvatar, nightMats });
   // next door to it, the old coffee house (ahwa.js)
   const ahwa = buildAhwa({ scene, floor: ahwaFloor || { colliders: [], seats: [], surfaces: [], interactables: [] }, makeSign, buildAvatar, nightMats });
+  const felucca = buildFelucca({ scene, floor: feluccaFloor || { colliders: [], seats: [], surfaces: [], interactables: [] }, makeSign, buildAvatar });
   const nile = buildNile({ scene, r, nightMats, lampGlows, building, sand, paveMap: paveTex, roadMap: roadTex, glowTex, palm });
 
   // birds: a few soft V shapes gliding in slow circles
@@ -4446,6 +4461,7 @@ function buildCairo(scene, { kosharyFloor, ahwaFloor } = {}) {
     life.update(dt, t);
     koshari.update(dt, t);
     ahwa.update(dt, t);
+    felucca.update(dt);
     nile.update(dt, t);
     if (adhanK > 0) {
       adhanK = Math.max(0, adhanK - dt / 90);
@@ -4490,7 +4506,7 @@ function buildCairo(scene, { kosharyFloor, ahwaFloor } = {}) {
     });
   }
 
-  return { setSky, setWeather, setFlash, update, setClock, faceTex, life, koshari, ahwa, adhan() { adhanK = 1; } };
+  return { setSky, setWeather, setFlash, update, setClock, faceTex, life, koshari, ahwa, felucca, adhan() { adhanK = 1; } };
 }
 
 function lerpAngleW(a, b, t) {

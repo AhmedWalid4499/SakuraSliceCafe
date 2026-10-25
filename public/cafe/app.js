@@ -45,6 +45,16 @@ const ROOMS = {
     enter: () => 'You step into the Art Studio. Light from the big windows, the smell of paint, and the gallery wall full of everyone’s pictures.' },
   laundry: { where: 'in the Laundry Room', long: 'in the Laundry Room on the second floor, watching the machines go round', pj: true,
     enter: () => 'You carry your basket into the Laundry Room. A dryer is tumbling somewhere, and it smells of clean washing.' },
+  hammam: { where: 'in the Hammam', long: 'in the Hammam and Spa on the second floor, warm and steamy',
+    enter: () => 'You step into the Hammam. Warm air, the sound of water in the basins, and light through the stars in the dome ♨️' },
+  studio: { where: 'in the Recording Studio', long: 'in the Recording Studio on the second floor, by the ON AIR light',
+    enter: () => 'You slip into the Recording Studio. It’s hushed in here — foam on the walls, the microphone waiting in the booth 🎙️' },
+  tearoom: { where: 'in the Tea Room', long: 'in the Japanese Tea Room on the second floor, on the tatami',
+    enter: () => 'You slide the door open and step onto the tatami. The kettle hums on its brazier. 一期一会 — one time, one meeting 🍵' },
+  playroom: { where: 'in the Playroom', long: 'in the Kids’ Playroom on the second floor, probably in the ball pit', pj: true,
+    enter: () => 'You step into the Playroom. There’s a ball pit, a tower of blocks waiting to fall over, and Hana in the story corner 🧸' },
+  post: { where: 'in the Post Room', long: 'in the Post Room on the second floor, by the pigeonholes', pj: true,
+    enter: () => 'You step into the Post Room. A wall of pigeonholes, the smell of paper and stamps, and a red postbox 💌' },
   tent: { where: 'in the Ramadan Tent', long: 'up on the roof in the Ramadan Tent, under the lanterns',
     enter: () => tentGreeting() },
   cinema: { where: 'at the Rooftop Cinema', long: 'up at the Rooftop Cinema on the roof, under its covered roof',
@@ -825,7 +835,7 @@ function updateCamera(dt) {
   // keep the camera inside the room, under the ceiling
   const K = world.kitchen;
   const inKitchen = world.floor === 'main' && player.pos.z < ROOM.minZ - 0.05;
-  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'hall2' ? world.hall2.bounds : world.floor === 'common' ? world.common.bounds : world.floor === 'koshari' ? world.koshari.bounds : world.floor === 'ahwa' ? world.ahwa.bounds : world.floor === 'music' ? world.music.bounds : world.floor === 'prayer' ? world.prayer.bounds : world.floor === 'sleepover' ? world.sleepover.bounds : world.rooms[world.floor] ? world.rooms[world.floor].bounds : ROOM;
+  const box = inKitchen ? { minX: K.minX, maxX: K.maxX, minZ: K.minZ, maxZ: K.maxZ + 1.2 } : world.floor === 'home' ? world.home.cameraBox(player.pos) : world.floor === 'hall' ? world.hall.bounds : world.floor === 'hall2' ? world.hall2.bounds : world.floor === 'common' ? world.common.bounds : world.floor === 'koshari' ? world.koshari.bounds : world.floor === 'ahwa' ? world.ahwa.bounds : world.floor === 'felucca' ? world.felucca.bounds : world.floor === 'music' ? world.music.bounds : world.floor === 'prayer' ? world.prayer.bounds : world.floor === 'sleepover' ? world.sleepover.bounds : world.rooms[world.floor] ? world.rooms[world.floor].bounds : ROOM;
   // Glide the walls in rather than snapping: walking through a doorway (into
   // your kitchen, bathroom, library or out on the balcony) changes the box, and
   // a hard switch used to jump the camera from one side of the wall to the other.
@@ -923,7 +933,7 @@ function updatePeople(dt) {
 
 function updateOnline() {
   const n = state.people.size + (state.me ? 1 : 0);
-  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'hall2' ? ' · in the upper hallway' : state.room === 'common' ? ' · in the Common room' : state.room === 'koshari' ? ' · at Koshari Abu Saied, across the road' : state.room === 'ahwa' ? ' · at Ahwet El-Sett, across the road' : state.room === 'music' ? ' · in the Music Room' : state.room === 'prayer' ? ' · in the Prayer Room' : state.room === 'sleepover' ? ' · in the Sleepover Room' : ROOMS[state.room] ? ' · ' + ROOMS[state.room].where : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
+  const where = state.room === 'garden' ? ' · up on the roof garden' : state.room === 'hall' ? ' · in the hallway upstairs' : state.room === 'hall2' ? ' · in the upper hallway' : state.room === 'common' ? ' · in the Common room' : state.room === 'koshari' ? ' · at Koshari Abu Saied, across the road' : state.room === 'ahwa' ? ' · at Ahwet El-Sett, across the road' : state.room === 'felucca' ? ' · on the felucca, on the Nile' : state.room === 'music' ? ' · in the Music Room' : state.room === 'prayer' ? ' · in the Prayer Room' : state.room === 'sleepover' ? ' · in the Sleepover Room' : ROOMS[state.room] ? ' · ' + ROOMS[state.room].where : state.home ? ` · in ${state.roomName}` : state.roomName ? ` · upstairs, ${state.roomName}` : '';
   $('online').textContent = (n <= 1 ? 'just you, for now' : `${n} people here`) + where;
 }
 
@@ -1011,6 +1021,13 @@ function handle(m) {
       setMovie(m.movie, m.now);
       if (m.movie) sysChat(`📺 ${m.movie.by} put on “${m.movie.title}”.`);
       else if (m.by) sysChat(`📺 ${m.by} turned the film off.`);
+      break;
+    case 'letter':
+      toast(`💌 ${m.from} wrote you a letter — it’s waiting in your pigeonhole in the Post Room (second floor).`);
+      sound.cue('heart');
+      break;
+    case 'studio:list':
+      world.rooms.studio.setList(m.recordings); studioList = m.recordings;
       break;
     case 'gift':
       toast(`🎁 ${m.from} sent you a present — it's waiting by the door of your room.`);
@@ -1329,8 +1346,9 @@ const KOSHARI_BOWLS = { 'koshari-s': 'a small koshari', 'koshari-m': 'a medium k
 // …and so does a glass of tea from the ahwa next door
 const AHWA_CUPS = { 'ahwa-shai': ['a glass of shai with mint', 'teaglass'], 'ahwa-qahwa': ['a little cup of Turkish coffee', 'coffeecup'], 'ahwa-sahlab': ['a cup of sahlab', 'sahlab'] };
 // …and the Ramadan tent's iftar treats
+const TEA_BOWLS = { 'tea-matcha': ['a bowl of matcha you whisked yourself', 'matchabowl'] };
 const TENT_TREATS = { 'tent-dates': ['three dates', 'dates'], 'tent-qatayef': ['a plate of qatayef', 'qatayef'], 'tent-qamareldin': ['a glass of qamar el-din', 'qamareldin'] };
-const pastryOf = id => (KOSHARI_BOWLS[id] ? { id, name: KOSHARI_BOWLS[id], shape: 'koshari', by: 'abu-saied' } : AHWA_CUPS[id] ? { id, name: AHWA_CUPS[id][0], shape: AHWA_CUPS[id][1], by: 'ahwa' } : TENT_TREATS[id] ? { id, name: TENT_TREATS[id][0], shape: TENT_TREATS[id][1], by: 'tent' } : null)
+const pastryOf = id => (KOSHARI_BOWLS[id] ? { id, name: KOSHARI_BOWLS[id], shape: 'koshari', by: 'abu-saied' } : AHWA_CUPS[id] ? { id, name: AHWA_CUPS[id][0], shape: AHWA_CUPS[id][1], by: 'ahwa' } : TENT_TREATS[id] ? { id, name: TENT_TREATS[id][0], shape: TENT_TREATS[id][1], by: 'tent' } : TEA_BOWLS[id] ? { id, name: TEA_BOWLS[id][0], shape: TEA_BOWLS[id][1], by: 'tearoom' } : null)
   || pastries().find(p => p.id === id) || { id, name: 'pastry', shape: 'daifuku', by: 'yuki' };
 const bakerOf = p => (p.by === 'hana' ? 'Hana' : 'Yuki');
 
@@ -1794,6 +1812,26 @@ function click(x, y) {
   if (d.kind === 'room-door' || d.kind === 'room-out') return walkToThing(h, () => goToRoom(d.to));
   if (d.kind === 'garden-cinema') return walkToThing(h, () => goToRoom('cinema'));
   if (d.kind === 'garden-tent') return walkToThing(h, () => goToRoom('tent'));
+  if (d.kind === 'felucca-go') return goToRoom('felucca');
+  if (d.kind === 'felucca-out') return goToRoom('main');
+  if (d.kind === 'felucca-rais') return walkToThing(h, () => { const st = world.felucca.status(); bubble(world.felucca.group, st.sailing ? 'Ahlan! Look — Cairo Tower! ⛵' : 'Ahlan, ya basha! Sit down, we go soon ⛵', 'npc'); toast(st.sailing ? `⛵ We’re out on the river — back at the landing in ${Math.ceil(st.left)}s.` : `⛵ We push off in ${Math.ceil(st.left)}s. Find a cushion!`); });
+  if (d.kind === 'hammam-slab') { const s = world.rooms.hammam.slabSeats.find(x => !seatTaken(x)); if (s) goSit(s); return toast('♨️ You lie back on the warm marble and look up at the little stars in the dome. Your shoulders drop.'); }
+  if (d.kind === 'hammam-steam') return walkToThing(h, takeSteam);
+  if (d.kind === 'hammam-basin') return walkToThing(h, () => toast('💧 You scoop warm water from the basin with the copper tas and pour it over your arms. Lovely.'));
+  if (d.kind === 'hammam-lounge') { goSit(d.seat); return toast('🛁 You wrap yourself in a soft robe and lie back. Somebody hands you a cucumber water.'); }
+  if (d.kind === 'hammam-water') return walkToThing(h, () => { bubble(player.av.group, '🥒💧', 'emote'); toast('🥒 A cold glass of cucumber water, and a fresh towel from the pile.'); });
+  if (d.kind === 'studio-mic') return walkToThing(h, openRecorder);
+  if (d.kind === 'studio-play') return openRecordings();
+  if (d.kind === 'tea-make') return walkToThing(h, openTea);
+  if (d.kind === 'tea-scroll') return toast('🌸 一期一会 — ichigo ichie: “one time, one meeting”. This moment won’t come again, so treat it — and whoever’s here — with care.');
+  if (d.kind === 'play-pit') { const s = world.rooms.playroom.pitSeats.find(x => !seatTaken(x)); if (s) goSit(s); bubble(player.av.group, '🎉', 'emote'); send({ t: 'emote', e: '🎉' }); return toast('🟡🔴🔵 SPLASH! Into the ball pit!'); }
+  if (d.kind === 'play-blocks') return walkToThing(h, () => { const n = world.rooms.playroom.addBlock(); toast(n >= 12 ? '🧱 Twelve blocks high… it wobbles… CRASH! Again!' : `🧱 You add a block — the tower is ${n} high.`); });
+  if (d.kind === 'play-slide') return walkToThing(h, () => { bubble(player.av.group, 'Wheeee! 🛝', 'emote'); send({ t: 'emote', e: '🛝' }); });
+  if (d.kind === 'play-crayons') return walkToThing(h, openPaint);
+  if (d.kind === 'play-story') { if (d.seat && player.seat !== d.seat) goSit(d.seat); return openStory(); }
+  if (d.kind === 'post-hole') return walkToThing(h, () => openPostHole(d.door));
+  if (d.kind === 'post-write') return walkToThing(h, () => openLetter(null));
+  if (d.kind === 'post-lost') return walkToThing(h, () => toast('🧦 In the lost & found: one striped glove, a pink umbrella, a library book (overdue!) and a tiny toy car. Nobody’s claimed the car.'));
   if (d.kind === 'tent-iftar') return walkToThing(h, openTent);
   if (d.kind === 'tent-board') return toast(tentStatus().say);
   if (d.kind === 'tent-lantern') return toast('🏮 A fanous — coloured glass in a brass frame, the way they’ve hung in Cairo every Ramadan for a thousand years. Wahawi ya wahawi 🎶');
@@ -1901,7 +1939,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel'];
+const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel', 'recPanel', 'teaPanel', 'storyPanel', 'postPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -3136,7 +3174,7 @@ $('talkForm').addEventListener('submit', async e => {
   try {
     const holding = [player.drink && (menu().find(d => d.id === player.drink) || {}).name,
       player.dessert && player.dessert.bites < 3 && pastryOf(player.dessert.id).name].filter(Boolean).join(' and ');
-    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'hall2' ? 'in the upper hallway, one floor further up' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.room === 'koshari' ? 'across the road at Koshari Abu Saied, the koshari shop' : state.room === 'ahwa' ? 'across the road at Ahwet El-Sett, the old coffee house, over a glass of tea' : state.room === 'music' ? 'in the Music Room upstairs, by the piano and the little stage' : state.room === 'prayer' ? 'in the quiet Prayer Room upstairs' : state.room === 'sleepover' ? 'up on the second floor, in the Sleepover Room — beds everywhere, a film on the big TV' : ROOMS[state.room] ? ROOMS[state.room].long : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
+    const where = state.room === 'garden' ? 'up on the roof garden' : state.room === 'hall' ? 'in the hallway upstairs' : state.room === 'hall2' ? 'in the upper hallway, one floor further up' : state.room === 'common' ? 'in the Common room upstairs, on the sofa by the big TV' : state.room === 'koshari' ? 'across the road at Koshari Abu Saied, the koshari shop' : state.room === 'ahwa' ? 'across the road at Ahwet El-Sett, the old coffee house, over a glass of tea' : state.room === 'felucca' ? 'out on the Nile on the café’s felucca' : state.room === 'music' ? 'in the Music Room upstairs, by the piano and the little stage' : state.room === 'prayer' ? 'in the quiet Prayer Room upstairs' : state.room === 'sleepover' ? 'up on the second floor, in the Sleepover Room — beds everywhere, a film on the big TV' : ROOMS[state.room] ? ROOMS[state.room].long : state.home ? `upstairs, in ${state.roomName}` : state.room !== 'main' ? `upstairs, in ${state.roomName}'s room` : player.seat ? `sitting at ${player.seat.label}` : 'standing in the café';
     const r = await api('/npc/' + id, { method: 'POST', body: { text, holding, where } });
     typing.remove();
     if (talkTo !== id) return;
@@ -3317,7 +3355,7 @@ async function goToRoom(room, group = null) {
   const isHome = !!homeData;
   const isHall = room === 'hall' || room === 'hall2';
   const isCommon = room === 'common';
-  const isMusic = room === 'music', isPrayer = room === 'prayer', isKoshari = room === 'koshari' || room === 'ahwa', isSleep = room === 'sleepover';
+  const isMusic = room === 'music', isPrayer = room === 'prayer', isKoshari = room === 'koshari' || room === 'ahwa' || room === 'felucca', isSleep = room === 'sleepover';
   const extra = !!ROOMS[room]; // the landing, the rooms off it, the cinema (world.rooms)
   const up = room !== 'main' && !roof && !isHome && !isHall && !isCommon && !isMusic && !isPrayer && !isKoshari && !isSleep && !extra; // a group's room upstairs
   state.room = room;
@@ -3364,13 +3402,13 @@ async function goToRoom(room, group = null) {
     player.ry = a.ry;
     cam.yaw = 0; cam.pitch = 0.32; cam.dist = cam.targetDist = 3.4;
   }
-  if (room === 'main' && (from === 'koshari' || from === 'ahwa')) { // back across the road and in at the front door
+  if (room === 'main' && (from === 'koshari' || from === 'ahwa' || from === 'felucca')) { // back across the road and in at the front door
     player.pos.set(0, 0, mapZ(3.8)); player.ry = Math.PI;
     cam.yaw = 0; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.6;
   }
   if (isKoshari) { // in from the street, the counter ahead
-    const a = world[room].arrival;
-    player.pos.set(a.x, 0, a.z); player.ry = a.ry;
+    const a = room === 'felucca' ? world.felucca.arrival() : world[room].arrival;
+    player.pos.set(a.x, world.floorY, a.z); player.ry = a.ry;
     cam.yaw = Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 2.8;
   }
   if (extra) { // in through its door (on the landing: out of the room you were in, or at the top of the stairs)
@@ -3422,7 +3460,10 @@ async function goToRoom(room, group = null) {
   if (room === 'cinema') refreshCinema(true);
   if (room === 'art') loadGallery();
   if (room === 'tent') refreshTent(true);
+  if (room === 'studio') loadRecordings();
+  if (room === 'post') loadHoles();
   sysChat(extra ? ROOMS[room].enter(from) : isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.'
+    : room === 'felucca' ? feluccaGreeting()
     : room === 'ahwa' ? 'You cross the road to Ahwet El-Sett. The click of tawla pieces, glasses of tea on brass trays, and the gramophone in the corner.'
     : isKoshari ? 'You cross the road — mind the tuk-tuk — to Koshari Abu Saied. The spoon rings on the steel bowls.'
     : isMusic ? 'You open the doors to the Music Room. Someone has left the piano lid up.'
@@ -3436,7 +3477,7 @@ async function goToRoom(room, group = null) {
     : roof && from === 'cinema' ? 'You step out of the cinema onto the roof garden, blinking.' : roof && from === 'tent' ? 'You duck out of the tent onto the roof garden. The lanterns glow behind you.' : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
-    : up ? `You climb the spiral stairs to ${group.name}'s room.` : from === 'koshari' || from === 'ahwa' ? 'You cross back over the road and in at the café door. The bell chimes.' : 'You come back down into the café.');
+    : up ? `You climb the spiral stairs to ${group.name}'s room.` : from === 'felucca' ? 'You step off onto the landing and stroll back up the street to the café. The bell chimes.' : from === 'koshari' || from === 'ahwa' ? 'You cross back over the road and in at the café door. The bell chimes.' : 'You come back down into the café.');
   if (isHome && homeData.focus) offerFocus(homeData.focus, homeData.now);
   updateOnline();
   await wait(120);
@@ -5085,6 +5126,231 @@ $('tentMenu').onclick = e => {
   toast(`🌙 ${TENT_TREATS[id][0][0].toUpperCase() + TENT_TREATS[id][0].slice(1)}, from the sofra. Sit on a cushion — press B for a bite. Saha w hana!`);
 };
 
+// ── the felucca: it carries you (and everyone else aboard) as it sails
+const felucca = { phase: null };
+function rideFelucca() {
+  const mv = world.felucca.move();
+  if (state.room !== 'felucca') { felucca.phase = null; return; }
+  mv.apply(player.pos); player.ry += mv.dyaw;
+  if (player.target) mv.apply(player.target);
+  if (player.path) player.path.forEach(mv.apply);
+  mv.apply(camTarget); cam.yaw += mv.dyaw;
+  for (const p of state.people.values()) {
+    mv.apply(p.pos); p.ry += mv.dyaw;
+    if (p.state && p.state.x != null) { mv.apply(p.state); p.state.ry = (p.state.ry || 0) + mv.dyaw; }
+  }
+  const st = world.felucca.status();
+  if (felucca.phase !== null && felucca.phase !== st.sailing) sysChat(st.sailing ? '⛵ The ra’is pushes off from the landing — we’re sailing! The wind fills the big white sail.' : '⛵ We glide back in to the landing. Stay aboard for the next sail, or step off.');
+  felucca.phase = st.sailing;
+}
+function feluccaGreeting() {
+  const st = world.felucca.status();
+  return st.sailing ? `The boatman rows you out and helps you aboard the felucca, already under sail on the Nile — back at the landing in about ${Math.ceil(st.left / 60)} min. Look out for Cairo Tower ⛵`
+    : `You step aboard the café’s felucca at the landing. The ra’is grins — “we go in ${Math.ceil(st.left)} seconds!” Find a cushion ⛵`;
+}
+
+// ── the hammam: a steam, that fogs everything up for a while
+function takeSteam() {
+  const s = world.rooms.hammam.steamSeats.find(x => !seatTaken(x));
+  if (s) goSit(s);
+  const fog = $('steamFog');
+  fog.classList.remove('hidden', 'clear'); void fog.offsetWidth; fog.classList.add('on');
+  toast('☁️ You step into the steam room and close the glass door. Breathe in slowly…');
+  setTimeout(() => { fog.classList.add('clear'); }, 16000);
+  setTimeout(() => { fog.classList.remove('on', 'clear'); fog.classList.add('hidden'); toast('✨ You come out of the steam pink, warm and very relaxed.'); }, 19000);
+}
+
+// ── the Recording Studio: record in the booth, and play back what's been made here
+let studioList = [];
+const rec = { media: null, chunks: [], blob: null, started: 0, timer: null, stream: null };
+async function loadRecordings() {
+  try { const r = await api('/studio/recordings'); studioList = r.recordings; world.rooms.studio.setList(r.recordings); } catch (e) { /* the board waits */ }
+}
+function openRecorder() {
+  $('recErr').textContent = '';
+  $('recState').textContent = rec.blob ? `Recorded ${Math.round((rec.seconds || 0))} seconds — listen, then share it.` : 'Press record and talk — a book chat, a story read aloud, anything kind. Up to 90 seconds.';
+  $('recListen').classList.toggle('hidden', !rec.blob);
+  $('recShareRow').classList.toggle('hidden', !rec.blob);
+  renderRecList();
+  openPanel('recPanel');
+}
+function openRecordings() { openRecorder(); }
+function renderRecList() {
+  $('recList').replaceChildren(...(studioList.length ? studioList.map(r => {
+    const row = document.createElement('div'); row.className = 'event-row';
+    const t = document.createElement('b'); t.textContent = `🎙️ ${r.title}`;
+    const p = document.createElement('p'); p.className = 'fine'; p.textContent = `${r.by} · ${Math.round(r.seconds || 0)}s`;
+    const a = document.createElement('audio'); a.controls = true; a.preload = 'none'; a.src = r.url; a.style.width = '100%';
+    row.append(t, p, a);
+    if ((state.me && r.byId === state.me.id) || (state.me && state.me.isAdmin)) {
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'btn ghost small'; del.textContent = 'Take it down';
+      del.onclick = async () => { try { const x = await api('/studio/recording/' + r.id, { method: 'DELETE', body: {} }); studioList = x.recordings; world.rooms.studio.setList(x.recordings); renderRecList(); } catch (e) { toast(e.message); } };
+      row.append(del);
+    }
+    return row;
+  }) : [Object.assign(document.createElement('p'), { className: 'fine', textContent: 'Nothing recorded here yet — be the first.' })]));
+}
+$('recStart').onclick = async () => {
+  $('recErr').textContent = '';
+  if (rec.media) { rec.media.stop(); return; }
+  try {
+    rec.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) { $('recErr').textContent = 'The microphone isn’t available — allow it in your browser, then try again.'; return; }
+  const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  rec.chunks = []; rec.blob = null;
+  rec.media = new MediaRecorder(rec.stream, type ? { mimeType: type } : undefined);
+  rec.media.ondataavailable = e => { if (e.data.size) rec.chunks.push(e.data); };
+  rec.media.onstop = () => {
+    clearInterval(rec.timer);
+    rec.seconds = (Date.now() - rec.started) / 1000;
+    rec.blob = new Blob(rec.chunks, { type: (rec.media.mimeType || 'audio/webm').split(';')[0] });
+    rec.stream.getTracks().forEach(t => t.stop());
+    rec.media = null;
+    world.rooms.studio.setOnAir(false);
+    $('recStart').textContent = '⏺ Record again';
+    $('recListen').src = URL.createObjectURL(rec.blob);
+    openRecorder();
+  };
+  rec.started = Date.now();
+  rec.media.start();
+  world.rooms.studio.setOnAir(true);
+  bubble(player.av.group, '🎙️ ON AIR', 'emote');
+  send({ t: 'emote', e: '🎙️' });
+  $('recStart').textContent = '⏹ Stop';
+  rec.timer = setInterval(() => {
+    const sec = (Date.now() - rec.started) / 1000;
+    $('recState').textContent = `🔴 Recording… ${Math.floor(sec)}s (up to 90)`;
+    if (sec >= 90 && rec.media) rec.media.stop();
+  }, 250);
+};
+$('recShare').onclick = async () => {
+  if (!rec.blob) return;
+  $('recErr').textContent = '';
+  try {
+    const q = new URLSearchParams({ title: $('recTitle').value.trim() || 'A recording', seconds: String(Math.round(rec.seconds || 0)) });
+    const r = await fetch('/api/studio/upload?' + q, { method: 'POST', credentials: 'include', headers: { 'Content-Type': rec.blob.type || 'audio/webm' }, body: rec.blob });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'That didn’t upload.');
+    studioList = j.recordings; world.rooms.studio.setList(j.recordings);
+    rec.blob = null; $('recTitle').value = ''; $('recStart').textContent = '⏺ Record';
+    toast('🎙️ It’s on the studio shelf now — anyone in here can listen.');
+    openRecorder();
+  } catch (e) { $('recErr').textContent = e.message; }
+};
+
+// ── the Tea Room: a matcha ceremony, a step at a time
+const TEA_STEPS = ['Bow, and wipe the chawan and the chashaku with the silk fukusa', 'Warm the bowl with hot water from the kettle, then empty it', 'Two scoops of matcha from the natsume into the bowl', 'A ladle of hot water — not boiling — over the tea', 'Whisk with the chasen in quick “M” shapes until it froths', 'Turn the bowl twice so its front faces your guest, and offer it'];
+const tea = { step: 0, busy: false };
+function openTea() { tea.step = 0; renderTea(); openPanel('teaPanel'); }
+function renderTea() {
+  $('teaList').replaceChildren(...TEA_STEPS.map((t, i) => { const li = document.createElement('li'); li.textContent = (i < tea.step ? '✅ ' : i === tea.step ? '👉 ' : '◽ ') + t; li.style.opacity = i <= tea.step ? 1 : 0.55; return li; }));
+  const done = tea.step >= TEA_STEPS.length;
+  $('teaNext').textContent = done ? '🍵 Take the bowl' : tea.busy ? '…' : 'Next';
+  $('teaNext').disabled = tea.busy;
+}
+$('teaNext').onclick = async () => {
+  if (tea.busy) return;
+  if (tea.step < TEA_STEPS.length) {
+    tea.busy = true; renderTea();
+    sound.cue('pin');
+    await wait(TEA_STEPS[tea.step].includes('Whisk') ? 1800 : 1000);
+    tea.busy = false; tea.step++; renderTea();
+    return;
+  }
+  closePanels();
+  if (player.dessert) return toast('🍵 Finish what you have first — or put it down.');
+  player.dessert = { id: 'tea-matcha', bites: 0 };
+  player.av.setDessert('matchabowl', 0);
+  sound.cue('drink'); sendMove(true); refreshActions();
+  bubble(player.av.group, '🍵 Otemae chōdai itashimasu', 'emote');
+  toast('🍵 A bowl of bright green matcha, frothed just right. Turn it, sip it slowly — press B. Ichigo ichie.');
+};
+
+// ── the Playroom: Hana reads a picture book in the story corner
+const STORIES_FOR_KIDS = [
+  { title: 'The Cat Who Ran the Café', pages: ['Once there was a ginger cat called Mishmish who lived at Sakura Slice Café.', 'Every morning Mishmish sat on the counter and watched Yuki make the sakura slices.', 'One day Yuki was late! So Mishmish put on a tiny apron…', '…and knocked every cup off the counter. CRASH!', 'Yuki came in, laughed, and gave Mishmish a bowl of milk. “Maybe stick to napping,” she said.', 'And Mishmish did. The end. 🐱'] },
+  { title: 'The Little Felucca', pages: ['On the river Nile there was a little felucca with a big white sail.', 'All the big boats went “TOOT TOOT!” and the little felucca felt very small.', 'But when the wind blew, the little felucca flew across the water like a bird!', 'It sailed past the tall Cairo Tower, which waved hello.', 'At sunset everyone wanted a ride on the little felucca — because it was the fastest of all.', 'The end. ⛵'] },
+  { title: 'The Lantern That Was Afraid of the Dark', pages: ['In a box in the attic lived a small red lantern called Fanoos.', 'Fanoos was afraid of the dark. “What if it never ends?” he whispered.', 'Then Ramadan came, and someone lifted Fanoos out and lit a candle inside him.', 'He glowed! And the dark wasn’t scary at all — it was where his light could shine.', 'Every night children carried him down the street, singing “Wahawi ya wahawi!”', 'The end. 🏮'] },
+];
+const story = { i: 0, page: 0 };
+function openStory() {
+  story.i = Math.floor(Math.random() * STORIES_FOR_KIDS.length); story.page = 0;
+  renderStory();
+  openPanel('storyPanel');
+  if (world.rooms.playroom.hana) bubble(world.rooms.playroom.hana.group, `Shall we read “${STORIES_FOR_KIDS[story.i].title}”? 📖`, 'npc');
+}
+function renderStory() {
+  const s = STORIES_FOR_KIDS[story.i];
+  $('storyTitle').textContent = s.title;
+  $('storyText').textContent = s.pages[story.page];
+  $('storyPage').textContent = `${story.page + 1} / ${s.pages.length}`;
+  $('storyNext').textContent = story.page < s.pages.length - 1 ? 'Turn the page ›' : '📚 Another one!';
+}
+$('storyNext').onclick = () => {
+  const s = STORIES_FOR_KIDS[story.i];
+  if (story.page < s.pages.length - 1) story.page++;
+  else { story.i = (story.i + 1) % STORIES_FOR_KIDS.length; story.page = 0; }
+  sound.cue('pin');
+  renderStory();
+};
+
+// ── the Post Room: letters to the neighbours, in their pigeonholes
+let postHoles = [];
+async function loadHoles() {
+  try {
+    const r = await api('/post/holes');
+    postHoles = r.holes;
+    world.rooms.post.setHoles(r.holes.map(h => (h ? { name: h.name, mine: h.mine, waiting: h.mine && r.waiting > 0 } : null)));
+    if (r.waiting) toast(`💌 There ${r.waiting === 1 ? 'is a letter' : `are ${r.waiting} letters`} in your pigeonhole!`);
+  } catch (e) { /* the labels wait */ }
+}
+async function openPostHole(door) {
+  const h = postHoles[door];
+  if (h && h.mine) {
+    try {
+      const r = await api('/post/mine');
+      $('postTitle').textContent = 'Your pigeonhole 📬';
+      $('postWrite').classList.add('hidden');
+      $('postLetters').classList.remove('hidden');
+      $('postLetters').replaceChildren(...(r.letters.length ? r.letters.map(l => {
+        const row = document.createElement('div'); row.className = 'event-row' + (l.unread ? ' now' : '');
+        const t = document.createElement('b'); t.textContent = `💌 From ${l.fromName}`;
+        const p = document.createElement('p'); p.style.whiteSpace = 'pre-wrap'; p.textContent = l.body;
+        const w = document.createElement('span'); w.className = 'fine'; w.textContent = new Date(l.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        row.append(w, t, p);
+        return row;
+      }) : [Object.assign(document.createElement('p'), { className: 'fine', textContent: 'Nothing here yet. Write to a neighbour — they might write back!' })]));
+      $('postErr').textContent = '';
+      openPanel('postPanel');
+      loadHoles();
+    } catch (e) { toast(e.message); }
+    return;
+  }
+  if (!h) return toast(`📭 Room ${String(door + 1).padStart(2, '0')} — nobody lives there yet.`);
+  openLetter(door);
+}
+function openLetter(door) {
+  $('postTitle').textContent = 'Write a letter ✍️';
+  $('postLetters').classList.add('hidden');
+  $('postWrite').classList.remove('hidden');
+  const sel = $('postTo');
+  sel.replaceChildren(...postHoles.map((h, i) => (h && !h.mine ? Object.assign(document.createElement('option'), { value: String(i), textContent: `Room ${String(i + 1).padStart(2, '0')} — ${h.name}` }) : null)).filter(Boolean));
+  if (door != null) sel.value = String(door);
+  $('postErr').textContent = '';
+  openPanel('postPanel');
+}
+$('postSend').onclick = async () => {
+  $('postErr').textContent = '';
+  if (!$('postTo').value) { $('postErr').textContent = 'Who’s it to?'; return; }
+  try {
+    await api('/post/letters', { method: 'POST', body: { door: Number($('postTo').value), body: $('postBody').value } });
+    $('postBody').value = '';
+    closePanels();
+    sound.cue('pin');
+    toast('📮 Posted! It’s waiting in their pigeonhole.');
+  } catch (e) { $('postErr').textContent = e.message; }
+};
+
 // ── presents
 const giftOf = id => (state.home && state.home.gifts || []).find(g => g.id === id);
 // somewhere clear for it in your room: the main room first, near the door
@@ -5327,6 +5593,7 @@ function frame() {
   const t = clock.elapsedTime;
   world.update(dt, t);
   if (state.started) {
+    rideFelucca();
     updatePlayer(dt);
     updatePeople(dt);
     staff.update(dt);
@@ -5361,7 +5628,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie, openTent };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie, openTent, openTea, openStory, openLetter, openPostHole, takeSteam, openRecorder };
 
 // ───────────────────────────────────────── start
 

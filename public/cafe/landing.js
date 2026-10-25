@@ -30,6 +30,16 @@ export const LANDING_DOORS = [
     lines: [{ text: 'Art Studio', size: 110, weight: '700' }, { text: 'paint · hang it up 🎨', size: 62 }] },
   { room: 'laundry', x: 5.2, side: 1, color: '#9fb8d6', glass: '#eaf6ff', bg: '#e3eef0', label: 'The Laundry Room — washing machines and dryers',
     lines: [{ text: 'Laundry', size: 110, weight: '700' }, { text: 'wash · dry · fold 🧺', size: 62 }] },
+  { room: 'tearoom', x: 1.2, side: -1, color: '#8a6a4a', glass: '#fbf6ea', bg: '#f4ecd8', label: 'The Japanese Tea Room — tatami, matcha, a branch of sakura',
+    lines: [{ text: '茶室 Tea Room', size: 104, weight: '700' }, { text: 'tatami · matcha 🍵', size: 62 }] },
+  { room: 'studio', x: 6.8, side: -1, color: '#4a4258', glass: '#ffd0e0', bg: '#16131f', label: 'The Recording Studio — record a book chat or read a story aloud',
+    lines: [{ text: 'Studio', size: 110, weight: '700', color: '#f2a7bb' }, { text: 'ON AIR 🎙️', size: 64, color: '#f4ece0' }] },
+  { room: 'hammam', x: -3.5, side: 1, color: '#2f6b72', glass: '#e3eef0', bg: '#f4efe8', label: 'The Hammam and Spa — warm marble, steam, robes and cucumber water',
+    lines: [{ text: 'Hammam & Spa', size: 104, weight: '700' }, { text: 'steam · marble · rest ♨️', size: 60 }] },
+  { room: 'playroom', x: 2.3, side: 1, color: '#e2b04a', glass: '#dff1ff', bg: '#fffaf0', label: 'The Kids’ Playroom — a ball pit, blocks and Hana’s story corner',
+    lines: [{ text: 'Playroom', size: 110, weight: '700', color: '#5f8fc4' }, { text: 'ball pit · stories 🧸', size: 62 }] },
+  { room: 'post', x: 8.2, side: 1, color: '#7a1f2c', glass: '#f4ecd8', bg: '#f4ecd8', label: 'The Post Room — pigeonholes for every flat, letters between neighbours',
+    lines: [{ text: 'Post Room', size: 110, weight: '700' }, { text: 'letters · lost & found 💌', size: 60 }] },
 ];
 
 export function buildLanding({ floor, makeSign }) {

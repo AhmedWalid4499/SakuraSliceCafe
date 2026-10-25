@@ -24,6 +24,11 @@ function sprinkle(g, n, r, y, color, size = 0.0035) {
 }
 
 const BUILD = {
+  matchabowl(g) { // a chawan of matcha, whisked to a froth
+    const bowl = mesh(new THREE.CylinderGeometry(0.045, 0.03, 0.045, SEG), '#3a4a3a', { roughness: 0.5 }); bowl.position.y = 0.0225; g.add(bowl);
+    const tea = disc(0.041, 0.003, '#8ac25a', { roughness: 0.7 }); tea.position.y = 0.044; g.add(tea);
+    sprinkle(g, 14, 0.03, 0.046, '#c8e6a0', 0.003);
+  },
   dates(g) { // three dates on a little brass dish, the way iftar starts
     const dish = disc(0.05, 0.006, '#c9a25b', { metalness: 0.7, roughness: 0.3 }); dish.position.y = 0.003; g.add(dish);
     for (let i = 0; i < 3; i++) { const d = ball(0.012, '#4a2a18', { roughness: 0.35 }); d.scale.set(1, 0.75, 1.9); d.position.set(-0.018 + i * 0.018, 0.016, (i % 2) * 0.01); d.rotation.y = i * 0.6; g.add(d); }
