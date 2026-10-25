@@ -16,7 +16,11 @@ import { buildCommon, COMMON } from './common.js';
 import { buildMusic, MUSIC } from './music.js';
 import { buildPrayer, PRAYER } from './prayer.js';
 import { buildSleepover, SLEEPOVER } from './sleepover.js';
-import { buildLanding } from './landing.js';
+import { buildLanding, buildLanding3 } from './landing.js';
+import { buildKaraoke } from './karaoke.js';
+import { buildEscape } from './escape.js';
+import { buildPool } from './pool.js';
+import { buildObservatory } from './observatory.js';
 import { buildGameRoom } from './gameroom.js';
 import { buildLibrary } from './library.js';
 import { buildCinema } from './cinema.js';
@@ -371,8 +375,10 @@ export function buildWorld(renderer) {
   // the rooms on the second floor, off its landing, and the cinema on the roof:
   // each a floor of its own, built by its module (ROOM_BUILDERS below)
   const ROOM_BUILDERS = { landing: buildLanding, games: buildGameRoom, library: buildLibrary, cinema: buildCinema, bakery: buildBakery, gym: buildGym, art: buildArt, laundry: buildLaundry, tent: buildTent,
-    hammam: buildHammam, studio: buildStudio, tearoom: buildTearoom, playroom: buildPlayroom, post: buildPostOffice };
-  const ROOM_Y = name => (name === 'cinema' || name === 'tent' ? FLOOR3_Y : FLOOR2_Y); // (the cinema and the tent are on the roof)
+    hammam: buildHammam, studio: buildStudio, tearoom: buildTearoom, playroom: buildPlayroom, post: buildPostOffice,
+    landing3: buildLanding3, karaoke: buildKaraoke, escape: buildEscape, pool: buildPool, observatory: buildObservatory };
+  // (the cinema and the tent are on the roof; the pool and the observatory on the terrace above it)
+  const ROOM_Y = name => (name === 'pool' || name === 'observatory' ? FLOOR3_Y + 3.6 : name === 'cinema' || name === 'tent' ? FLOOR3_Y : FLOOR2_Y);
   for (const k of Object.keys(ROOM_BUILDERS)) { floors[k] = mkFloor(); scene.add(floors[k].group); floors[k].group.position.y = ROOM_Y(k); floors[k].group.visible = false; }
   scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group, floors.sleepover.group, floors.ahwa.group, floors.felucca.group);
   // the Common room (common.js), off the hallway, for everyone who lives upstairs

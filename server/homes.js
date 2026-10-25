@@ -392,9 +392,9 @@ router.delete('/home/:ownerId(\\d+)/movie', auth.requireUser, smallLimit, wrap(a
 // keeps the job while they're watching — and anyone who comes in later picks
 // it up from there. ('common' is the Common room; 'home:<id>' a resident's room.)
 const tvPos = new Map(); // room -> { list, index, t, at, by }
-const TV_ROOM = /^(common|sleepover|cinema|ahwa|home:\d+)$/;
+const TV_ROOM = /^(common|sleepover|cinema|ahwa|karaoke|home:\d+)$/;
 async function mayWatch(userId, room) {
-  if (['common', 'sleepover', 'cinema', 'ahwa'].includes(room)) return true;
+  if (['common', 'sleepover', 'cinema', 'ahwa', 'karaoke'].includes(room)) return true;
   const m = /^home:(\d+)$/.exec(room);
   return !!m && canEnterHome(userId, Number(m[1]));
 }
@@ -416,26 +416,28 @@ router.post('/tv/pos', auth.requireUser, smallLimit, wrap(async (req, res) => {
   res.json({ ok: true, kept: fresh });
 }));
 
-// The Sleepover Room's TV (the second floor): like a flat's, anyone in the
-// room can put something on — or turn it off — for everyone there.
-router.get('/tv/sleepover/movie', auth.requireUser, wrap(async (_req, res) => {
-  res.json({ movie: movieIn('sleepover'), now: Date.now() });
+// The Sleepover Room's TV and the Karaoke Room's big screen: like a flat's,
+// anyone in the room can put something on — or turn it off — for everyone there.
+const SHARED_TV = '/tv/:room(sleepover|karaoke)/movie';
+router.get(SHARED_TV, auth.requireUser, wrap(async (req, res) => {
+  res.json({ movie: movieIn(req.params.room), now: Date.now() });
 }));
-router.post('/tv/sleepover/movie', auth.requireUser, smallLimit, wrap(async (req, res) => {
+router.post(SHARED_TV, auth.requireUser, smallLimit, wrap(async (req, res) => {
+  const room = req.params.room;
   const link = youtubeLink((req.body || {}).url);
   if (!link) return res.status(400).json({ error: "That doesn't look like a YouTube link — paste the address of a video or a playlist." });
   const movie = {
     ...link, title: (await videoTitle(link.videoId, link.list)) || (link.list ? 'a playlist' : 'a film'),
     by: req.user.display_name, byId: req.user.id, startedAt: Date.now(),
   };
-  movies.set('sleepover', movie);
-  tvPos.delete('sleepover');
-  realtime.broadcast({ t: 'home:movie', movie, now: Date.now() }, null, 'sleepover');
+  movies.set(room, movie);
+  tvPos.delete(room);
+  realtime.broadcast({ t: 'home:movie', movie, now: Date.now() }, null, room);
   res.json({ movie, now: Date.now() });
 }));
-router.delete('/tv/sleepover/movie', auth.requireUser, smallLimit, wrap(async (req, res) => {
-  movies.delete('sleepover');
-  realtime.broadcast({ t: 'home:movie', movie: null, by: req.user.display_name }, null, 'sleepover');
+router.delete(SHARED_TV, auth.requireUser, smallLimit, wrap(async (req, res) => {
+  movies.delete(req.params.room);
+  realtime.broadcast({ t: 'home:movie', movie: null, by: req.user.display_name }, null, req.params.room);
   res.json({ movie: null });
 }));
 
