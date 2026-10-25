@@ -470,14 +470,14 @@
     </div>
     <form id="joinForm" autocomplete="on">
       <label class="field"><span>What should we call you?</span><input type="text" name="displayName" maxlength="24" required placeholder="Mariam"></label>
-      <label class="field"><span>Username</span><input type="text" name="username" maxlength="24" required placeholder="mariam" pattern="[A-Za-z0-9_.]{3,24}" autocomplete="username"></label>
+      <label class="field"><span>Username</span><input type="text" name="username" maxlength="24" required placeholder="mariam" pattern="[A-Za-z0-9_.]{3,24}" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
       <label class="field"><span>Email</span><input type="email" name="email" required placeholder="you@email.com" autocomplete="email"></label>
       <label class="field"><span>Password (8+ characters)</span><input type="password" name="password" minlength="8" required autocomplete="new-password"></label>
       <div class="error" id="joinErr"></div>
       <button class="btn wide" type="submit">Make my avatar 🌸</button>
     </form>
     <form id="loginForm" class="hidden" autocomplete="on">
-      <label class="field"><span>Email or username</span><input type="text" name="login" required autocomplete="username"></label>
+      <label class="field"><span>Email or username</span><input type="text" name="login" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
       <label class="field"><span>Password</span><input type="password" name="password" required autocomplete="current-password"></label>
       <div class="error" id="loginErr"></div>
       <button class="btn wide" type="submit">Open the door</button>

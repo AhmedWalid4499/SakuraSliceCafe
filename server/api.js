@@ -99,7 +99,7 @@ api.post('/auth/register', authLimit, wrap(async (req, res) => {
   if (password.length < 8 || password.length > 200) return res.status(400).json({ error: 'Passwords need at least 8 characters.' });
   if (!(await kindness.guard(res, `${displayName} (${username})`, 'name', null))) return;
 
-  const taken = await query('SELECT email, username FROM users WHERE email = $1 OR username = $2', [email, username]);
+  const taken = await query('SELECT lower(email) AS email, lower(username) AS username FROM users WHERE lower(email) = $1 OR lower(username) = $2', [email, username]);
   if (taken.rows.length) {
     const t = taken.rows[0];
     return res.status(409).json({ error: t.email === email ? 'There\'s already an account with that email.' : 'That username is taken.' });
@@ -116,12 +116,13 @@ api.post('/auth/register', authLimit, wrap(async (req, res) => {
 }));
 
 api.post('/auth/login', authLimit, wrap(async (req, res) => {
-  const login = cleanText(req.body.login || req.body.email, 120).toLowerCase();
+  // (capitals don't matter in an email or a username — "Mariam", "MARIAM" and "mariam" are one account)
+  const login = cleanText(req.body.login || req.body.email, 120).toLowerCase().replace(/^@/, '');
   const password = String(req.body.password || '');
-  const { rows } = await query('SELECT * FROM users WHERE email = $1 OR username = $1', [login]);
+  const { rows } = await query('SELECT * FROM users WHERE lower(email) = $1 OR lower(username) = $1 ORDER BY lower(email) = $1 DESC, id LIMIT 1', [login]);
   const u = rows[0];
   if (!u || !(await auth.checkPassword(password, u.password_hash))) {
-    return res.status(401).json({ error: 'That email or password isn\'t right.' });
+    return res.status(401).json({ error: 'That email or password isn\'t right. (Capitals don\'t matter in your username or email — but they do in your password.)' });
   }
   await query('UPDATE users SET last_seen_at = now() WHERE id = $1', [u.id]);
   await auth.createSession(res, u.id);
@@ -135,7 +136,7 @@ api.post('/auth/logout', wrap(async (req, res) => {
 
 // who sent an invite link (only their display name — for the door's welcome)
 api.get('/invite/:username', wrap(async (req, res) => {
-  const { rows } = await query('SELECT display_name FROM users WHERE username = $1', [String(req.params.username).toLowerCase().slice(0, 24)]);
+  const { rows } = await query('SELECT display_name FROM users WHERE lower(username) = $1', [String(req.params.username).toLowerCase().slice(0, 24)]);
   if (!rows[0]) return res.status(404).json({ error: 'No one by that name.' });
   res.json({ displayName: rows[0].display_name });
 }));

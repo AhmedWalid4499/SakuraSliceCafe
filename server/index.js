@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 // Which version is running (Railway sets RAILWAY_GIT_COMMIT_SHA) — handy for
 // "is my update live yet?": open /version in the browser.
 const VERSION = {
-  release: 'kitchen, gym & yoga, art studio, laundry, and Ahwet El-Sett',
+  release: 'sign in with capitals or without',
   commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
   started: new Date().toISOString(),
 };
@@ -87,7 +87,7 @@ async function cafePreview(req) {
   const who = String(req.query.invite || '').toLowerCase().slice(0, 24);
   if (!/^[a-z0-9_.]{3,24}$/.test(who)) return base;
   try {
-    const { rows } = await require('./db').query('SELECT display_name FROM users WHERE username = $1', [who]);
+    const { rows } = await require('./db').query('SELECT display_name FROM users WHERE lower(username) = $1', [who]);
     if (!rows[0]) return base;
     return { ...base, title: `${rows[0].display_name} saved you a seat at Sakura Slice Café 🌸`, description: 'Come and sit with me — order something warm, play a game of tawla, and stay as long as you like.' };
   } catch (e) { return base; }
