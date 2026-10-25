@@ -23,7 +23,7 @@ import { createRadio, audioDuration } from './radio.js';
 import { createRegulars } from './regulars.js';
 import { createGames } from './games.js';
 import { createTour } from './tour.js';
-import { cairoPrayerDay } from './prayertimes.mjs';
+import { cairoPrayerDay, ramadan } from './prayertimes.mjs';
 import { createArcade } from './arcade.js';
 import { createScreenLayer } from './tvscreen.js';
 
@@ -45,6 +45,8 @@ const ROOMS = {
     enter: () => 'You step into the Art Studio. Light from the big windows, the smell of paint, and the gallery wall full of everyone’s pictures.' },
   laundry: { where: 'in the Laundry Room', long: 'in the Laundry Room on the second floor, watching the machines go round', pj: true,
     enter: () => 'You carry your basket into the Laundry Room. A dryer is tumbling somewhere, and it smells of clean washing.' },
+  tent: { where: 'in the Ramadan Tent', long: 'up on the roof in the Ramadan Tent, under the lanterns',
+    enter: () => tentGreeting() },
   cinema: { where: 'at the Rooftop Cinema', long: 'up at the Rooftop Cinema on the roof, under its covered roof',
     enter: () => 'You step into the Rooftop Cinema. Red seats, the smell of popcorn, and a proper roof overhead — rain or shine, the film goes on 🎬' },
 };
@@ -1326,7 +1328,9 @@ const pastries = () => (Array.isArray(state.content['counter.pastries']) ? state
 const KOSHARI_BOWLS = { 'koshari-s': 'a small koshari', 'koshari-m': 'a medium koshari', 'koshari-l': 'a large koshari' };
 // …and so does a glass of tea from the ahwa next door
 const AHWA_CUPS = { 'ahwa-shai': ['a glass of shai with mint', 'teaglass'], 'ahwa-qahwa': ['a little cup of Turkish coffee', 'coffeecup'], 'ahwa-sahlab': ['a cup of sahlab', 'sahlab'] };
-const pastryOf = id => (KOSHARI_BOWLS[id] ? { id, name: KOSHARI_BOWLS[id], shape: 'koshari', by: 'abu-saied' } : AHWA_CUPS[id] ? { id, name: AHWA_CUPS[id][0], shape: AHWA_CUPS[id][1], by: 'ahwa' } : null)
+// …and the Ramadan tent's iftar treats
+const TENT_TREATS = { 'tent-dates': ['three dates', 'dates'], 'tent-qatayef': ['a plate of qatayef', 'qatayef'], 'tent-qamareldin': ['a glass of qamar el-din', 'qamareldin'] };
+const pastryOf = id => (KOSHARI_BOWLS[id] ? { id, name: KOSHARI_BOWLS[id], shape: 'koshari', by: 'abu-saied' } : AHWA_CUPS[id] ? { id, name: AHWA_CUPS[id][0], shape: AHWA_CUPS[id][1], by: 'ahwa' } : TENT_TREATS[id] ? { id, name: TENT_TREATS[id][0], shape: TENT_TREATS[id][1], by: 'tent' } : null)
   || pastries().find(p => p.id === id) || { id, name: 'pastry', shape: 'daifuku', by: 'yuki' };
 const bakerOf = p => (p.by === 'hana' ? 'Hana' : 'Yuki');
 
@@ -1789,6 +1793,11 @@ function click(x, y) {
   // the doors along the landing, and back out of each room
   if (d.kind === 'room-door' || d.kind === 'room-out') return walkToThing(h, () => goToRoom(d.to));
   if (d.kind === 'garden-cinema') return walkToThing(h, () => goToRoom('cinema'));
+  if (d.kind === 'garden-tent') return walkToThing(h, () => goToRoom('tent'));
+  if (d.kind === 'tent-iftar') return walkToThing(h, openTent);
+  if (d.kind === 'tent-board') return toast(tentStatus().say);
+  if (d.kind === 'tent-lantern') return toast('🏮 A fanous — coloured glass in a brass frame, the way they’ve hung in Cairo every Ramadan for a thousand years. Wahawi ya wahawi 🎶');
+  if (d.kind === 'tent-drum') return walkToThing(h, () => { bubble(player.av.group, '🥁 Es-ha ya nayem, wahhed el-dayem!', 'emote'); send({ t: 'emote', e: '🥁' }); sound.cue('pin'); setTimeout(() => sound.cue('pin'), 260); toast('🥁 Boom-boom… “Wake up, sleeper — praise the Eternal!” The musaharati’s call, to wake everyone for suhoor.'); });
   if (d.kind === 'arcade') return walkToThing(h, () => arcade.open(d.game));
   if (d.kind === 'arcade-board') return showScores();
   if (d.kind === 'games-shelf') return walkToThing(h, () => toast('🎲 Chess, tawla, snakes and ladders, Sakura Eights… Sit at one of the game tables and press 🎲 Games to set one out.'));
@@ -1892,7 +1901,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel'];
+const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -3366,13 +3375,13 @@ async function goToRoom(room, group = null) {
   }
   if (extra) { // in through its door (on the landing: out of the room you were in, or at the top of the stairs)
     const r = world.rooms[room];
-    const a = (room === 'landing' && from && r.doorFront(from)) || r.arrival;
+    const a = (room === 'landing' && from && r.doorFront(from)) || (room === 'cinema' && from === 'landing' && r.fromLanding) || r.arrival;
     player.pos.set(a.x, world.floorY, a.z);
     player.ry = a.ry;
     cam.yaw = a.ry + Math.PI; cam.pitch = 0.32; cam.dist = cam.targetDist = 3.2;
   }
-  if (roof && from === 'cinema') { // out of the cinema's door, on the side of the stair house
-    const a = world.gardenCinemaDoor;
+  if (roof && (from === 'cinema' || from === 'tent')) { // out of the cinema's (or the tent's) door, on the side of the stair house
+    const a = from === 'tent' ? world.gardenTentDoor : world.gardenCinemaDoor;
     player.pos.set(a.x, world.floorY, a.z); player.ry = a.ry;
     cam.yaw = a.ry + Math.PI; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.4;
   }
@@ -3412,6 +3421,7 @@ async function goToRoom(room, group = null) {
   if (room === 'library') { world.rooms.library.setBooks(authorBooks()); loadWords(); }
   if (room === 'cinema') refreshCinema(true);
   if (room === 'art') loadGallery();
+  if (room === 'tent') refreshTent(true);
   sysChat(extra ? ROOMS[room].enter(from) : isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.'
     : room === 'ahwa' ? 'You cross the road to Ahwet El-Sett. The click of tawla pieces, glasses of tea on brass trays, and the gramophone in the corner.'
     : isKoshari ? 'You cross the road — mind the tuk-tuk — to Koshari Abu Saied. The spoon rings on the steel bowls.'
@@ -3423,7 +3433,7 @@ async function goToRoom(room, group = null) {
       : room === 'hall' && from === 'hall2' ? 'You go back down to the first hallway.'
       : room === 'hall2' && from === 'landing' ? 'You pad back down the stairs to the upper hallway.'
       : 'You step out into the hallway.')
-    : roof && from === 'cinema' ? 'You step out of the cinema onto the roof garden, blinking.' : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
+    : roof && from === 'cinema' ? 'You step out of the cinema onto the roof garden, blinking.' : roof && from === 'tent' ? 'You duck out of the tent onto the roof garden. The lanterns glow behind you.' : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
     : up ? `You climb the spiral stairs to ${group.name}'s room.` : from === 'koshari' || from === 'ahwa' ? 'You cross back over the road and in at the café door. The bell chimes.' : 'You come back down into the café.');
@@ -4641,6 +4651,7 @@ setInterval(() => {
   } else wasOnStage = false;
   if (state.room === 'prayer' && Date.now() - quietRoom.timesAt > 60e3) refreshPrayerTimes();
   if (state.room === 'cinema' && Date.now() - (cinemaShow.at || 0) > 15e3) { cinemaShow.at = Date.now(); refreshCinema(); }
+  if (state.room === 'tent' && Date.now() - (tentState.at || 0) > 20e3) refreshTent();
   // the treadmills' belts and the bikes' wheels go round while somebody's on them
   if (state.room === 'gym') world.rooms.gym.setBusy([player.seat && player.seat.id, ...[...state.people.values()].map(p => p.seat && p.seat.id)].filter(Boolean));
   if (Date.now() - (adhan.checked || 0) > 15e3) { adhan.checked = Date.now(); checkAdhan(); }
@@ -5021,6 +5032,59 @@ $('gramoSave').onclick = async () => {
   } catch (e) { $('gramoErr').textContent = e.message; }
 };
 
+// ── the Ramadan Tent: how long to iftar (or to Ramadan), and the treats on the sofra
+const tentState = { at: 0, iftar: null };
+const mins = ms => { const m = Math.max(0, Math.round(ms / 60e3)); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`; };
+function tentStatus() {
+  const r = ramadan(), day = cairoPrayerDay(), now = Date.now();
+  const at = k => day.list.find(p => p.key === k).at.getTime();
+  if (r.eid) return { board: { title: 'Eid Mubarak!', big: 'عيد مبارك', line: 'kol sana w enta tayeb 🎉' }, say: '🎉 Eid Mubarak! Kol sana w enta tayeb — have some kahk.' };
+  if (r.now) {
+    const maghrib = at('maghrib'), fajr = at('fajr');
+    if (now < fajr) return { board: { title: `Ramadan · night ${r.day}`, big: mins(fajr - now), line: 'until Fajr — suhoor time 🌙' }, say: `🌙 Suhoor time — ${mins(fajr - now)} until Fajr.` };
+    if (now < maghrib) return { board: { title: `Ramadan · day ${r.day}`, big: mins(maghrib - now), line: `until iftar · Maghrib at ${day.list.find(p => p.key === 'maghrib').clock}` }, say: `🌙 ${mins(maghrib - now)} until iftar (Maghrib at ${day.list.find(p => p.key === 'maghrib').clock}). Hang in there!` };
+    return { board: { title: `Ramadan · night ${r.day}`, big: 'Iftar! 🌙', line: 'the fast is broken — Ramadan Kareem' }, say: '🌙 It’s after Maghrib — iftar is served. Ramadan Kareem!' };
+  }
+  const n = r.daysUntil;
+  return { board: { title: 'Ramadan is coming', big: n == null ? 'soon' : `${n} days`, line: 'the lanterns are already up 🏮' }, say: `🏮 Ramadan is ${n == null ? 'coming soon' : `${n} day${n === 1 ? '' : 's'} away`} — but the tent is open all year, for a glass of qamar el-din and a game after dinner.` };
+}
+function tentGreeting() {
+  const r = ramadan();
+  return r.now ? `You step into the Ramadan Tent. Lanterns of every colour, the sofra laid for iftar, and the smell of qatayef. Ramadan Kareem 🌙`
+    : r.eid ? 'You step into the tent — it’s Eid! Kahk on every plate and everybody in their new clothes 🎉'
+      : 'You step into the Ramadan Tent. The lanterns are lit, the khayamiya glows, and there are qatayef on the tray even out of season 🏮';
+}
+function refreshTent(force = false) {
+  tentState.at = Date.now();
+  const st = tentStatus();
+  world.rooms.tent.setBoard(st.board);
+  // at Maghrib in Ramadan: the cannon, and iftar
+  const r = ramadan(), day = cairoPrayerDay(), m = day.list.find(p => p.key === 'maghrib').at.getTime(), now = Date.now();
+  if (r.now && now >= m && now - m < 5 * 60e3 && tentState.iftar !== day.list[0].clock + r.day && state.room === 'tent') {
+    tentState.iftar = day.list[0].clock + r.day;
+    sound.thunder();
+    sysChat('💥 The Maghrib cannon booms over Cairo — iftar! Break your fast with a date and some water. Kol sana w enta tayeb 🌙');
+  }
+}
+function openTent() {
+  const st = tentStatus();
+  $('tentNow').textContent = st.say;
+  openPanel('tentPanel');
+}
+$('tentMenu').onclick = e => {
+  const b = e.target.closest('[data-id]');
+  if (!b) return;
+  closePanels();
+  if (player.dessert) return toast('🍯 Finish what you have first — or put it down on a table.');
+  const id = b.dataset.id;
+  player.dessert = { id, bites: 0 };
+  player.av.setDessert(TENT_TREATS[id][1], 0);
+  sound.cue('drink');
+  sendMove(true);
+  refreshActions();
+  toast(`🌙 ${TENT_TREATS[id][0][0].toUpperCase() + TENT_TREATS[id][0].slice(1)}, from the sofra. Sit on a cushion — press B for a bite. Saha w hana!`);
+};
+
 // ── presents
 const giftOf = id => (state.home && state.home.gifts || []).find(g => g.id === id);
 // somewhere clear for it in your room: the main room first, near the door
@@ -5297,7 +5361,7 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie, openTent };
 
 // ───────────────────────────────────────── start
 
