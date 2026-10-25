@@ -24,6 +24,23 @@ function sprinkle(g, n, r, y, color, size = 0.0035) {
 }
 
 const BUILD = {
+  dates(g) { // three dates on a little brass dish, the way iftar starts
+    const dish = disc(0.05, 0.006, '#c9a25b', { metalness: 0.7, roughness: 0.3 }); dish.position.y = 0.003; g.add(dish);
+    for (let i = 0; i < 3; i++) { const d = ball(0.012, '#4a2a18', { roughness: 0.35 }); d.scale.set(1, 0.75, 1.9); d.position.set(-0.018 + i * 0.018, 0.016, (i % 2) * 0.01); d.rotation.y = i * 0.6; g.add(d); }
+  },
+  qatayef(g) { // qatayef: little half-moon pancakes, filled with nuts, syrup on top
+    const plate = disc(0.06, 0.004, '#f4ece0', { roughness: 0.3 }); plate.position.y = 0.002; g.add(plate);
+    for (let i = 0; i < 3; i++) {
+      const q = mesh(new THREE.SphereGeometry(0.024, SEG, 10, 0, Math.PI), '#d9a25a', { roughness: 0.6, side: THREE.DoubleSide });
+      q.scale.set(1, 1, 0.45); q.rotation.set(-Math.PI / 2, 0, i * 2.1); q.position.set(Math.cos(i * 2.1) * 0.022, 0.006, Math.sin(i * 2.1) * 0.022); g.add(q);
+    }
+    sprinkle(g, 10, 0.03, 0.03, '#7ab05a', 0.003);
+  },
+  qamareldin(g) { // a glass of qamar el-din: apricot, thick and orange
+    const glass = mesh(new THREE.CylinderGeometry(0.022, 0.018, 0.075, SEG, 1, true), '#e8f2f4', { transparent: true, opacity: 0.4, roughness: 0.05, side: THREE.DoubleSide });
+    glass.position.y = 0.038; g.add(glass);
+    const juice = disc(0.02, 0.06, '#e8892a', { roughness: 0.3 }); juice.position.y = 0.031; g.add(juice);
+  },
   teaglass(g) { // the ahwa's shai: a small glass of dark tea on a saucer, a sprig of mint
     const saucer = disc(0.045, 0.004, '#f4f1ea', { roughness: 0.3 }); saucer.position.y = 0.002; g.add(saucer);
     const glass = mesh(new THREE.CylinderGeometry(0.022, 0.018, 0.07, SEG, 1, true), '#e8f2f4', { transparent: true, opacity: 0.45, roughness: 0.05, side: THREE.DoubleSide });

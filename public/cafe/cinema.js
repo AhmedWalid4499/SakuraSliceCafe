@@ -152,6 +152,19 @@ export function buildCinema({ floor, makeSign }) {
     g.add(hit); interactables.push(hit);
     group.add(g);
   }
+  // and the stairs down to the second floor's landing (its door there says "⬆ Rooftop Cinema")
+  {
+    const g = new THREE.Group();
+    g.position.set(3.4, 0, R.maxZ); g.rotation.y = Math.PI;
+    for (const s of [-1, 1]) g.add(at(rbox(0.7, 2.25, 0.05, 0.015, std('#7c1f2c', { roughness: 0.55 })), s * 0.36, 1.125, 0.025));
+    for (const [w, h, dx, y] of [[0.1, 2.35, -0.77, 1.175], [0.1, 2.35, 0.77, 1.175], [1.64, 0.1, 0, 2.35]]) g.add(at(box(w, h, 0.08, wood), dx, y, 0.04));
+    const sign = makeSign([{ text: '⬇ The second floor', size: 92, weight: '700' }], 1.0, 0.24);
+    sign.position.set(0, 2.62, 0.04); g.add(sign);
+    const hit = at(new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.3), new THREE.MeshBasicMaterial({ visible: false })), 0, 1.15, 0.1);
+    hit.userData = { kind: 'room-out', to: 'landing', label: 'Down the stairs to the second floor landing' };
+    g.add(hit); interactables.push(hit);
+    group.add(g);
+  }
   const name = makeSign([{ text: 'The Rooftop Cinema', size: 120, weight: '700', color: '#ffd98a' }, { text: 'films under the Cairo sky 🎬', font: 'Dancing Script, cursive', size: 72, color: '#f2a7bb' }], 2.0, 0.5, { bg: '#16131f', border: '#e2b04a' });
   name.position.set(1.6, 3.4, R.maxZ - 0.04); name.rotation.y = Math.PI; group.add(name);
   plant(group, colliders, R.minX + 0.5, R.maxZ - 0.5, 1.0);
@@ -170,6 +183,7 @@ export function buildCinema({ floor, makeSign }) {
   return {
     lights, bounds: R, screen,
     arrival: { x: -3.6, z: R.maxZ - 1.2, ry: Math.PI },
+    fromLanding: { x: 3.4, z: R.maxZ - 1.2, ry: Math.PI }, // up the stairs from the second floor
     // what's on: the film showing now (or null), and the programme
     setProgramme(film, list) {
       const old = screenMat.map; screenMat.map = screenTex(film, list.find(f => !f.now) || null); screenMat.needsUpdate = true; old?.dispose();

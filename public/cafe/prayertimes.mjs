@@ -65,3 +65,21 @@ export function cairoPrayerDay(now = new Date()) {
 
 // From Cairo, Makkah is a little east of south-east.
 export const QIBLA_BEARING = 136;
+
+// The Hijri date in Cairo (Umm al-Qura, the way the browser counts it), and
+// where Ramadan is: in it (which day), Eid al-Fitr, or how many days to go.
+const hijriFmt = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { timeZone: 'Africa/Cairo', day: 'numeric', month: 'numeric', year: 'numeric' });
+export function hijri(now = new Date()) {
+  const p = Object.fromEntries(hijriFmt.formatToParts(now).filter(x => ['day', 'month', 'year'].includes(x.type)).map(x => [x.type, parseInt(x.value, 10)]));
+  return { day: p.day, month: p.month, year: p.year };
+}
+export function ramadan(now = new Date()) {
+  const h = hijri(now);
+  if (h.month === 9) return { now: true, day: h.day, eid: false, daysUntil: 0 };
+  if (h.month === 10 && h.day <= 3) return { now: false, day: 0, eid: true, daysUntil: 0 };
+  for (let d = 1; d < 400; d++) {
+    const x = hijri(new Date(now.getTime() + d * 86400e3));
+    if (x.month === 9) return { now: false, day: 0, eid: false, daysUntil: d };
+  }
+  return { now: false, day: 0, eid: false, daysUntil: null };
+}

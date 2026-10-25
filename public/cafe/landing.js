@@ -16,6 +16,8 @@ const R = LANDING;
 export const LANDING_DOORS = [
   { room: 'sleepover', x: -7.2, side: -1, color: '#4f7a5a', glass: '#e8e0ff', bg: '#f6eefa', label: 'The Sleepover Room — beds for everyone, and a TV anyone can put on',
     lines: [{ text: 'Sleepover Room', size: 104, weight: '700' }, { text: 'beds · bathroom · TV 🌙', size: 64 }] },
+  { room: 'cinema', x: -4.4, side: -1, color: '#7c1f2c', glass: '#ffe7a0', bg: '#16131f', label: 'Up the stairs to the Rooftop Cinema — covered, rain or shine 🎬',
+    lines: [{ text: '⬆ Rooftop Cinema', size: 100, weight: '700', color: '#ffd98a' }, { text: 'up the stairs · films 🎬', size: 60, color: '#f4ece0' }] },
   { room: 'games', x: -1.6, side: -1, color: '#2f5d6e', glass: '#d9f2ff', bg: '#e3eef0', label: 'The Games Room — pool, ping-pong, foosball and the game tables',
     lines: [{ text: 'Games Room', size: 110, weight: '700' }, { text: 'pool · ping-pong · baby-foot 🎱', size: 60 }] },
   { room: 'library', x: 4.0, side: -1, color: '#6e472e', glass: '#ffe9c4', bg: '#f3e1d0', label: 'The BookBeans Library — books, armchairs and the writers’ nook',
