@@ -1022,6 +1022,23 @@ function handle(m) {
       if (m.movie) sysChat(`📺 ${m.movie.by} put on “${m.movie.title}”.`);
       else if (m.by) sysChat(`📺 ${m.by} turned the film off.`);
       break;
+    case 'partner:invite':
+      toast(`💌 ${m.from} would like you to share their room — a bedroom partner!`);
+      sound.cue('heart');
+      openPartner();
+      break;
+    case 'partner:accepted':
+      toast(`💞 ${m.name} said yes — you share your room now, and both your names are on the door.`);
+      sound.cue('heart');
+      if (state.room === 'hall' || state.room === 'hall2') loadHallDoors();
+      break;
+    case 'partner:declined':
+      toast(`${m.name} would rather keep their own room for now — that's all right 🌸`);
+      break;
+    case 'partner:ended':
+      toast(`${m.name} doesn't share the room with you any more.`);
+      if (state.room === 'hall' || state.room === 'hall2') loadHallDoors();
+      break;
     case 'letter':
       toast(`💌 ${m.from} wrote you a letter — it’s waiting in your pigeonhole in the Post Room (second floor).`);
       sound.cue('heart');
@@ -1939,7 +1956,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel', 'recPanel', 'teaPanel', 'storyPanel', 'postPanel'];
+const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel', 'recPanel', 'teaPanel', 'storyPanel', 'postPanel', 'partnerPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2949,6 +2966,8 @@ $('enterBtn').onclick = async () => {
   if (small) setTimeout(() => toast('🎧 Tap 🎧 at the top for the café radio.'), 4000);
   if (!state.open) setTimeout(() => toast(`🌙 The café is closed for now (${state.calendar && state.calendar.ramadan ? 'Ramadan hours: noon – 2am' : 'open 10am – 10pm'}, Cairo time) — but the door is never locked for you. Sit as long as you like.`), 2500);
   state.started = true;
+  // someone asked you to share their room while you were away?
+  setTimeout(() => api('/home/partner').then(r => { if (r.invites && r.invites.length) { toast(`💌 ${r.invites[0].fromName} would like you to share their room 💞`); openPartner(); } }).catch(() => {}), 6000);
   canvas.focus();
 
   connect();
@@ -3940,14 +3959,14 @@ function openFrame(id) {
 }
 async function saveItem(id, change) {
   try {
-    const { item } = await api('/home/items/' + id, { method: 'PATCH', body: change });
+    const { item } = await api('/home/items/' + id, { method: 'PATCH', body: { ...change, ownerId: state.home.ownerId } });
     world.home.update(item);
     renderSelection();
   } catch (e) { toast(e.message); }
 }
 async function removeItem(id) {
   try {
-    await api('/home/items/' + id, { method: 'DELETE', body: {} });
+    await api('/home/items/' + id, { method: 'DELETE', body: { ownerId: state.home.ownerId } });
     world.home.remove(id);
     decor.sel = null;
     sound.cue('pin');
@@ -4022,7 +4041,7 @@ async function placeAt(sx, sy) {
   try {
     const { item } = decor.moveId
       ? await api('/home/items/' + decor.moveId, { method: 'PATCH', body })
-      : await api('/home/items', { method: 'POST', body: { ...body, kind: decor.pick, color: decor.color } });
+      : await api('/home/items', { method: 'POST', body: { ...body, kind: decor.pick, color: decor.color, ownerId: state.home.ownerId } });
     world.home.update(item);
     sound.cue('pin');
     decor.sel = decor.moveId ? item.id : null;
@@ -4064,9 +4083,11 @@ function openRoomPanel() {
     b.onclick = () => saveRoom({ wallpaper: w });
     return b;
   }));
-  renderPetForm(true);
+  const owner = !state.home.shared; // (a bedroom partner can change the room, but the cat and the guest list are its owner's)
+  $('roomOwnerOnly').classList.toggle('hidden', !owner);
+  if (owner) { renderPetForm(true); renderGuests(); }
   $('roomOpen').checked = !!r.open;
-  renderGuests();
+  $('roomPartnerLine').textContent = r.partnerName && owner ? `💞 You share this room with ${r.partnerName}.` : state.home.shared ? `💞 You share this room with ${r.ownerName}.` : '';
   const s = state.home.stats || {};
   $('roomStats').textContent = `📚 ${s.focusMinutes || 0} minutes studied in ${s.sessions || 0} session${s.sessions === 1 ? '' : 's'} · 🌙 ${s.nights || 0} night${s.nights === 1 ? '' : 's'} slept here`;
   $('roomErr').textContent = '';
@@ -4087,7 +4108,7 @@ function renderGuests() {
 }
 async function saveRoom(change) {
   try {
-    const { room } = await api('/home', { method: 'PATCH', body: change });
+    const { room } = await api('/home', { method: 'PATCH', body: { ...change, ownerId: state.home.ownerId } });
     state.home.room = room;
     world.home.setRoom(room);
     state.roomName = room.name;
@@ -4096,6 +4117,48 @@ async function saveRoom(change) {
   } catch (e) { $('roomErr').textContent = e.message; }
 }
 $('roomName').addEventListener('change', () => saveRoom({ name: $('roomName').value }));
+
+// ── bedroom partners: share your room with someone (they say yes), or say yes to someone's
+async function openPartner() {
+  $('partnerErr').textContent = '';
+  let r;
+  try { r = await api('/home/partner'); } catch (e) { return toast(e.message); }
+  const has = r.partner;
+  $('partnerNow').textContent = has ? (has.role === 'owner' ? `💞 You share your room with ${has.name}.` : `💞 You share ${has.name}’s room with them.`) : 'You don’t share a room with anyone just now.';
+  $('partnerEnd').classList.toggle('hidden', !has);
+  $('partnerGo').classList.toggle('hidden', !has);
+  $('partnerAsk').classList.toggle('hidden', !!has);
+  $('partnerSent').textContent = !has && r.sent ? `You’ve asked ${r.sent.toName} — waiting for them to say yes.` : '';
+  $('partnerInvites').replaceChildren(...r.invites.map(i => {
+    const row = document.createElement('div'); row.className = 'event-row';
+    const t = document.createElement('b'); t.textContent = `💌 ${i.fromName} would like you to share their room`;
+    const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'btn small'; yes.textContent = 'Yes, move in 💞';
+    yes.onclick = async () => { try { await api('/home/partner/accept', { method: 'POST', body: { ownerId: i.ownerId } }); toast(`💞 You and ${i.fromName} share a room now — your names are on the door.`); sound.cue('heart'); openPartner(); if (state.room === 'hall' || state.room === 'hall2') loadHallDoors(); } catch (e) { $('partnerErr').textContent = e.message; } };
+    const no = document.createElement('button'); no.type = 'button'; no.className = 'btn ghost small'; no.textContent = 'No, thank you';
+    no.onclick = async () => { try { await api('/home/partner/decline', { method: 'POST', body: { ownerId: i.ownerId } }); openPartner(); } catch (e) { $('partnerErr').textContent = e.message; } };
+    row.append(t, yes, no);
+    return row;
+  }));
+  partnerState.flat = has ? has.flat : null;
+  openPanel('partnerPanel');
+}
+const partnerState = { flat: null };
+$('partnerAsk').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('partnerErr').textContent = '';
+  try {
+    const r = await api('/home/partner/invite', { method: 'POST', body: { username: $('partnerUser').value } });
+    $('partnerUser').value = '';
+    toast(`💌 You asked ${r.to.displayName} to share your room. If they say yes, both your names go on the door.`);
+    openPartner();
+  } catch (err) { $('partnerErr').textContent = err.message; }
+});
+$('partnerEnd').onclick = async () => {
+  if (!confirm('Stop sharing the room? (The furniture stays where it is, in the flat it’s in.)')) return;
+  try { await api('/home/partner', { method: 'DELETE', body: {} }); toast('You don’t share a room any more.'); openPartner(); if (state.home && state.home.shared) goToRoom(hallFor(state.home.room.door)); } catch (e) { $('partnerErr').textContent = e.message; }
+};
+$('partnerGo').onclick = () => { closePanels(); if (partnerState.flat) goToRoom('home:' + partnerState.flat); };
+$('roomPartner').onclick = () => openPartner();
 $('roomOpen').addEventListener('change', () => saveRoom({ open: $('roomOpen').checked }));
 $('roomInvite').addEventListener('submit', async e => {
   e.preventDefault();

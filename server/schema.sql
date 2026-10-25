@@ -314,3 +314,17 @@ CREATE TABLE IF NOT EXISTS letters (
   read_at    TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS letters_to_idx ON letters(to_id, created_at DESC);
+-- Bedroom partners: two people sharing one flat. The flat stays its owner's;
+-- the partner can come and go, decorate and sleep there, and both names go on
+-- the door. One partner per flat, one shared flat per person (server/homes.js).
+CREATE TABLE IF NOT EXISTS home_partners (
+  owner_id   INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  partner_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS home_partner_invites (
+  owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (owner_id, to_id)
+);
