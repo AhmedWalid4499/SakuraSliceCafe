@@ -328,3 +328,58 @@ CREATE TABLE IF NOT EXISTS home_partner_invites (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (owner_id, to_id)
 );
+-- The fourth floor (server/upstairs.js).
+-- The Writer's Room: short stories pinned on the stories board.
+CREATE TABLE IF NOT EXISTS writer_stories (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title      TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- The Pottery Studio: the cups people have shaped, glazed and fired.
+CREATE TABLE IF NOT EXISTS pottery_cups (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  shape      JSONB NOT NULL,
+  glaze      TEXT NOT NULL,
+  pattern    TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- The Greenhouse: a plant grows a stage for every (Cairo) day it's watered.
+CREATE TABLE IF NOT EXISTS flower_pots (
+  id           SERIAL PRIMARY KEY,
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  flower       TEXT NOT NULL,
+  growth       INTEGER NOT NULL DEFAULT 0,
+  last_watered DATE,
+  planted_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- The Pet Café: the pets' names (the first person to name one names it), and
+-- how fond each pet is of each person.
+CREATE TABLE IF NOT EXISTS pet_names (
+  pet      TEXT PRIMARY KEY,
+  name     TEXT NOT NULL,
+  named_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  named_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS pet_love (
+  user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pet       TEXT NOT NULL,
+  love      INTEGER NOT NULL DEFAULT 0,
+  petted_at TIMESTAMPTZ,
+  fed_at    TIMESTAMPTZ,
+  PRIMARY KEY (user_id, pet)
+);
+-- The Party Hall: who's booked it, for what, and when.
+CREATE TABLE IF NOT EXISTS party_bookings (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  occasion   TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  starts_at  TIMESTAMPTZ NOT NULL,
+  ends_at    TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS party_bookings_when_idx ON party_bookings(ends_at);

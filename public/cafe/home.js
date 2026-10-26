@@ -1568,7 +1568,7 @@ const WALLPAPER = {
 const lerpAng = (a, b, k) => { let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI; if (d < -Math.PI) d += Math.PI * 2; return a + d * k; };
 
 // ── the cat: about 45 cm nose to tail, facing +z. pose() moves it.
-function makeCat(coat = 'ginger') {
+export function makeCat(coat = 'ginger') {
   const col = COATS[coat] || COATS.ginger;
   const group = new THREE.Group();
   const fur = std(col, { roughness: 1 }), dark = std(darken(col, 0.35), { roughness: 1 });

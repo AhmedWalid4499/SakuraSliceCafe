@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { buildAvatar, makeLabel } from './avatar.js';
+import { buildAvatar, makeLabel, disposeTree } from './avatar.js';
 import { makeDessert } from './pastries.js';
 import { mapX, mapZ, deltaAt, OLD } from './layout.mjs';
 import { buildHome } from './home.js';
@@ -16,11 +16,19 @@ import { buildCommon, COMMON } from './common.js';
 import { buildMusic, MUSIC } from './music.js';
 import { buildPrayer, PRAYER } from './prayer.js';
 import { buildSleepover, SLEEPOVER } from './sleepover.js';
-import { buildLanding, buildLanding3 } from './landing.js';
+import { buildLanding, buildLanding3, buildLanding4 } from './landing.js';
 import { buildKaraoke } from './karaoke.js';
 import { buildEscape } from './escape.js';
 import { buildPool } from './pool.js';
 import { buildObservatory } from './observatory.js';
+import { buildWriters } from './writers.js';
+import { buildBookbeans } from './bookbeans.js';
+import { buildPottery, makeCupMesh } from './pottery.js';
+import { buildGreenhouse } from './greenhouse.js';
+import { buildHaunted } from './haunted.js';
+import { buildOnsen } from './onsen.js';
+import { buildPetCafe } from './petcafe.js';
+import { buildParty } from './party.js';
 import { buildGameRoom } from './gameroom.js';
 import { buildLibrary } from './library.js';
 import { buildCinema } from './cinema.js';
@@ -376,9 +384,12 @@ export function buildWorld(renderer) {
   // each a floor of its own, built by its module (ROOM_BUILDERS below)
   const ROOM_BUILDERS = { landing: buildLanding, games: buildGameRoom, library: buildLibrary, cinema: buildCinema, bakery: buildBakery, gym: buildGym, art: buildArt, laundry: buildLaundry, tent: buildTent,
     hammam: buildHammam, studio: buildStudio, tearoom: buildTearoom, playroom: buildPlayroom, post: buildPostOffice,
-    landing3: buildLanding3, karaoke: buildKaraoke, escape: buildEscape, pool: buildPool, observatory: buildObservatory };
-  // (the cinema and the tent are on the roof; the pool and the observatory on the terrace above it)
-  const ROOM_Y = name => (name === 'pool' || name === 'observatory' ? FLOOR3_Y + 3.6 : name === 'cinema' || name === 'tent' ? FLOOR3_Y : FLOOR2_Y);
+    landing3: buildLanding3, karaoke: buildKaraoke, escape: buildEscape, pool: buildPool, observatory: buildObservatory,
+    landing4: buildLanding4, writers: buildWriters, pottery: buildPottery, greenhouse: buildGreenhouse, haunted: buildHaunted,
+    onsen: buildOnsen, petcafe: buildPetCafe, party: buildParty, bookbeans: buildBookbeans };
+  // (the cinema and the tent are on the roof; the pool, the observatory, the onsen and the greenhouse up on top,
+  // under the open sky; BookBeans Corner is next door, on the street)
+  const ROOM_Y = name => (['pool', 'observatory', 'onsen', 'greenhouse'].includes(name) ? FLOOR3_Y + 3.6 : name === 'cinema' || name === 'tent' ? FLOOR3_Y : name === 'bookbeans' ? 0 : FLOOR2_Y);
   for (const k of Object.keys(ROOM_BUILDERS)) { floors[k] = mkFloor(); scene.add(floors[k].group); floors[k].group.position.y = ROOM_Y(k); floors[k].group.visible = false; }
   scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group, floors.sleepover.group, floors.ahwa.group, floors.felucca.group);
   // the Common room (common.js), off the hallway, for everyone who lives upstairs
@@ -2502,6 +2513,36 @@ export function buildWorld(renderer) {
     sign.userData = { kind: 'felucca-go', label: 'The café felucca, on the Nile at the end of the street — go aboard ⛵' };
     floors.main.group.add(sign); floors.main.interactables.push(sign);
   }
+  // …and across the door: the sign for BookBeans Corner next door, and a shelf of
+  // cups people made in the Pottery Studio upstairs (setCupShelf, from app.js)
+  {
+    const sign = makeSign([{ text: '📚 BookBeans Corner', size: 96, weight: '700' }, { text: 'coffee & books, next door · click to go', size: 54 }], 1.2, 0.4, { bg: '#f3e1d0', border: '#6e472e' });
+    sign.position.set(3.3, 2.65, ROOM.maxZ - 0.08); sign.rotation.y = Math.PI;
+    sign.userData = { kind: 'bookbeans-go', label: 'BookBeans Corner, the coffee-and-books shop next door — go in ☕📚' };
+    floors.main.group.add(sign); floors.main.interactables.push(sign);
+  }
+  const cupShelf = new THREE.Group();
+  {
+    const wood = std(COLORS.wood, { roughness: 0.6 });
+    for (const y of [1.45, 1.9]) {
+      const plank = rbox(1.3, 0.04, 0.22, 0.01, wood); plank.position.set(0, y, 0); cupShelf.add(plank);
+      for (const sx of [-0.55, 0.55]) { const br = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.12, 0.16), M.woodDark); br.position.set(sx, y - 0.08, 0.02); cupShelf.add(br); }
+    }
+    const tag = makeSign([{ text: 'made upstairs 🏺', font: 'Dancing Script, cursive', size: 80 }], 0.6, 0.14, { bg: '#fbf3ea' });
+    tag.position.set(0, 1.2, -0.08); tag.rotation.y = Math.PI; cupShelf.add(tag);
+    cupShelf.position.set(3.3, 0, ROOM.maxZ - 0.14); cupShelf.rotation.y = Math.PI;
+    floors.main.group.add(cupShelf);
+  }
+  const shelfCups = new THREE.Group(); cupShelf.add(shelfCups);
+  function setCupShelf(cups) {
+    shelfCups.children.slice().forEach(c => { shelfCups.remove(c); disposeTree(c); });
+    (cups || []).slice(0, 10).forEach((c, i) => {
+      const m = makeCupMesh(c.shape || {}, c.glaze, c.pattern);
+      m.position.set(-0.5 + (i % 5) * 0.25, i < 5 ? 1.92 : 1.47, 0);
+      m.rotation.y = i * 0.7;
+      shelfCups.add(m);
+    });
+  }
 
   // ════════════════════════════════════════════════════════════════
   //  Built after the spread-out, in the café's real coordinates:
@@ -3567,7 +3608,7 @@ export function buildWorld(renderer) {
   for (const [k, build] of Object.entries(ROOM_BUILDERS)) { rooms[k] = build({ floor: floors[k], makeSign, animate: f => animated.push(f), buildAvatar }); noFog(floors[k].group); }
   doorHours.ready = true;
   const api = Object.assign(api_, {
-    scene, npcs, update, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, sleepover, rooms, gardenCinemaDoor, gardenTentDoor, koshari: outside.koshari, ahwa: outside.ahwa, felucca: outside.felucca,
+    scene, npcs, update, setCupShelf, setTimeOfDay, setWeather, setBoardSign, setUpstairsSign, setFloor, floors, setGarden, gardenSpots, home, hall, hall2, common, music, prayer, sleepover, rooms, gardenCinemaDoor, gardenTentDoor, koshari: outside.koshari, ahwa: outside.ahwa, felucca: outside.felucca,
     setClock: (hour, label, w) => outside.setClock(hour, label, w),
     setStreetSound: f => { outside.life.onSound = f; },
     adhan: () => outside.adhan(),

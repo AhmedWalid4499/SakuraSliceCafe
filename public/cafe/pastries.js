@@ -23,7 +23,45 @@ function sprinkle(g, n, r, y, color, size = 0.0035) {
   }
 }
 
+// Bouquets from the Greenhouse (held in the hand, no plate): kraft paper, a ribbon, the flowers.
+const BOUQUET = { sakura: ['#f6c3d0', '#fff0f4'], jasmine: ['#ffffff', '#fff6c8'], rose: ['#d8344f', '#f06a80'], tulip: ['#ff7a5a', '#ffd23f'], sunflower: ['#ffc53a', '#6b3e1f'], lotus: ['#7a9be8', '#c9d6ff'] };
+function bouquet(g, [petal, centre]) {
+  const paper = mesh(new THREE.ConeGeometry(0.06, 0.17, SEG, 1, true), '#c9a07a', { roughness: 0.9, side: THREE.DoubleSide });
+  paper.rotation.x = Math.PI; paper.position.y = 0.085; g.add(paper);
+  const ribbon = mesh(new THREE.TorusGeometry(0.018, 0.005, 6, 16), '#f2a7bb'); ribbon.rotation.x = Math.PI / 2; ribbon.position.y = 0.05; g.add(ribbon);
+  for (let i = 0; i < 7; i++) {
+    const a = i * 2.4, d = i ? 0.03 : 0;
+    const head = ball(0.02, petal, { roughness: 0.6 }); head.scale.y = 0.75;
+    head.position.set(Math.cos(a) * d, 0.18 + (i % 3) * 0.012, Math.sin(a) * d); g.add(head);
+    const mid = ball(0.007, centre); mid.position.copy(head.position); mid.position.y += 0.012; g.add(mid);
+    const leaf = ball(0.014, '#6fa86a'); leaf.scale.set(0.5, 1.4, 0.3); leaf.position.set(Math.cos(a + 1) * 0.04, 0.16, Math.sin(a + 1) * 0.04); leaf.rotation.z = Math.cos(a) * 0.6; g.add(leaf);
+  }
+}
+const NO_PLATE = new Set(['bbcup', 'candy', ...Object.keys(BOUQUET).map(f => 'bouquet_' + f)]);
+
 const BUILD = {
+  ...Object.fromEntries(Object.entries(BOUQUET).map(([f, c]) => ['bouquet_' + f, g => bouquet(g, c)])),
+  partycake(g) { // a slice of the Party Hall's cake: sponge, cream, sprinkles and a candle
+    const layers = [['#f6dcb0', 0.016], ['#fff4f0', 0.008], ['#f6dcb0', 0.016], ['#fbe0e6', 0.01]];
+    let y = 0;
+    for (const [c, h] of layers) { const b = mesh(new THREE.CylinderGeometry(0.05, 0.05, h, 3, 1, false, 0, Math.PI / 3), c); b.position.set(-0.02, y + h / 2, -0.02); g.add(b); y += h; }
+    for (let i = 0; i < 8; i++) { const sp = ball(0.003, ['#ff6a9a', '#3fb8e0', '#ffd23f', '#7dd8a0'][i % 4]); sp.position.set(-0.01 + (i % 4) * 0.009, y + 0.002, 0.0 + Math.floor(i / 4) * 0.01); g.add(sp); }
+    const candle = mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.03, 8), '#8ac2ff'); candle.position.set(0.0, y + 0.015, 0.008); g.add(candle);
+    const flame = ball(0.004, '#ffb03a', { emissive: '#ff9a2a', emissiveIntensity: 2 }); flame.scale.y = 1.6; flame.position.set(0, y + 0.034, 0.008); g.add(flame);
+  },
+  bbcup(g) { // a BookBeans paper cup: a brown sleeve with a little bean-and-book stamp, a lid
+    const cup = mesh(new THREE.CylinderGeometry(0.03, 0.022, 0.09, SEG), '#fbf6ee', { roughness: 0.6 }); cup.position.y = 0.045; g.add(cup);
+    const sleeve = mesh(new THREE.CylinderGeometry(0.0285, 0.025, 0.04, SEG), '#9a6a44', { roughness: 0.9 }); sleeve.position.y = 0.045; g.add(sleeve);
+    const lid = mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.008, SEG), '#3a2a22', { roughness: 0.5 }); lid.position.y = 0.094; g.add(lid);
+    const stamp = ball(0.008, '#f2a7bb'); stamp.scale.z = 0.3; stamp.position.set(0, 0.045, 0.028); g.add(stamp);
+  },
+  candy(g) { // a little pumpkin bucket of Halloween sweets
+    const pail = mesh(new THREE.SphereGeometry(0.04, SEG, 12), '#f08a24', { roughness: 0.6 }); pail.scale.y = 0.8; pail.position.y = 0.032; g.add(pail);
+    for (let i = 0; i < 5; i++) { const c = ball(0.01, ['#ff6a9a', '#7dd8a0', '#ffd23f', '#c98aff', '#3fb8e0'][i]); c.position.set(Math.cos(i * 1.3) * 0.018, 0.062, Math.sin(i * 1.3) * 0.018); g.add(c); }
+    const face = ball(0.006, '#2a1a12'); face.position.set(-0.012, 0.035, 0.037); g.add(face);
+    const face2 = face.clone(); face2.position.x = 0.012; g.add(face2);
+    const handle = mesh(new THREE.TorusGeometry(0.04, 0.003, 6, 20, Math.PI), '#2a1a12'); handle.position.y = 0.05; g.add(handle);
+  },
   matchabowl(g) { // a chawan of matcha, whisked to a froth
     const bowl = mesh(new THREE.CylinderGeometry(0.045, 0.03, 0.045, SEG), '#3a4a3a', { roughness: 0.5 }); bowl.position.y = 0.0225; g.add(bowl);
     const tea = disc(0.041, 0.003, '#8ac25a', { roughness: 0.7 }); tea.position.y = 0.044; g.add(tea);
@@ -190,6 +228,7 @@ export function makeDessert(shape, bites = 0) {
   const rim = mesh(new THREE.TorusGeometry(0.08, 0.004, 6, SEG * 2), '#f6ece0', { roughness: 0.35 });
   rim.rotation.x = Math.PI / 2; rim.position.y = 0.012;
   g.add(plate, rim);
+  if (NO_PLATE.has(shape)) plate.visible = rim.visible = false; // (a bouquet, a cup, a bucket: held as it is)
   const pastry = new THREE.Group();
   pastry.position.y = 0.012;
   (BUILD[shape] || BUILD.daifuku)(pastry);

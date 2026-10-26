@@ -27,6 +27,10 @@ import { cairoPrayerDay, ramadan } from './prayertimes.mjs';
 import { createArcade } from './arcade.js';
 import { createScreenLayer } from './tvscreen.js';
 import { moonTonight, constellationsTonight, SHAPES } from './observatory.js';
+import { BB_BOOKS, coverDataURL } from './bookbeans.js';
+import { GLAZES, PATTERNS, drawCupProfile } from './pottery.js';
+import { FLOWERS } from './greenhouse.js';
+import { PETS } from './petcafe.js';
 
 // The rooms everyone shares on the second floor (off its landing) and the
 // cinema on the roof — each built by its own module into world.rooms[name].
@@ -52,10 +56,28 @@ const ROOMS = {
     enter: () => 'You step into the Karaoke Room. The mirror ball is turning, the lights sweep the floor, and the microphone is waiting 🎤' },
   escape: { where: 'in the Escape Room', long: 'in the Escape Room on the third floor, trying to get out of the Pharaoh’s Study',
     enter: () => 'You step into the Pharaoh’s Study. Dust, old books, a sarcophagus — and a golden door with four locks. Turn the hourglass when you’re ready 🔐' },
-  pool: { where: 'at the rooftop pool', long: 'up at the rooftop pool, with all of Cairo below',
+  pool: { where: 'at the rooftop pool', long: 'up at the rooftop pool, with all of Cairo below', swim: true,
     enter: () => 'You climb out onto the rooftop terrace. The pool glitters, the palms rustle, and all of Cairo spreads out below 🌴' },
   observatory: { where: 'in the Observatory', long: 'in the Observatory up top, under the dome of stars',
     enter: () => { const m = moonTonight(); return `You step under the dome. Stars painted all over it, and the big telescope pointing up at the open slot. Tonight: a ${m.name.toLowerCase()} 🔭`; } },
+  landing4: { where: 'on the fourth floor landing', long: 'up on the fourth floor landing', pj: true,
+    enter: from => (from === 'landing3' ? 'You climb on up to the fourth floor — the Writer’s Room, pottery, the greenhouse, the haunted library, the onsen, the Pet Café and the Party Hall.' : 'You step back out onto the fourth floor landing.') },
+  writers: { where: 'in the Writer’s Room', long: 'in the Writer’s Room on the fourth floor, by the fire', pj: true,
+    enter: () => 'You step into the Writer’s Room. Typewriters clacking softly, the fire crackling, and the stories board full of pins ✍️' },
+  pottery: { where: 'in the Pottery Studio', long: 'in the Pottery Studio on the fourth floor, at the wheel',
+    enter: () => 'You step into the Pottery Studio. The wheels hum, there’s clay on everything, and the kiln ticks as it cools 🏺' },
+  greenhouse: { where: 'in the Greenhouse', long: 'in the Flower Shop & Greenhouse on the fourth floor, among the flowers',
+    enter: () => 'You step into the Flower Shop. It smells of jasmine and wet earth, and the greenhouse glitters at the back 🌷' },
+  haunted: { where: 'in the Haunted Library', long: 'in the Haunted Library on the fourth floor… if they dare',
+    enter: () => 'You creak the door open. Candles flicker, books float by on their own… and something white drifts between the shelves 👻 There are ten little pumpkins hidden in here — can you find them all? 🎃' },
+  onsen: { where: 'in the Onsen Garden', long: 'up in the Onsen Garden, soaking in the hot spring', swim: true,
+    enter: () => { const m = cairoNow().getUTCMonth() + 1; return 'You slide the gate open onto the Onsen Garden — steam curling off the hot springs, stone lanterns glowing, open to the sky. ♨️' + (m === 12 || m <= 2 ? ' And look — snow monkeys, soaking too! 🐒❄️' : ''); } },
+  petcafe: { where: 'in the Pet Café', long: 'in the Pet Café on the fourth floor, with a cat on their lap', pj: true,
+    enter: () => 'You step into the Pet Café. A cat opens one eye from the windowsill, and two bunnies thump hello from their pen 🐾' },
+  party: { where: 'in the Party Hall', long: 'in the Party Hall on the fourth floor',
+    enter: () => 'You step into the Party Hall. A dance floor, a little stage, and the bookings board by the door 🎉' },
+  bookbeans: { where: 'at BookBeans Corner', long: 'next door at BookBeans Corner, with a coffee and a book',
+    enter: () => 'You step next door into BookBeans Corner. Coffee and old paper — the two best smells in the world ☕📚' },
   hammam: { where: 'in the Hammam', long: 'in the Hammam and Spa on the second floor, warm and steamy',
     enter: () => 'You step into the Hammam. Warm air, the sound of water in the basins, and light through the stars in the dome ♨️' },
   studio: { where: 'in the Recording Studio', long: 'in the Recording Studio on the second floor, by the ON AIR light',
@@ -381,13 +403,17 @@ const player = {
 // Everyone in the room sees them; downstairs, in the garden and the Prayer Room
 // you're in your day clothes.
 const pjRoom = room => !!(ROOMS[room] && ROOMS[room].pj) || room === 'hall' || room === 'hall2' || room === 'common' || room === 'music' || room === 'sleepover' || /^home:/.test(room || '');
-const dressFor = avatar => (avatar && avatar.pj && avatar.pj.on && pjRoom(state.room) ? { pj: avatar.pj } : {});
-let wearingPJ = false;
+// Swimwear: at the pool and in the onsen everyone's in theirs (avatar.swim, or
+// trunks / a swimsuit if they haven't chosen).
+const swimRoom = room => !!(ROOMS[room] && ROOMS[room].swim);
+const swimFor = av => ({ style: av.gender === 'she' ? 'swimsuit' : 'trunks', color: av.gender === 'she' ? '#ff6a9a' : '#2f8ab0', ...(av.swim || {}) });
+const dressFor = avatar => (!avatar ? {} : swimRoom(state.room) ? { swim: swimFor(avatar) } : avatar.pj && avatar.pj.on && pjRoom(state.room) ? { pj: avatar.pj } : {});
+let wearing = '{}'; // what you've got on (so we only re-dress when it changes)
 
 function playerAvatar() {
   if (player.av) { scene.remove(player.av.group); disposeTree(player.av.group); }
   player.av = buildAvatar(state.me.avatar, dressFor(state.me.avatar));
-  wearingPJ = !!dressFor(state.me.avatar).pj;
+  wearing = JSON.stringify(dressFor(state.me.avatar));
   noFog(player.av.group);
   player.label = makeLabel(state.me.displayName, { bg: 'rgba(212,103,138,0.92)', color: '#fff' });
   player.label.position.y = player.av.height + 0.12;
@@ -692,6 +718,7 @@ function refreshActions() {
     drinkBtn.title = drinkBtn.querySelector('.t').textContent;
   }
   $('biteAct').classList.toggle('hidden', !canBite());
+  $('giveAct').classList.toggle('hidden', !canGive());
   $('sipAct').classList.toggle('hidden', !canSip());
   $('decorAct').classList.toggle('hidden', !inMyRoom());
   $('roomAct').classList.toggle('hidden', !inMyRoom());
@@ -728,6 +755,7 @@ function takeBite() {
   if (!canBite()) return;
   if (!player.dessert && !takeFromTable('dessert')) return;
   const d = player.dessert;
+  if (/^flower-/.test(d.id)) { bubble(player.av.group, '💐 mmm…', 'emote'); return toast('💐 You bury your nose in the flowers. Heavenly.'); } // (a bouquet is for smelling)
   d.bites += 1;
   player.av.play('bite');
   setTimeout(() => player.dessert === d && player.av.setDessert(pastryOf(d.id).shape, d.bites), 500);
@@ -809,7 +837,7 @@ function updatePlayer(dt) {
   const lying = !!player.seat?.lie;
   player.av.group.rotation.order = 'YXZ';
   player.av.group.rotation.x = lying ? -Math.PI / 2 : 0;
-  player.av.update(dt, { moving: moving || !!player.seat?.run, sitting: !!player.seat && !lying && !player.seat.run, sitH: player.seat?.h ?? 0.54, waving: player.waving, asleep: lying, typing: !!player.seat?.work });
+  player.av.update(dt, { moving: moving || !!player.seat?.run, sitting: !!player.seat && !lying && !player.seat.run && !player.seat.swim, sitH: player.seat?.h ?? 0.54, waving: player.waving, asleep: lying, typing: !!player.seat?.work, swimming: !!player.seat?.swim });
   if (moving) sendMove();
 }
 
@@ -938,7 +966,7 @@ function updatePeople(dt) {
     p.av.group.rotation.order = 'YXZ';
     p.av.group.rotation.x = seat?.lie ? -Math.PI / 2 : 0;
     if (p.waving > 0) p.waving -= dt;
-    p.av.update(dt, { moving: moving || !!seat?.run, sitting: !!seat && !seat.lie && !seat.run, sitH: seat?.h ?? 0.54, waving: p.waving || 0, asleep: !!seat?.lie, typing: !!seat?.work });
+    p.av.update(dt, { moving: moving || !!seat?.run, sitting: !!seat && !seat.lie && !seat.run && !seat.swim, sitH: seat?.h ?? 0.54, waving: p.waving || 0, asleep: !!seat?.lie, typing: !!seat?.work, swimming: !!seat?.swim });
   }
 }
 
@@ -1050,6 +1078,15 @@ function handle(m) {
       toast(`${m.name} doesn't share the room with you any more.`);
       if (state.room === 'hall' || state.room === 'hall2') loadHallDoors();
       break;
+    case 'writers:stories': writerStories = m.stories; if (state.room === 'writers') world.rooms.writers.setBoard(writerStories); break;
+    case 'writers:sprint':
+      if (m.sprint && !sprintLeft()) sysChat(`⏱️ ${m.sprint.by} starts a ${m.sprint.minutes}-minute writing sprint — click the clock on the mantel to join!`);
+      sprintNow = m.sprint; sprintSkew = Date.now() - m.now; renderSprint(); break;
+    case 'pottery:cups': cupList = m.cups; showCups(); break;
+    case 'pets:names': petsNow.names = m.names; world.rooms.petcafe.setNames(m.names); break;
+    case 'party:bookings': partyNow = { bookings: m.bookings.map(b => ({ ...b, mine: !!(partyNow.bookings.find(x => x.id === b.id) || {}).mine })), skew: Date.now() - m.now }; partyTick(true); if (!$('partyPanel').classList.contains('hidden')) renderParty(); break;
+    case 'party:confetti': if (state.room === 'party') { world.rooms.party.confetti(); sound.cue('heart'); sysChat(`🎊 ${m.who} throws confetti!`); } break;
+    case 'handed': handedToMe(m); break;
     case 'escape':
       escapeNow = m.state; escapeSkew = Date.now() - m.state.now; renderEscapeBoard();
       if (m.started) sysChat(`⏳ ${m.started} turns the hourglass over. Fifteen minutes — go!`);
@@ -1383,7 +1420,13 @@ const AHWA_CUPS = { 'ahwa-shai': ['a glass of shai with mint', 'teaglass'], 'ahw
 // …and the Ramadan tent's iftar treats
 const TEA_BOWLS = { 'tea-matcha': ['a bowl of matcha you whisked yourself', 'matchabowl'] };
 const TENT_TREATS = { 'tent-dates': ['three dates', 'dates'], 'tent-qatayef': ['a plate of qatayef', 'qatayef'], 'tent-qamareldin': ['a glass of qamar el-din', 'qamareldin'] };
-const pastryOf = id => (KOSHARI_BOWLS[id] ? { id, name: KOSHARI_BOWLS[id], shape: 'koshari', by: 'abu-saied' } : AHWA_CUPS[id] ? { id, name: AHWA_CUPS[id][0], shape: AHWA_CUPS[id][1], by: 'ahwa' } : TENT_TREATS[id] ? { id, name: TENT_TREATS[id][0], shape: TENT_TREATS[id][1], by: 'tent' } : TEA_BOWLS[id] ? { id, name: TEA_BOWLS[id][0], shape: TEA_BOWLS[id][1], by: 'tearoom' } : null)
+// …and the fourth floor's: bouquets, cake, BookBeans coffee, Halloween sweets
+const UP_TREATS = {
+  ...Object.fromEntries(['sakura', 'jasmine', 'rose', 'tulip', 'sunflower', 'lotus'].map(f => [`flower-${f}`, [`a bouquet of ${f === 'lotus' ? 'blue lotus' : f}`, `bouquet_${f}`]])),
+  'party-cake': ['a slice of party cake', 'partycake'], 'haunt-candy': ['a bucket of Halloween sweets', 'candy'],
+  'bb-latte': ['a BookBeans latte', 'bbcup'], 'bb-cardamom': ['a cardamom coffee', 'bbcup'], 'bb-cocoa': ['a hot chocolate', 'bbcup'], 'bb-karak': ['a karak tea', 'bbcup'],
+};
+const pastryOf = id => (UP_TREATS[id] ? { id, name: UP_TREATS[id][0], shape: UP_TREATS[id][1], by: 'upstairs' } : KOSHARI_BOWLS[id] ? { id, name: KOSHARI_BOWLS[id], shape: 'koshari', by: 'abu-saied' } : AHWA_CUPS[id] ? { id, name: AHWA_CUPS[id][0], shape: AHWA_CUPS[id][1], by: 'ahwa' } : TENT_TREATS[id] ? { id, name: TENT_TREATS[id][0], shape: TENT_TREATS[id][1], by: 'tent' } : TEA_BOWLS[id] ? { id, name: TEA_BOWLS[id][0], shape: TEA_BOWLS[id][1], by: 'tearoom' } : null)
   || pastries().find(p => p.id === id) || { id, name: 'pastry', shape: 'daifuku', by: 'yuki' };
 const bakerOf = p => (p.by === 'hana' ? 'Hana' : 'Yuki');
 
@@ -1858,6 +1901,29 @@ function click(x, y) {
   if (d.kind === 'obs-scope') return walkToThing(h, openScope);
   if (d.kind === 'obs-chart') return toast(`✨ Tonight over Cairo, look for ${constellationsTonight().join(', ')} — and a ${moonTonight().name.toLowerCase()}. The telescope will show you.`);
   if (d.kind === 'felucca-go') return goToRoom('felucca');
+  if (d.kind === 'bookbeans-go') return goToRoom('bookbeans');
+  // the fourth floor, and BookBeans next door
+  if (d.kind === 'writers-board') return walkToThing(h, openStories);
+  if (d.kind === 'writers-sprint') return walkToThing(h, openSprint);
+  if (d.kind === 'writers-shelf') return walkToThing(h, openAuthorShelf);
+  if (d.kind === 'bb-counter') return walkToThing(h, openBBCounter);
+  if (d.kind === 'bb-blind') return walkToThing(h, openBlindDate);
+  if (d.kind === 'bb-browse') return walkToThing(h, openBrowse);
+  if (d.kind === 'pottery-wheel') { goSit(d.seat); return openPottery(d.seat); }
+  if (d.kind === 'pottery-kiln') return toast(kilnBusy ? '🔥 The kiln is glowing — your cup is firing.' : '🔥 The kiln. Shape a cup at a wheel first, then fire it in here.');
+  if (d.kind === 'pottery-shelf') return toast(cupList.length ? `🍵 The cup shelf: ${cupList.slice(0, 4).map(c => `“${c.name}” by ${c.by}`).join(', ')}${cupList.length > 4 ? '…' : ''}` : '🍵 The cup shelf is empty — make the first cup!');
+  if (d.kind === 'flower-shop') return walkToThing(h, openFlowerShop);
+  if (d.kind === 'flower-plant' || d.kind === 'flower-pots') return walkToThing(h, openPots);
+  if (d.kind === 'haunt-pumpkin') return walkToThing(h, () => findPumpkin(d.n));
+  if (d.kind === 'haunt-ghost') { bubble(player.av.group, '😱', 'emote'); return toast('👻 “Boo!” says the ghost — then giggles and floats off through a bookshelf.'); }
+  if (d.kind === 'haunt-candy') return walkToThing(h, () => { if (player.dessert || player.drink) return toast('🍬 Your hands are full!'); player.dessert = { id: 'haunt-candy', bites: 0 }; player.av.setDessert('candy', 0); sound.cue('pin'); sendMove(true); refreshActions(); toast('🍬 Trick or treat! A little pumpkin bucket of sweets. (B to eat one)'); });
+  if (d.kind === 'onsen-soak') { const s = world.rooms.onsen.soak.find(x => !seatTaken(x)); if (s) goSit(s); else return toast('♨️ The springs are full just now — wait for a space.'); bubble(player.av.group, '♨️😌', 'emote'); send({ t: 'emote', e: '♨️' }); return toast('♨️ You slip into the hot water. Ahhh. The steam curls up round you, and somewhere a bamboo spout goes “tok”.'); }
+  if (d.kind === 'onsen-bucket') { bubble(player.av.group, '💦', 'emote'); send({ t: 'emote', e: '💦' }); return toast('💦 You scoop hot water from the wooden bucket and splash it over your shoulders.'); }
+  if (d.kind === 'pet') return walkToThing(h, () => openPet(d.pet));
+  if (d.kind === 'pet-treats') return toast('🐟🥕 The treats jar. Click a cat or a bunny to give them one (once an hour each).');
+  if (d.kind === 'party-book') return walkToThing(h, openParty);
+  if (d.kind === 'party-cake') return walkToThing(h, cutCake);
+  if (d.kind === 'party-confetti') return throwConfetti();
   if (d.kind === 'felucca-out') return goToRoom('main');
   if (d.kind === 'felucca-rais') return walkToThing(h, () => { const st = world.felucca.status(); bubble(world.felucca.group, st.sailing ? 'Ahlan! Look — Cairo Tower! ⛵' : 'Ahlan, ya basha! Sit down, we go soon ⛵', 'npc'); toast(st.sailing ? `⛵ We’re out on the river — back at the landing in ${Math.ceil(st.left)}s.` : `⛵ We push off in ${Math.ceil(st.left)}s. Find a cushion!`); });
   if (d.kind === 'hammam-slab') { const s = world.rooms.hammam.slabSeats.find(x => !seatTaken(x)); if (s) goSit(s); return toast('♨️ You lie back on the warm marble and look up at the little stars in the dome. Your shoulders drop.'); }
@@ -1984,7 +2050,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel', 'recPanel', 'teaPanel', 'storyPanel', 'postPanel', 'partnerPanel', 'escapePanel', 'scopePanel'];
+const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel', 'recPanel', 'teaPanel', 'storyPanel', 'postPanel', 'partnerPanel', 'escapePanel', 'scopePanel', 'storiesPanel', 'sprintPanel', 'bbPanel', 'potteryPanel', 'flowerPanel', 'handPanel', 'petPanel', 'partyPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2786,10 +2852,13 @@ const OPTIONS = {
   outfit: ['#7aab7a', '#4d7a4d', '#f2a7bb', '#d4678a', '#efe0c4', '#6b8fb5', '#e8b44a', '#a0714f', '#3a3a4a', '#fef9f5'],
   accent: ['#fef9f5', '#fde8ef', '#f4ead8', '#d4678a', '#7aab7a', '#6b8fb5', '#e8b44a'],
   accessory: [['none', 'Nothing'], ['glasses', 'Glasses'], ['headphones', 'Headphones'], ['scarf', 'Scarf'], ['beanie', 'Beanie'], ['flower', 'A sakura flower']],
+  swimStyle: [['trunks', 'Swim shorts 🩳'], ['swimsuit', 'Swimsuit 👙'], ['full', 'Full-cover suit 🏊']],
+  swimColor: ['#2f8ab0', '#ff6a9a', '#ffd23f', '#3a7a6a', '#7a5ad0', '#e04a4a', '#1f2a44', '#7dd8a0'],
   pjColor: ['#9fb8d6', '#f2c6d0', '#c9b3d9', '#b8cfc4', '#f4ead8', '#3f4d6e', '#d4678a', '#e8b44a'],
   pjPattern: [['stripes', 'Stripes'], ['dots', 'Dots'], ['stars', 'Stars'], ['hearts', 'Hearts'], ['checks', 'Checks'], ['plain', 'Plain']],
 };
 let previewPJ = false; // the avatar maker's preview: day clothes, or pyjamas
+let previewSwim = false; // …or swimwear
 
 let draft = null;
 let preview = null;
@@ -2864,7 +2933,7 @@ function renderCreator() {
       b.type = 'button';
       b.className = 'chip' + (draft.pj[key] === id ? ' on' : '');
       b.textContent = name;
-      b.onclick = () => { draft.pj[key] = id; if (key !== 'on') draft.pj.on = true; previewPJ = draft.pj.on; renderCreator(); };
+      b.onclick = () => { draft.pj[key] = id; if (key !== 'on') draft.pj.on = true; previewPJ = draft.pj.on; previewSwim = false; renderCreator(); };
       el.appendChild(b);
     }
   };
@@ -2874,12 +2943,29 @@ function renderCreator() {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'swatch' + (draft.pj.color === c ? ' on' : '');
     b.style.background = c; b.setAttribute('aria-label', 'pyjamas ' + c);
-    b.onclick = () => { draft.pj.color = c; previewPJ = true; renderCreator(); };
+    b.onclick = () => { draft.pj.color = c; previewPJ = true; previewSwim = false; renderCreator(); };
     return b;
   }));
   pjChips($('optPJPattern'), OPTIONS.pjPattern, 'pattern');
   pjChips($('optPJCap'), [[false, 'No cap'], [true, 'A nightcap']], 'cap');
   $('pjPreview').textContent = previewPJ && draft.pj.on ? '👀 Showing your pyjamas — tap to see your day clothes' : '👀 See them on';
+  // swimwear, for the pool and the onsen
+  const sw = swimFor(draft);
+  $('optSwim').replaceChildren(...OPTIONS.swimStyle.map(([id, name]) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip' + (sw.style === id ? ' on' : '');
+    b.textContent = name;
+    b.onclick = () => { draft.swim = { ...sw, style: id }; previewSwim = true; previewPJ = false; renderCreator(); };
+    return b;
+  }));
+  $('optSwimColor').replaceChildren(...OPTIONS.swimColor.map(c => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'swatch' + (sw.color === c ? ' on' : '');
+    b.style.background = c; b.setAttribute('aria-label', 'swimwear ' + c);
+    b.onclick = () => { draft.swim = { ...sw, color: c }; previewSwim = true; previewPJ = false; renderCreator(); };
+    return b;
+  }));
+  $('swimPreview').textContent = previewSwim ? '👀 Showing your swimwear — tap to see your day clothes' : '👀 See it on';
   if (preview) preview.rebuild();
 }
 
@@ -2903,7 +2989,7 @@ function startPreview() {
   preview = {
     rebuild() {
       if (av) { s.remove(av.group); disposeTree(av.group); }
-      av = buildAvatar(draft, previewPJ && draft.pj && draft.pj.on ? { pj: draft.pj } : {});
+      av = buildAvatar(draft, previewSwim ? { swim: swimFor(draft) } : previewPJ && draft.pj && draft.pj.on ? { pj: draft.pj } : {});
       s.add(av.group);
     },
     frame(dt) {
@@ -2925,7 +3011,8 @@ function startPreview() {
 }
 
 $('creatorCancel').onclick = () => $('creator').classList.add('hidden');
-$('pjPreview').onclick = () => { if (!draft.pj.on) draft.pj.on = true; previewPJ = !previewPJ; renderCreator(); };
+$('pjPreview').onclick = () => { if (!draft.pj.on) draft.pj.on = true; previewPJ = !previewPJ; previewSwim = false; renderCreator(); };
+$('swimPreview').onclick = () => { previewSwim = !previewSwim; previewPJ = false; renderCreator(); };
 $('creatorSave').onclick = async () => {
   const btn = $('creatorSave');
   btn.disabled = true;
@@ -3409,7 +3496,7 @@ async function goToRoom(room, group = null) {
   state.roomName = up ? group.name : isHome ? homeData.room.name : null;
   state.home = isHome ? { ...homeData, ownerId: Number(room.slice(5)) } : null;
   // into your pyjamas upstairs (or back into your day clothes)
-  if (!!dressFor(state.me.avatar).pj !== wearingPJ) playerAvatar();
+  if (JSON.stringify(dressFor(state.me.avatar)) !== wearing) playerAvatar();
   world.setFloor(roof ? 'garden' : isHome ? 'home' : isHall ? room : isCommon ? 'common' : isMusic ? 'music' : isPrayer ? 'prayer' : isSleep ? 'sleepover' : extra ? room : isKoshari ? room : up ? 'up' : 'main');
   if (isHall) await loadHallDoors();
   if (isHome) {
@@ -3449,7 +3536,7 @@ async function goToRoom(room, group = null) {
     player.ry = a.ry;
     cam.yaw = 0; cam.pitch = 0.32; cam.dist = cam.targetDist = 3.4;
   }
-  if (room === 'main' && (from === 'koshari' || from === 'ahwa' || from === 'felucca')) { // back across the road and in at the front door
+  if (room === 'main' && (from === 'koshari' || from === 'ahwa' || from === 'felucca' || from === 'bookbeans')) { // back across the road and in at the front door
     player.pos.set(0, 0, mapZ(3.8)); player.ry = Math.PI;
     cam.yaw = 0; cam.pitch = 0.3; cam.dist = cam.targetDist = 3.6;
   }
@@ -3510,6 +3597,13 @@ async function goToRoom(room, group = null) {
   if (room === 'studio') loadRecordings();
   if (room === 'post') loadHoles();
   if (room === 'escape') loadEscape();
+  if (room === 'writers') { world.rooms.writers.setBooks(authorBooks()); loadStories(); loadSprint(); }
+  if (room === 'pottery' || room === 'main') loadCups();
+  if (room === 'greenhouse') loadPots();
+  if (room === 'haunted') world.rooms.haunted.setFound(pumpkinsFound());
+  if (room === 'onsen') onsenSeason();
+  if (room === 'petcafe') loadPets(true);
+  if (room === 'party') loadParty();
   if (room !== 'karaoke') world.rooms.karaoke.setSinging(false);
   sysChat(extra ? ROOMS[room].enter(from) : isCommon ? 'You open the doors to the Common room. Someone has left the kettle on.'
     : room === 'felucca' ? feluccaGreeting()
@@ -3526,7 +3620,7 @@ async function goToRoom(room, group = null) {
     : roof && from === 'cinema' ? 'You step out of the cinema onto the roof garden, blinking.' : roof && from === 'tent' ? 'You duck out of the tent onto the roof garden. The lanterns glow behind you.' : roof ? 'You climb all the way up to the roof garden. The air smells of mint and warm stone.'
     : isHome ? (state.home.canEdit ? (homeData.items.length ? 'You open the door to your room.' : "You open the door to your room. It's empty for now — 🛠️ Decorate to make it yours.")
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
-    : up ? `You climb the spiral stairs to ${group.name}'s room.` : from === 'felucca' ? 'You step off onto the landing and stroll back up the street to the café. The bell chimes.' : from === 'koshari' || from === 'ahwa' ? 'You cross back over the road and in at the café door. The bell chimes.' : 'You come back down into the café.');
+    : up ? `You climb the spiral stairs to ${group.name}'s room.` : from === 'bookbeans' ? 'You step back next door into Sakura Slice. The bell chimes.' : from === 'felucca' ? 'You step off onto the landing and stroll back up the street to the café. The bell chimes.' : from === 'koshari' || from === 'ahwa' ? 'You cross back over the road and in at the café door. The bell chimes.' : 'You come back down into the café.');
   if (isHome && homeData.focus) offerFocus(homeData.focus, homeData.now);
   updateOnline();
   await wait(120);
@@ -4790,6 +4884,9 @@ setInterval(() => {
   if (state.room === 'cinema' && Date.now() - (cinemaShow.at || 0) > 15e3) { cinemaShow.at = Date.now(); refreshCinema(); }
   if (state.room === 'tent' && Date.now() - (tentState.at || 0) > 20e3) refreshTent();
   if (state.room === 'escape') renderEscapeBoard();
+  if (state.room === 'writers' || sprintMine) renderSprint();
+  if (state.room === 'party') partyTick();
+  if (state.room === 'pottery') for (let i = 0; i < 3; i++) world.rooms.pottery.setSpinning(i, [player.seat && player.seat.id, ...[...state.people.values()].map(p => p.state.seat)].includes(`pottery-wheel-${i}`));
   // the treadmills' belts and the bikes' wheels go round while somebody's on them
   if (state.room === 'gym') world.rooms.gym.setBusy([player.seat && player.seat.id, ...[...state.people.values()].map(p => p.seat && p.seat.id)].filter(Boolean));
   if (Date.now() - (adhan.checked || 0) > 15e3) { adhan.checked = Date.now(); checkAdhan(); }
@@ -5360,7 +5457,7 @@ $('teaNext').onclick = async () => {
   player.av.setDessert('matchabowl', 0);
   sound.cue('drink'); sendMove(true); refreshActions();
   bubble(player.av.group, '🍵 Otemae chōdai itashimasu', 'emote');
-  toast('🍵 A bowl of bright green matcha, frothed just right. Turn it, sip it slowly — press B. Ichigo ichie.');
+  toast('🍵 A bowl of bright green matcha, frothed just right. Turn it, sip it slowly — press B — or serve it to a guest with 🎁 Give. Ichigo ichie.');
 };
 
 // ── the Playroom: Hana reads a picture book in the story corner
@@ -5822,7 +5919,500 @@ function frame() {
 }
 resize();
 requestAnimationFrame(frame);
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie, openTent, openTea, openStory, openLetter, openPostHole, takeSteam, openRecorder, openScope, openEscape, startEscape };
+// ════════════════════════════════════════ the fourth floor, and BookBeans Corner next door
+
+// ── the Writer's Room: the stories board
+let writerStories = [], storyOpen = null;
+async function loadStories() {
+  try { const r = await api('/writers/stories'); writerStories = r.stories; world.rooms.writers.setBoard(writerStories); } catch (e) { /* fine */ }
+}
+function openStories() {
+  storyOpen = null;
+  $('storiesTitle').textContent = 'The stories board';
+  $('storyRead').classList.add('hidden'); $('storyForm').classList.add('hidden');
+  $('storiesList').classList.remove('hidden'); $('storyNew').classList.remove('hidden');
+  $('storiesList').replaceChildren(...(writerStories.length ? writerStories.map(s => {
+    const b = document.createElement('button'); b.type = 'button';
+    const t = document.createElement('span'); t.className = 'txt';
+    const name = document.createElement('b'); name.textContent = '📌 ' + s.title;
+    const by = document.createElement('small'); by.textContent = `by ${s.name} · about ${s.words} words`;
+    t.append(name, by); b.append(t);
+    b.onclick = () => readPinned(s.id);
+    return b;
+  }) : [Object.assign(document.createElement('p'), { className: 'fine', textContent: 'Nothing pinned up yet. Write the first story ✍️' })]));
+  openPanel('storiesPanel');
+  loadStories().then(() => { if (!$('storiesPanel').classList.contains('hidden') && !storyOpen && $('storyForm').classList.contains('hidden')) { const n = writerStories.length; if (n !== $('storiesList').children.length) openStories(); } });
+}
+async function readPinned(id) {
+  try {
+    const { story } = await api('/writers/story/' + id);
+    storyOpen = story;
+    $('storiesTitle').textContent = story.title;
+    $('storyBy').textContent = `by ${story.name} · ${new Date(story.at).toLocaleDateString()}`;
+    $('storyBody').textContent = story.body;
+    $('storyDel').classList.toggle('hidden', !(story.mine || (state.me && state.me.isAdmin)));
+    $('storiesList').classList.add('hidden'); $('storyNew').classList.add('hidden');
+    $('storyRead').classList.remove('hidden');
+  } catch (e) { toast(e.message); }
+}
+$('storyBack').onclick = () => openStories();
+$('storyNew').onclick = () => {
+  $('storiesTitle').textContent = 'Write a story ✍️';
+  $('storiesList').classList.add('hidden'); $('storyNew').classList.add('hidden');
+  $('storyForm').classList.remove('hidden'); $('storyErr').textContent = '';
+  $('storyBodyIn').focus();
+};
+$('storyCancel').onclick = () => openStories();
+$('storyBodyIn').oninput = () => { const n = ($('storyBodyIn').value.match(/\S+/g) || []).length; $('storyCount').textContent = `${n} word${n === 1 ? '' : 's'}`; };
+$('storyForm').onsubmit = async e => {
+  e.preventDefault();
+  $('storyErr').textContent = '';
+  try {
+    const r = await api('/writers/stories', { method: 'POST', body: { title: $('storyTitleIn').value, body: $('storyBodyIn').value } });
+    writerStories = r.stories; world.rooms.writers.setBoard(writerStories);
+    $('storyTitleIn').value = ''; $('storyBodyIn').value = ''; $('storyCount').textContent = '0 words';
+    sound.cue('pin'); send({ t: 'emote', e: '📌' });
+    toast('📌 Pinned on the stories board for everyone to read.');
+    openStories();
+  } catch (err) { $('storyErr').textContent = err.message; }
+};
+$('storyDel').onclick = async () => {
+  if (!storyOpen || !confirm('Take this story down from the board?')) return;
+  try { const r = await api('/writers/story/' + storyOpen.id, { method: 'DELETE' }); writerStories = r.stories; world.rooms.writers.setBoard(writerStories); openStories(); } catch (e) { toast(e.message); }
+};
+
+// ── the writing sprint: everyone writing at once, against the clock
+let sprintNow = null, sprintSkew = 0, sprintMine = false, sprintEnded = 0;
+const sprintLeft = () => (sprintNow ? Math.max(0, sprintNow.endsAt - (Date.now() - sprintSkew)) : 0);
+async function loadSprint() {
+  try { const r = await api('/writers/sprint'); sprintNow = r.sprint; sprintSkew = Date.now() - r.now; renderSprint(); } catch (e) { /* fine */ }
+}
+function renderSprint() {
+  const left = sprintLeft(), on = left > 0;
+  if (sprintMine && sprintNow && !on && !sprintEnded) {
+    sprintEnded = Date.now();
+    sysChat('⏱️ Time! The writing sprint is over — how many words did you get down?');
+    sound.cue('heart');
+    $('sprintWords').classList.remove('hidden');
+    openPanel('sprintPanel');
+  }
+  if (!on) { sprintMine = false; }
+  if (state.room === 'writers') world.rooms.writers.setSprint({ running: on, clock: fmt(left / 1000), writers: on ? sprintNow.writers.length : 0 });
+  if ($('sprintPanel').classList.contains('hidden')) return;
+  const me = state.me && state.me.displayName;
+  $('sprintState').textContent = on ? `✍️ ${fmt(left / 1000)} left · ${sprintNow.writers.join(', ')} ${sprintNow.writers.length === 1 ? 'is' : 'are'} writing.` : 'No sprint on just now. Start one — anyone in the room can join.';
+  $('sprintStart').classList.toggle('hidden', on);
+  $('sprintJoin').classList.toggle('hidden', !on || sprintMine || (sprintNow && sprintNow.writers.includes(me)));
+}
+function startTyping() {
+  closePanels();
+  const desk = world.seats.find(s => /^writers-desk/.test(s.id) && !seatTaken(s));
+  if (desk && !(player.seat && player.seat.work)) goSit(desk);
+  toast('⏱️ Go! Write, write, write — don’t stop to fix anything. The clock is on the mantel.');
+}
+function sprintChips() {
+  $('sprintStart').replaceChildren(...[5, 10, 15, 20, 25].map(m => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = `${m} min`;
+    b.onclick = async () => {
+      try { const r = await api('/writers/sprint/start', { method: 'POST', body: { minutes: m } }); sprintNow = r.sprint; sprintSkew = Date.now() - r.now; sprintMine = true; sprintEnded = 0; startTyping(); renderSprint(); } catch (e) { toast(e.message); }
+    };
+    return b;
+  }));
+}
+function openSprint() { sprintChips(); $('sprintWords').classList.toggle('hidden', !sprintEnded || Date.now() - sprintEnded > 10 * 60e3); openPanel('sprintPanel'); renderSprint(); loadSprint(); }
+$('sprintJoin').onclick = async () => {
+  try { const r = await api('/writers/sprint/join', { method: 'POST', body: {} }); sprintNow = r.sprint; sprintSkew = Date.now() - r.now; sprintMine = true; sprintEnded = 0; startTyping(); } catch (e) { toast(e.message); }
+};
+$('sprintWords').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    const r = await api('/library/words', { method: 'POST', body: { words: Number($('sprintWordsIn').value) } });
+    sprintEnded = 0; $('sprintWordsIn').value = ''; $('sprintWords').classList.add('hidden');
+    closePanels();
+    toast(`✍️ Logged! That’s ${r.words.mine.toLocaleString()} words for you today. Well sprinted.`);
+  } catch (err) { toast(err.message); }
+};
+
+// ── BookBeans Corner: the counter, the shelves, and a blind date with a book
+const BB_MENU = [['bb-latte', 'BookBeans Latte', 'velvety, with a sakura-dusted heart'], ['bb-cardamom', 'Cardamom Coffee', 'Egyptian style, fragrant and strong'], ['bb-cocoa', 'Hot Chocolate', 'thick, with whipped cream'], ['bb-karak', 'Karak Tea', 'spiced, milky, sweet']];
+function bbMenuRows() {
+  return BB_MENU.map(([id, name, line]) => {
+    const b = document.createElement('button'); b.type = 'button';
+    const t = document.createElement('span'); t.className = 'txt';
+    const n = document.createElement('b'); n.textContent = '☕ ' + name;
+    const s = document.createElement('small'); s.textContent = line;
+    t.append(n, s); b.append(t);
+    b.onclick = () => {
+      closePanels();
+      if (player.dessert || player.drink) return toast('☕ Your hands are full — put down what you’re holding first.');
+      sound.espresso(player.pos, id !== 'bb-karak', true);
+      setTimeout(() => {
+        player.dessert = { id, bites: 0 };
+        player.av.setDessert('bbcup', 0);
+        sound.cue('drink'); sendMove(true); refreshActions();
+        toast(`☕ One ${name}, in a BookBeans cup. Sip it slowly (B) and find a good book.`);
+      }, 1400);
+    };
+    return b;
+  });
+}
+function openBBCounter() {
+  $('bbTitle').textContent = 'The counter';
+  const wrap = document.createElement('div'); wrap.className = 'menu-list';
+  wrap.append(...bbMenuRows());
+  $('bbBody').replaceChildren(wrap);
+  openPanel('bbPanel');
+}
+function bookCard(bk) {
+  const d = document.createElement('div');
+  const img = new Image(); img.src = coverDataURL(bk); img.alt = ''; img.style.cssText = 'width:120px;float:left;margin:0 12px 6px 0;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+  const h = document.createElement('b'); h.textContent = bk.title; h.style.fontSize = '16px';
+  const by = document.createElement('p'); by.className = 'fine'; by.textContent = `${bk.author} · ${bk.genre}`;
+  const line = document.createElement('p'); line.style.cssText = 'font-family:Georgia,serif;font-style:italic'; line.textContent = '“' + bk.firstLine + '”';
+  const mood = document.createElement('p'); mood.className = 'fine'; mood.textContent = 'For when you’re feeling ' + bk.mood + '.';
+  d.append(img, h, by, line, mood);
+  d.style.overflow = 'hidden';
+  return d;
+}
+function openBrowse() {
+  $('bbTitle').textContent = 'The shelves 📚';
+  const grid = document.createElement('div'); grid.className = 'covers';
+  grid.append(...BB_BOOKS.map(bk => {
+    const b = document.createElement('button'); b.type = 'button';
+    const img = new Image(); img.src = coverDataURL(bk, 120, 180); img.alt = bk.title;
+    b.append(img, document.createTextNode(bk.title));
+    b.onclick = () => { const back = document.createElement('button'); back.className = 'btn ghost small'; back.type = 'button'; back.textContent = '⬅ The shelves'; back.onclick = openBrowse; $('bbBody').replaceChildren(bookCard(bk), back); };
+    return b;
+  }));
+  $('bbBody').replaceChildren(grid);
+  openPanel('bbPanel');
+}
+function openBlindDate() {
+  $('bbTitle').textContent = 'Blind date with a book 💌';
+  const pick = [...BB_BOOKS].sort(() => Math.random() - 0.5).slice(0, 3);
+  const intro = document.createElement('p'); intro.className = 'fine'; intro.textContent = 'Wrapped in brown paper, a few words on each in pencil. Pick one — no peeking.';
+  const list = document.createElement('div'); list.className = 'wrapped';
+  list.append(...pick.map(bk => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = '💌 ' + bk.hint;
+    b.onclick = () => {
+      sound.cue('pin');
+      const again = document.createElement('button'); again.className = 'btn ghost small'; again.type = 'button'; again.textContent = '💌 Another date'; again.onclick = openBlindDate;
+      const ta = document.createElement('p'); ta.textContent = '✨ You untie the string and fold back the paper…';
+      $('bbBody').replaceChildren(ta, bookCard(bk), again);
+      bubble(player.av.group, '📖💕', 'emote'); send({ t: 'emote', e: '📖' });
+    };
+    return b;
+  }));
+  $('bbBody').replaceChildren(intro, list);
+  openPanel('bbPanel');
+}
+
+// ── the Pottery Studio: shape a cup at the wheel, glaze it, fire it — and it goes on the shelf
+let cupList = [], potDraft = { shape: { h: 0.5, belly: 0.5, lip: 0.3, foot: 0.5, handle: true }, glaze: null, pattern: 'plain' }, potWheel = 0, kilnBusy = false;
+async function loadCups() {
+  try { const r = await api('/pottery/cups'); cupList = r.cups; showCups(); } catch (e) { /* fine */ }
+}
+function showCups() { world.rooms.pottery.setShelf(cupList); world.setCupShelf(cupList); }
+function drawPot() {
+  const s = potDraft.shape;
+  s.h = +$('potH').value; s.belly = +$('potBelly').value; s.lip = +$('potLip').value; s.foot = +$('potFoot').value; s.handle = $('potHandle').checked;
+  drawCupProfile($('potCanvas'), s, potDraft.glaze, potDraft.pattern);
+}
+function openPottery(seat) {
+  potWheel = seat ? Number(String(seat.id).split('-').pop()) || 0 : 0;
+  if (!potDraft.glaze) potDraft.glaze = GLAZES[0][0];
+  $('potGlaze').replaceChildren(...GLAZES.map(([color, name]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'swatch' + (potDraft.glaze === color ? ' on' : '');
+    b.style.background = color; b.title = name; b.setAttribute('aria-label', name);
+    b.onclick = () => { potDraft.glaze = color; openPottery(seat); };
+    return b;
+  }));
+  $('potPattern').replaceChildren(...PATTERNS.map(([id, name]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (potDraft.pattern === id ? ' on' : ''); b.textContent = name;
+    b.onclick = () => { potDraft.pattern = id; openPottery(seat); };
+    return b;
+  }));
+  $('potErr').textContent = '';
+  $('potFire').disabled = kilnBusy;
+  drawPot();
+  openPanel('potteryPanel');
+}
+for (const id of ['potH', 'potBelly', 'potLip', 'potFoot', 'potHandle']) $(id).oninput = drawPot;
+$('potFire').onclick = async () => {
+  if (kilnBusy) return;
+  drawPot();
+  const body = { shape: { ...potDraft.shape }, glaze: potDraft.glaze, pattern: potDraft.pattern, name: $('potName').value.trim() || 'A little cup' };
+  kilnBusy = true; $('potFire').disabled = true;
+  closePanels();
+  world.rooms.pottery.setKiln(true);
+  sysChat('🔥 You carry your cup to the kiln and close the door. It glows orange… (about 15 seconds)');
+  await wait(15000);
+  world.rooms.pottery.setKiln(false);
+  kilnBusy = false;
+  try {
+    const r = await api('/pottery/cups', { method: 'POST', body });
+    cupList = r.cups; showCups();
+    $('potName').value = '';
+    sound.cue('heart');
+    toast(`🏺 Out of the kiln: “${body.name}”, glazed and shining! It’s on the cup shelf here — and on the shelf by the café’s front door.`);
+  } catch (e) { toast(e.message); }
+};
+
+// ── the Flower Shop & Greenhouse: three pots each, watered once a day, three days to bloom
+let potsNow = { mine: [], all: [] };
+const POT_STAGES = ['🌰 just planted', '🌱 a sprout', '🌿 leafy, with a bud', '🌸 in bloom!'];
+async function loadPots() {
+  try { potsNow = await api('/flowers/pots'); world.rooms.greenhouse.setPots(potsNow.all); } catch (e) { /* fine */ }
+}
+function holdFlower(flower, how) {
+  if (player.dessert || player.drink) { toast('💐 Your hands are full — put down what you’re holding first.'); return false; }
+  player.dessert = { id: 'flower-' + flower, bites: 0 };
+  player.av.setDessert('bouquet_' + flower, 0);
+  sound.cue('heart'); sendMove(true); refreshActions();
+  toast(`💐 ${how} A bouquet of ${FLOWERS[flower].name.toLowerCase()} ${FLOWERS[flower].emoji}. Give it to someone (🎁 Give) — or just enjoy it.`);
+  return true;
+}
+function openFlowerShop() {
+  $('flowerTitle').textContent = 'The flower shop 💐';
+  const wrap = document.createElement('div'); wrap.className = 'menu-list';
+  wrap.append(...Object.entries(FLOWERS).map(([id, f]) => {
+    const b = document.createElement('button'); b.type = 'button';
+    const t = document.createElement('span'); t.className = 'txt';
+    const n = document.createElement('b'); n.textContent = `${f.emoji} ${f.name}`;
+    const s = document.createElement('small'); s.textContent = f.line;
+    t.append(n, s); b.append(t);
+    b.onclick = () => { closePanels(); holdFlower(id, 'Wrapped in paper and tied with a ribbon:'); };
+    return b;
+  }));
+  const p = document.createElement('p'); p.className = 'fine'; p.textContent = 'Or grow your own in the greenhouse — the potting bench at the back.';
+  $('flowerBody').replaceChildren(wrap, p);
+  $('flowerErr').textContent = '';
+  openPanel('flowerPanel');
+}
+function renderPots() {
+  $('flowerTitle').textContent = 'Your pots 🌱';
+  const rows = potsNow.mine.map(p => {
+    const f = FLOWERS[p.flower] || { name: p.flower, emoji: '🌼' };
+    const row = document.createElement('div'); row.className = 'pot';
+    const b = document.createElement('b'); b.textContent = `${f.emoji} ${f.name} — ${POT_STAGES[p.stage]}`;
+    row.append(b);
+    if (p.stage >= 3) {
+      const pick = document.createElement('button'); pick.className = 'btn small'; pick.type = 'button'; pick.textContent = '✂️ Pick';
+      pick.onclick = async () => {
+        if (player.dessert || player.drink) return toast('💐 Put down what you’re holding first, then pick it.');
+        try { const r = await api('/flowers/pick/' + p.id, { method: 'POST', body: {} }); potsNow = r; world.rooms.greenhouse.setPots(r.all); closePanels(); holdFlower(r.flower, 'You snip the stems and tie them up:'); } catch (e) { $('flowerErr').textContent = e.message; }
+      };
+      row.append(pick);
+    } else if (p.watered) {
+      const s = document.createElement('small'); s.className = 'fine'; s.textContent = '💧 watered today'; row.append(s);
+    } else {
+      const w = document.createElement('button'); w.className = 'btn small'; w.type = 'button'; w.textContent = '💧 Water';
+      w.onclick = async () => {
+        try {
+          const r = await api('/flowers/water/' + p.id, { method: 'POST', body: {} });
+          potsNow = r; world.rooms.greenhouse.setPots(r.all); renderPots();
+          sound.cue('pin'); bubble(player.av.group, '💧🌱', 'emote');
+          if (r.grew) toast((r.mine.find(x => x.id === p.id) || {}).stage >= 3 ? '🌸 It’s in bloom! Pick it whenever you like.' : '💧 Glug glug. It’ll grow a little overnight — come back tomorrow to water it again.');
+        } catch (e) { $('flowerErr').textContent = e.message; }
+      };
+      row.append(w);
+    }
+    return row;
+  });
+  const parts = [...rows];
+  if (potsNow.mine.length < 3) {
+    const p = document.createElement('p'); p.className = 'fine'; p.textContent = potsNow.mine.length ? 'Plant another (up to three):' : 'Choose some seeds to plant. Water them once a day — three days and they bloom.';
+    const chips = document.createElement('div'); chips.className = 'chips';
+    chips.append(...Object.entries(FLOWERS).map(([id, f]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = `${f.emoji} ${f.name}`;
+      b.onclick = async () => {
+        try { potsNow = await api('/flowers/plant', { method: 'POST', body: { flower: id } }); world.rooms.greenhouse.setPots(potsNow.all); sound.cue('pin'); toast(`🌰 You press the ${f.name.toLowerCase()} seeds into the soil. Water them (today counts!).`); renderPots(); } catch (e) { $('flowerErr').textContent = e.message; }
+      };
+      return b;
+    }));
+    parts.push(p, chips);
+  }
+  $('flowerBody').replaceChildren(...parts);
+}
+async function openPots() { $('flowerErr').textContent = ''; await loadPots(); renderPots(); openPanel('flowerPanel'); }
+
+// ── handing someone what you're holding (a bouquet, a bowl of matcha, cake, a BookBeans coffee)
+const HANDABLE = /^(tea-matcha|flower-\w+|party-cake|bb-\w+)$/;
+const canGive = () => !!(player.dessert && HANDABLE.test(player.dessert.id) && !player.dessert.bites);
+function openHand() {
+  if (!canGive()) return;
+  const what = pastryOf(player.dessert.id).name;
+  $('handTitle').textContent = `Give ${what} to…`;
+  const people = [...state.people.values()];
+  $('handList').replaceChildren(...(people.length ? people.map(p => {
+    const b = document.createElement('button'); b.type = 'button';
+    const t = document.createElement('span'); t.className = 'txt';
+    const n = document.createElement('b'); n.textContent = p.displayName; t.append(n); b.append(t);
+    b.onclick = async () => {
+      const item = player.dessert && player.dessert.id;
+      if (!item) return closePanels();
+      try {
+        await api('/hand', { method: 'POST', body: { to: p.id, item } });
+        player.dessert = null; player.av.setDessert(null); sendMove(true); refreshActions();
+        closePanels();
+        bubble(player.av.group, '🎁💕', 'emote'); send({ t: 'emote', e: '🎁' });
+        toast(`🎁 You give ${p.displayName} ${what}.`);
+      } catch (e) { toast(e.message); }
+    };
+    return b;
+  }) : [Object.assign(document.createElement('p'), { className: 'fine', textContent: 'There’s nobody else in the room just now.' })]));
+  openPanel('handPanel');
+}
+$('giveAct').onclick = openHand;
+function handedToMe(m) {
+  const what = pastryOf(m.item);
+  if (player.dessert || player.drink) return sysChat(`🎁 ${m.from} wants to give you ${what.name} — put down what you’re holding and ask them again!`);
+  player.dessert = { id: m.item, bites: 0 };
+  player.av.setDessert(what.shape, 0);
+  sound.cue('heart'); sendMove(true); refreshActions();
+  sysChat(`🎁 ${m.from} gives you ${what.name} 💕`);
+  toast(`🎁 ${m.from} gives you ${what.name} 💕`);
+}
+
+// ── the Haunted Library: ten little pumpkins hidden about the room (kept in this browser, per year)
+const pumpkinKey = () => `cafe.pumpkins.${state.me ? state.me.id : 0}.${cairoNow().getUTCFullYear()}`;
+function pumpkinsFound() { try { return JSON.parse(localStorage.getItem(pumpkinKey()) || '[]'); } catch (e) { return []; } }
+function findPumpkin(n) {
+  const found = pumpkinsFound();
+  if (found.includes(n)) return;
+  found.push(n);
+  try { localStorage.setItem(pumpkinKey(), JSON.stringify(found)); } catch (e) { /* fine */ }
+  world.rooms.haunted.setFound(found);
+  sound.cue('pin');
+  bubble(player.av.group, '🎃', 'emote'); send({ t: 'emote', e: '🎃' });
+  if (found.length >= 10) { sound.cue('heart'); sysChat('🎃👻 You found all ten pumpkins! The ghost does a little twirl. Happy Halloween, Pumpkin Hunter!'); toast('🏆 All ten pumpkins found! Happy Halloween 🎃'); }
+  else toast(`🎃 A little pumpkin! That’s ${found.length} of 10.`);
+}
+
+// ── the Onsen Garden: soak; snow monkeys in winter
+function onsenSeason() {
+  const m = cairoNow().getUTCMonth() + 1, h = cairoHour();
+  world.rooms.onsen.setWinter(m === 12 || m <= 2);
+  world.rooms.onsen.setNight(h >= 18 || h < 6);
+}
+
+// ── the Pet Café: stroke them, give them a treat, name them — and they remember you
+let petsNow = { names: {}, love: {} }, petOpen = null;
+const petKind = id => (PETS.find(p => p.id === id) || {}).kind || 'cat';
+const petCalled = id => petsNow.names[id] || (petKind(id) === 'bunny' ? 'the bunny' : 'the cat');
+async function loadPets(arriving = false) {
+  try {
+    petsNow = await api('/pets');
+    world.rooms.petcafe.setNames(petsNow.names);
+    if (!arriving) return;
+    // the ones who are fond of you come over to say hello
+    const fond = Object.entries(petsNow.love).filter(([, v]) => v.love >= 5).sort((a, b) => b[1].love - a[1].love).slice(0, 2).map(([id]) => id);
+    fond.forEach((id, i) => setTimeout(() => state.room === 'petcafe' && world.rooms.petcafe.comeTo(id, player.pos.x + (i ? 0.5 : -0.5), player.pos.z - 0.4), 1500 + i * 800));
+    if (fond.length) setTimeout(() => state.room === 'petcafe' && sysChat(`🐾 ${fond.map(petCalled).join(' and ')} ${fond.length > 1 ? 'remember' : 'remembers'} you, and ${fond.length > 1 ? 'come' : 'comes'} trotting over 💕`), 2200);
+  } catch (e) { /* fine */ }
+}
+function hearts(n) { return n >= 30 ? '💖💖💖💖💖' : n >= 15 ? '💖💖💖💖' : n >= 8 ? '💖💖💖' : n >= 3 ? '💖💖' : n >= 1 ? '💖' : '🤍'; }
+function openPet(id) {
+  petOpen = id;
+  const named = petsNow.names[id], love = (petsNow.love[id] || {}).love || 0;
+  $('petName').textContent = named ? `${named} ${petKind(id) === 'bunny' ? '🐰' : '🐱'}` : petKind(id) === 'bunny' ? 'A bunny 🐰' : 'A cat 🐱';
+  $('petLove').textContent = `${hearts(love)}  ${love >= 5 ? `${named || 'They'} know${named ? 's' : ''} you — and will come to say hello when you visit.` : love ? 'Getting to know you…' : 'Hasn’t met you yet.'}`;
+  $('petNameForm').classList.toggle('hidden', !!named);
+  $('petErr').textContent = '';
+  openPanel('petPanel');
+}
+async function petDo(what) {
+  if (!petOpen) return;
+  const id = petOpen;
+  try {
+    const r = await api(`/pets/${id}/${what}`, { method: 'POST', body: {} });
+    petsNow = { names: r.names, love: r.love };
+    world.rooms.petcafe.pet(id);
+    if (what === 'pet') { bubble(player.av.group, petKind(id) === 'bunny' ? '🐰💕' : '🐱💕', 'emote'); toast(petKind(id) === 'bunny' ? `🐰 You stroke ${petCalled(id)}’s soft ears. Nose twitch, twitch.` : `🐱 You stroke ${petCalled(id)}. Purrrrrr…`); }
+    else toast(r.counted ? (petKind(id) === 'bunny' ? `🥕 ${petCalled(id)} munches a carrot stick, very pleased.` : `🐟 ${petCalled(id)} gobbles the fishy treat and licks their whiskers.`) : `🍽️ ${petCalled(id)} has had a treat already — try again in an hour.`);
+    send({ t: 'emote', e: '💕' });
+    openPet(id);
+  } catch (e) { $('petErr').textContent = e.message; }
+}
+$('petStroke').onclick = () => petDo('pet');
+$('petFeed').onclick = () => petDo('feed');
+$('petNameForm').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    const r = await api(`/pets/${petOpen}/name`, { method: 'POST', body: { name: $('petNameIn').value } });
+    petsNow = r; world.rooms.petcafe.setNames(r.names); $('petNameIn').value = '';
+    sound.cue('heart'); toast(`🐾 Everyone will know them as ${r.names[petOpen]} now.`);
+    openPet(petOpen);
+  } catch (err) { $('petErr').textContent = err.message; }
+};
+
+// ── the Party Hall: bookings, the decorations while a party's on, and confetti
+let partyNow = { bookings: [], skew: 0 }, partyLive = undefined;
+const OCCASIONS = [['birthday', '🎂 Birthday'], ['wedding', '💍 Wedding'], ['graduation', '🎓 Graduation'], ['eid', '🌙 Eid'], ['baby', '🍼 Baby'], ['party', '🎉 Party']];
+let partyOcc = 'birthday';
+const cairoWhen = t => new Date(t).toLocaleString('en-GB', { timeZone: 'Africa/Cairo', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+async function loadParty() {
+  try { const r = await api('/party'); partyNow = { bookings: r.bookings, skew: Date.now() - r.now }; partyTick(true); } catch (e) { /* fine */ }
+}
+function partyTick(force = false) {
+  const now = Date.now() - partyNow.skew;
+  const live = partyNow.bookings.find(b => b.startsAt <= now && b.endsAt > now) || null;
+  const key = live ? live.id : null;
+  if (!force && key === partyLive) return;
+  const was = partyLive;
+  partyLive = key;
+  const r = world.rooms.party;
+  r.setBoard(partyNow.bookings.slice(0, 5).map(b => ({ title: b.title, when: cairoWhen(b.startsAt) })));
+  r.setDecor(!!live, live ? live.occasion : 'party');
+  r.setCake(!!live);
+  if (live) r.setBanner(live.title, live.occasion);
+  if (live && was !== undefined && was !== key && state.room === 'party') { sysChat(`🎉 The party is starting: ${live.title}`); r.confetti(); }
+}
+function renderParty() {
+  $('partyList').replaceChildren(...(partyNow.bookings.length ? partyNow.bookings.map(b => {
+    const row = document.createElement('div'); row.className = 'pot';
+    const t = document.createElement('b'); t.textContent = `${(OCCASIONS.find(o => o[0] === b.occasion) || ['', '🎉'])[1].split(' ')[0]} ${b.title}`;
+    const s = document.createElement('small'); s.className = 'fine'; s.textContent = `${cairoWhen(b.startsAt)} · ${b.by}`;
+    row.append(t, s);
+    if (b.mine || (state.me && state.me.isAdmin)) {
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'btn ghost small'; x.textContent = 'Cancel';
+      x.onclick = async () => { if (!confirm('Cancel this booking?')) return; try { const r = await api('/party/book/' + b.id, { method: 'DELETE' }); partyNow = { bookings: r.bookings, skew: Date.now() - r.now }; partyTick(true); renderParty(); } catch (e) { toast(e.message); } };
+      row.append(x);
+    }
+    return row;
+  }) : [Object.assign(document.createElement('p'), { className: 'fine', textContent: 'Nothing booked — the hall is free!' })]));
+  $('partyOcc').replaceChildren(...OCCASIONS.map(([id, name]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (partyOcc === id ? ' on' : ''); b.textContent = name;
+    b.onclick = () => { partyOcc = id; renderParty(); };
+    return b;
+  }));
+  if (!$('partyDate').value) { const d = cairoNow(); $('partyDate').value = d.toISOString().slice(0, 10); }
+}
+async function openParty() { $('partyErr').textContent = ''; renderParty(); openPanel('partyPanel'); await loadParty(); renderParty(); }
+$('partyForm').onsubmit = async e => {
+  e.preventDefault();
+  $('partyErr').textContent = '';
+  try {
+    const r = await api('/party/book', { method: 'POST', body: { occasion: partyOcc, title: $('partyTitleIn').value, date: $('partyDate').value, time: $('partyTime').value, hours: Number($('partyHours').value) } });
+    partyNow = { bookings: r.bookings, skew: Date.now() - r.now }; partyTick(true); renderParty();
+    $('partyTitleIn').value = '';
+    sound.cue('heart'); toast('🗓️ Booked! It’s on the board by the door. Tell your friends 🎉');
+  } catch (err) { $('partyErr').textContent = err.message; }
+};
+async function throwConfetti() {
+  try { await api('/party/confetti', { method: 'POST', body: {} }); } catch (e) { toast(e.message); }
+}
+$('partyConfetti').onclick = () => { closePanels(); throwConfetti(); };
+function cutCake() {
+  if (!partyLive) return toast('🎂 The cake only comes out during a party — book the hall!');
+  if (player.dessert || player.drink) return toast('🎂 Your hands are full — put down what you’re holding first.');
+  player.dessert = { id: 'party-cake', bites: 0 };
+  player.av.setDessert('partycake', 0);
+  sound.cue('drink'); sendMove(true); refreshActions();
+  toast('🎂 A slice of party cake, candle and all. Make a wish! (B for a bite)');
+}
+
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie, openTent, openTea, openStory, openLetter, openPostHole, takeSteam, openRecorder, openScope, openEscape, startEscape, openStories, openSprint, openBBCounter, openBlindDate, openBrowse, openPottery, openPots, openFlowerShop, openPet, openParty, findPumpkin, cutCake, throwConfetti, openHand };
 
 // ───────────────────────────────────────── start
 

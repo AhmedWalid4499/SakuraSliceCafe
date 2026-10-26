@@ -323,8 +323,13 @@ function buildAvatarParts(avatar, extra) {
     a.bottom = 'trousers';
     if (pj.cap) a.accessory = 'nightcap';
   }
+  // in swimwear (the pool, the onsen): trunks, a swimsuit, or a full-cover suit.
+  // Bare arms and legs (except the full suit), bare feet, no collar or buttons.
+  const sw = extra.swim && a.body !== 'owl' ? { style: 'trunks', color: '#2f8ab0', ...extra.swim } : null;
+  if (sw) { a.bottom = 'trousers'; if (a.accessory === 'nightcap' || a.accessory === 'beanie' || a.accessory === 'scarf') a.accessory = 'none'; }
   const root = new THREE.Group();
   const rig = new THREE.Group();     // everything that bobs and turns
+  rig.rotation.order = 'YXZ';        // (so a swimmer can lie forward, then turn)
   root.add(rig);
 
   const isOwl = a.body === 'owl';
@@ -338,6 +343,10 @@ function buildAvatarParts(avatar, extra) {
     : furry ? mat(a.outfit, { roughness: 0.85 }) : new THREE.MeshStandardMaterial({ color: a.outfit, map: softTex('knit'), roughness: 0.9 });
   const accentM = mat(a.accent, { roughness: 0.95 });
   const darkM = mat('#2a1d1d', { roughness: 0.25 });
+  const swimM = sw ? mat(sw.color, { roughness: 0.35 }) : null;
+  const full = sw && sw.style === 'full';
+  const topM = sw ? (sw.style === 'trunks' ? skinM : swimM) : outfitM; // the body
+  const sleeveM = sw ? (full ? swimM : skinM) : outfitM;              // the arms
   const pawM = isFox ? mat('#3b2722', { roughness: 0.95 }) : skinM; // foxes wear dark "socks"
   const parts = {};
   const blinkers = [];
@@ -346,18 +355,23 @@ function buildAvatarParts(avatar, extra) {
 
   // ── legs and shoes (or paws)
   if (!isOwl) {
-    const legM = furry ? pawM : pj ? outfitM : skirt ? mat(shade(a.skin, -0.04), { roughness: 0.6 }) : mat(shade(a.outfit, -0.28), { roughness: 0.9 });
-    const shoeM = furry ? pawM : pj ? mat('#fbf3ea', { roughness: 1 }) : mat('#5a3e36', { roughness: 0.5 }); // fluffy slippers
+    const legM = sw ? (full ? swimM : furry ? pawM : skinM) : furry ? pawM : pj ? outfitM : skirt ? mat(shade(a.skin, -0.04), { roughness: 0.6 }) : mat(shade(a.outfit, -0.28), { roughness: 0.9 });
+    const shoeM = sw ? (furry ? pawM : skinM) : furry ? pawM : pj ? mat('#fbf3ea', { roughness: 1 }) : mat('#5a3e36', { roughness: 0.5 }); // fluffy slippers (or bare feet)
     for (const side of [-1, 1]) {
       const hip = new THREE.Group();
       hip.position.set(0.092 * side, HIP, 0);
       const leg = capsule(furry ? 0.078 : 0.086, furry ? 0.26 : 0.24, null, legM);
       leg.position.y = -0.19;
-      const shoe = sphere(furry ? 0.1 : 0.108, null, shoeM);
-      shoe.scale.set(pj ? 1.0 : 0.88, pj ? 0.66 : 0.62, pj ? 1.35 : 1.3);
-      shoe.position.set(0, -0.47, 0.035);
+      const shoe = sphere(furry ? 0.1 : sw ? 0.085 : 0.108, null, shoeM);
+      shoe.scale.set(pj ? 1.0 : 0.88, pj ? 0.66 : sw ? 0.55 : 0.62, pj ? 1.35 : 1.3);
+      shoe.position.set(0, sw ? -0.46 : -0.47, 0.035);
       hip.add(leg, shoe);
-      if (!furry) {
+      if (sw && !full) { // the leg of the trunks / the swimsuit
+        const cuff = capsule(furry ? 0.085 : 0.094, sw.style === 'trunks' ? 0.07 : 0.0, null, swimM);
+        cuff.position.y = sw.style === 'trunks' ? -0.07 : -0.02;
+        hip.add(cuff);
+      }
+      if (!furry && !sw) {
         const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.083, 0.083, 0.02, SEG), mat('#f3e9df', { roughness: 0.8 }));
         sole.scale.z = 1.3;
         sole.position.set(0, -0.515, 0.035);
@@ -395,12 +409,22 @@ function buildAvatarParts(avatar, extra) {
       ? [[0, 0], [0.19, 0], [0.215, 0.05], [0.223 * wa, 0.16], [0.216 * wa, 0.3], [0.2 * sh, 0.4], [0.15 * sh, 0.48], [0.07, 0.52], [0, 0.53]]
       : [[0, 0], [0.215, 0], [0.24, 0.035], [0.245 * wa, 0.14], [0.236 * wa, 0.28], [0.214 * sh, 0.4], [0.17 * sh, 0.48], [0.09, 0.525], [0, 0.54]];
     const profile = prof.map(([r, y]) => new THREE.Vector2(r, y));
-    torso = new THREE.Mesh(new THREE.LatheGeometry(profile, SEG), outfitM);
+    torso = new THREE.Mesh(new THREE.LatheGeometry(profile, SEG), topM);
     torso.castShadow = true;
     torso.position.y = TORSO;
     // collar and three buttons
     const collarM = mat(furry ? a.accent : shade(a.outfit, 0.25), { roughness: 0.85 });
-    if (furry) {
+    if (sw) {
+      // trunks: a pair of shorts with a white drawstring band; a swimsuit: a stripe across it
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.245, 0.014, 8, SEG * 2), mat(sw.style === 'trunks' ? '#ffffff' : shade(sw.color, 0.35), { roughness: 0.6 }));
+      band.rotation.x = Math.PI / 2; band.position.y = sw.style === 'trunks' ? TORSO + 0.17 : TORSO + 0.3;
+      rig.add(band);
+      if (sw.style === 'trunks') {
+        const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.247, 0.245, 0.2, SEG * 2), swimM);
+        shorts.position.y = TORSO + 0.07; rig.add(shorts);
+        if (!furry) for (const side of [-1, 1]) { const tie = capsule(0.007, 0.05, null, mat('#ffffff')); tie.position.set(0.02 * side, TORSO + 0.13, 0.25); tie.rotation.z = 0.3 * side; rig.add(tie); }
+      }
+    } else if (furry) {
       for (const side of [-1, 1]) {
         const flap = new THREE.Mesh(new THREE.CircleGeometry(0.06, 3), collarM);
         flap.material.side = THREE.DoubleSide;
@@ -427,7 +451,7 @@ function buildAvatarParts(avatar, extra) {
         rig.add(pocket);
       }
     }
-    if (!extra.apron) {
+    if (!extra.apron && !sw) {
       for (let i = 0; i < 3; i++) {
         const b = sphere(furry ? 0.013 : 0.016, null, furry ? collarM : mat(pj ? '#fffaf2' : a.accent, { roughness: 0.6 }));
         b.position.set(0, 0.93 - i * 0.1, (furry ? 0.205 : 0.218) + (i === 2 ? 0.014 : 0));
@@ -441,7 +465,7 @@ function buildAvatarParts(avatar, extra) {
   rig.add(torso);
   parts.torso = torso;
 
-  if (skirt) {
+  if (skirt && !sw) {
     const sk = [[0.218, 0.13], [0.24, 0.04], [0.29, -0.14], [0.325, -0.27], [0.3, -0.285]].map(([r, y]) => new THREE.Vector2(r, y));
     const skirtMesh = new THREE.Mesh(new THREE.LatheGeometry(sk, SEG * 2), mat(shade(a.outfit, -0.1), { roughness: 0.85, side: THREE.DoubleSide }));
     skirtMesh.castShadow = true;
@@ -450,7 +474,7 @@ function buildAvatarParts(avatar, extra) {
   }
 
   // Apron (the café team wear them): bib, skirt, waist tie, neck strap, a pocket.
-  if (extra.apron && !isOwl) {
+  if (extra.apron && !isOwl && !sw) {
     const apM = mat(extra.apron, { roughness: 0.9, side: THREE.DoubleSide });
     const bib = new THREE.Mesh(new THREE.CylinderGeometry(0.212, 0.229, 0.27, SEG, 1, true, -Math.PI * 0.27, Math.PI * 0.54), apM);
     bib.position.y = TORSO + 0.29;
@@ -487,7 +511,7 @@ function buildAvatarParts(avatar, extra) {
       rig.add(pencil);
     }
   }
-  if (extra.neckerchief && !isOwl) {
+  if (extra.neckerchief && !isOwl && !sw) {
     const nm = mat(extra.neckerchief, { roughness: 0.9 });
     const band = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.025, 10, SEG), nm);
     band.rotation.x = Math.PI / 2;
@@ -513,9 +537,10 @@ function buildAvatarParts(avatar, extra) {
       }
     } else {
       shoulder.position.set(0.235 * side, SHOULDER, 0);
-      const arm = capsule(furry ? 0.064 : 0.072, furry ? 0.25 : 0.22, null, outfitM);
+      const arm = capsule(furry ? 0.064 : 0.072, furry ? 0.25 : 0.22, null, sw && !full && furry ? pawM : sleeveM);
       arm.position.y = -0.16;
-      const cuff = new THREE.Mesh(new THREE.TorusGeometry(furry ? 0.06 : 0.068, 0.017, 8, SEG), mat(furry ? a.accent : pj ? '#fffaf2' : shade(a.outfit, -0.12)));
+      const cuff = new THREE.Mesh(new THREE.TorusGeometry(furry ? 0.06 : 0.068, 0.017, 8, SEG), sw ? (full ? mat(shade(sw.color, 0.35)) : sleeveM) : mat(furry ? a.accent : pj ? '#fffaf2' : shade(a.outfit, -0.12)));
+      if (sw && !full) cuff.visible = false;
       cuff.rotation.x = Math.PI / 2;
       cuff.position.y = -0.31;
       const hand = sphere(furry ? 0.064 : 0.068, null, handM);
@@ -1056,8 +1081,11 @@ function buildAvatarParts(avatar, extra) {
   }
   // sitH: how high the seat's cushion is, so you sit on it rather than in it
   // asleep: eyes closed, very still. typing: hands forward on a keyboard.
-  function update(dt, { moving = false, sitting = false, sitH = 0.54, waving = 0, asleep = false, typing = false } = {}) {
+  let swimBlend = 0, swimT = Math.random() * 20, heading = 0;
+  function update(dt, { moving = false, sitting = false, sitH = 0.54, waving = 0, asleep = false, typing = false, swimming = false } = {}) {
     t += dt;
+    swimBlend += ((swimming ? 1 : 0) - swimBlend) * Math.min(1, dt * 4);
+    if (swimming) { swimT += dt; sitting = false; moving = false; }
     sitBlend += ((sitting ? 1 : 0) - sitBlend) * Math.min(1, dt * 8);
     if (sitting) sitDrop = 0.48 - sitH;
     if (moving) walkPhase += dt * 9;
@@ -1125,6 +1153,30 @@ function buildAvatarParts(avatar, extra) {
       parts.earL.userData.rest = restL; parts.earR.userData.rest = restR;
       parts.earL.rotation.z = restL + Math.sin(t * 0.9) * 0.05;
       parts.earR.rotation.z = restR + Math.sin(t * 0.9 + 1) * 0.05;
+    }
+    // swimming: lie forward on the water and do the front crawl — arms
+    // windmilling, legs kicking, head turning to breathe — up and down a lane
+    const sb = swimBlend;
+    if (sb > 0.002 && !isOwl) {
+      const lap = Math.sin(swimT * 0.28);                 // along the lane and back
+      const target = Math.cos(swimT * 0.28) >= 0 ? 0 : Math.PI;
+      heading += (target - heading) * Math.min(1, dt * 2.5);
+      const stroke = swimT * 4.2;
+      rig.rotation.x = 1.32 * sb;
+      rig.rotation.y = heading * sb;
+      const back = -0.72 * sb;                            // (so the body, not the feet, is over the spot)
+      rig.position.set(Math.sin(heading) * back, (0.64 + Math.sin(stroke * 2) * 0.025) * sb + rig.position.y * (1 - sb), lap * 0.9 * sb + Math.cos(heading) * back);
+      parts.armL.rotation.x = parts.armL.rotation.x * (1 - sb) - (stroke % (Math.PI * 2)) * sb;
+      parts.armR.rotation.x = parts.armR.rotation.x * (1 - sb) - ((stroke + Math.PI) % (Math.PI * 2)) * sb;
+      parts.armL.rotation.z *= 1 - sb; parts.armR.rotation.z *= 1 - sb;
+      if (parts.legL) {
+        parts.legL.rotation.x = parts.legL.rotation.x * (1 - sb) + Math.sin(swimT * 9) * 0.32 * sb;
+        parts.legR.rotation.x = parts.legR.rotation.x * (1 - sb) - Math.sin(swimT * 9) * 0.32 * sb;
+      }
+      head.rotation.x = head.rotation.x * (1 - sb) - 1.0 * sb;
+      head.rotation.y = head.rotation.y * (1 - sb) + Math.sin(stroke / 2) * 0.45 * sb;
+    } else if (rig.rotation.x || rig.rotation.y || rig.position.x || rig.position.z) {
+      rig.rotation.x = rig.rotation.y = 0; rig.position.x = rig.position.z = 0;
     }
   }
 

@@ -23,7 +23,8 @@ const GROUP_FIELDS = `g.id, g.name, g.description, g.color, g.is_public AS "isPu
 const PUBLIC_ROOMS = ['main', 'garden', 'hall', 'common', 'music', 'prayer', 'koshari', 'hall2', 'sleepover',
   'landing', 'games', 'library', 'cinema', 'bakery', 'gym', 'art', 'laundry', 'ahwa', 'tent',
   'hammam', 'studio', 'tearoom', 'playroom', 'post', 'felucca',
-  'landing3', 'karaoke', 'escape', 'pool', 'observatory'];
+  'landing3', 'karaoke', 'escape', 'pool', 'observatory',
+  'landing4', 'writers', 'pottery', 'greenhouse', 'haunted', 'onsen', 'petcafe', 'party', 'bookbeans'];
 const ROOM_RE = new RegExp(`^(${PUBLIC_ROOMS.join('|')}|group:\\d+|home:\\d+)$`);
 
 // Is this user allowed in this room? The public rooms are open to everyone signed in.

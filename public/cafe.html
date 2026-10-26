@@ -451,6 +451,13 @@
   #steamFog { position: fixed; inset: 0; z-index: 25; pointer-events: none; background: radial-gradient(ellipse at 50% 60%, rgba(255,255,255,.92), rgba(240,246,248,.75)); backdrop-filter: blur(6px); opacity: 0; transition: opacity 4s ease; }
   #steamFog.on { opacity: 1; }
   #steamFog.on.clear { opacity: 0; transition: opacity 3s ease; }
+  .covers { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; margin-top: 8px; max-height: 52vh; overflow: auto; }
+  .covers button { border: 0; padding: 0; background: none; text-align: left; font-size: 11.5px; color: var(--text-mid); }
+  .covers img { width: 100%; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,.18); display: block; margin-bottom: 4px; }
+  .wrapped { display: grid; gap: 8px; margin-top: 8px; }
+  .wrapped button { border: 1.5px dashed #9a6a44; background: #e8d2b4; color: #4a3020; border-radius: 12px; padding: 10px 12px; text-align: left; font-family: 'Dancing Script', cursive; font-size: 18px; line-height: 1.3; }
+  .pot { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 12px; background: var(--field); margin: 6px 0; }
+  .pot b { flex: 1; font-size: 14px; }
   .lock { margin: 8px 0; padding: 8px; border-radius: 10px; background: rgba(201,162,91,.12); }
   .lock.open { background: rgba(111,159,99,.18); }
   .lock.shake { animation: shake .35s; }
@@ -516,6 +523,8 @@
       <div class="opt-group"><span>Pyjamas upstairs?</span><p class="fine" style="margin:2px 0 6px">Wear them in your room, the hallway, the Common room and the Music Room — everyone up there sees them.</p><div class="chips" id="optPJ"></div>
         <div id="pjMore" class="hidden" style="margin-top:8px"><div class="chips" id="optPJColor"></div><div class="chips" id="optPJPattern" style="margin-top:8px"></div><div class="chips" id="optPJCap" style="margin-top:8px"></div>
         <button class="btn ghost" id="pjPreview" type="button" style="margin-top:8px;font-size:13px;padding:6px 12px"></button></div></div>
+      <div class="opt-group"><span>Swimwear</span><p class="fine" style="margin:2px 0 6px">What you change into at the rooftop pool and the onsen.</p><div class="chips" id="optSwim"></div><div class="chips" id="optSwimColor" style="margin-top:8px"></div>
+        <button class="btn ghost" id="swimPreview" type="button" style="margin-top:8px;font-size:13px;padding:6px 12px"></button></div>
       <div class="error" id="creatorErr"></div>
       <div class="row end"><button class="btn ghost hidden" id="creatorCancel" type="button">Cancel</button><button class="btn" id="creatorSave" type="button">Step inside</button></div>
     </div>
@@ -567,6 +576,7 @@
   <button id="drinkAct" class="hidden" title="Put your drink down"><span>🍵</span> <span class="t">Put drink down</span></button>
   <button id="sipAct" class="hidden" title="Take a sip (C)"><span>☕</span> <span class="t">Take a sip</span></button>
   <button id="biteAct" class="hidden" title="Take a bite (B)"><span>🍡</span> <span class="t">Take a bite</span></button>
+  <button id="giveAct" class="hidden" title="Give it to someone"><span>🎁</span> <span class="t">Give</span></button>
   <button id="gameAct" class="hidden" title="Play a game at this table"><span>🎲</span> <span class="t">Games</span></button>
   <button id="waveAct" title="Wave"><span>👋</span> <span class="t">Wave</span></button>
   <button id="emoteAct" title="Send a little something"><span>🌸</span></button>
@@ -1327,6 +1337,97 @@
   <canvas id="scopeCanvas" width="360" height="360" style="display:block;width:100%;max-width:360px;margin:6px auto"></canvas>
   <div id="scopePick" class="chips" style="justify-content:center"></div>
   <p class="fine" id="scopeText" style="text-align:center;margin-top:8px"></p>
+</div>
+
+<div id="storiesPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Writer’s Room ✍️</p>
+  <h3 id="storiesTitle">The stories board</h3>
+  <div id="storiesList" class="menu-list"></div>
+  <div id="storyRead" class="hidden"><p class="fine" id="storyBy"></p><div id="storyBody" style="white-space:pre-wrap;max-height:46vh;overflow:auto;font-family:Georgia,serif;line-height:1.55;font-size:15px"></div>
+    <div class="row" style="gap:6px;margin-top:10px"><button class="btn ghost small" id="storyBack" type="button">⬅ The board</button><button class="btn ghost small hidden" id="storyDel" type="button">Take it down</button></div></div>
+  <form id="storyForm" class="hidden"><input id="storyTitleIn" maxlength="60" placeholder="A title"><textarea id="storyBodyIn" maxlength="4000" rows="9" placeholder="Once upon a time, in a café in Cairo…" style="margin-top:6px;width:100%"></textarea>
+    <p class="fine" id="storyCount">0 words</p><div class="error" id="storyErr"></div>
+    <div class="row" style="gap:6px"><button class="btn ghost small" id="storyCancel" type="button">Cancel</button><button class="btn small" type="submit">📌 Pin it on the board</button></div></form>
+  <button class="btn" id="storyNew" type="button" style="margin-top:10px">✍️ Write a story</button>
+</div>
+
+<div id="sprintPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Writer’s Room ⏱️</p>
+  <h3>The writing sprint</h3>
+  <p class="lede" id="sprintState" style="font-size:14px"></p>
+  <div id="sprintStart" class="chips"></div>
+  <button class="btn hidden" id="sprintJoin" type="button" style="margin-top:8px">✍️ Join the sprint</button>
+  <form id="sprintWords" class="hidden" style="margin-top:10px"><p class="fine">Time! How many words did you write? (They go on today’s board in the library too.)</p>
+    <div class="row" style="gap:6px"><input type="number" id="sprintWordsIn" min="1" max="20000" placeholder="words" style="flex:1"><button class="btn small" type="submit">Log them</button></div></form>
+  <p class="fine" style="margin-top:8px">Sit at a desk to type. Everyone who joins writes until the clock runs out — then you all say how it went.</p>
+</div>
+
+<div id="bbPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">BookBeans Corner ☕📚</p>
+  <h3 id="bbTitle">The counter</h3>
+  <div id="bbBody"></div>
+</div>
+
+<div id="potteryPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Pottery Studio 🏺</p>
+  <h3>Shape your cup</h3>
+  <canvas id="potCanvas" width="240" height="200" style="display:block;width:240px;height:200px;margin:4px auto;background:#f6e6d8;border-radius:12px"></canvas>
+  <label class="fine">Tall <input type="range" id="potH" min="0" max="1" step="0.01" value="0.5"></label>
+  <label class="fine">Round <input type="range" id="potBelly" min="0" max="1" step="0.01" value="0.5"></label>
+  <label class="fine">Flared lip <input type="range" id="potLip" min="0" max="1" step="0.01" value="0.3"></label>
+  <label class="fine">Wide foot <input type="range" id="potFoot" min="0" max="1" step="0.01" value="0.5"></label>
+  <label class="fine"><input type="checkbox" id="potHandle" checked> A handle</label>
+  <div class="chips" id="potGlaze" style="margin-top:6px"></div>
+  <div class="chips" id="potPattern" style="margin-top:6px"></div>
+  <input id="potName" maxlength="30" placeholder="Name your cup" style="margin-top:8px">
+  <div class="error" id="potErr"></div>
+  <button class="btn" id="potFire" type="button" style="margin-top:8px">🔥 Fire it in the kiln</button>
+</div>
+
+<div id="flowerPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Greenhouse 🌱</p>
+  <h3 id="flowerTitle">Your pots</h3>
+  <div id="flowerBody"></div>
+  <div class="error" id="flowerErr"></div>
+</div>
+
+<div id="handPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">A little something 🎁</p>
+  <h3 id="handTitle">Give it to…</h3>
+  <div id="handList" class="menu-list"></div>
+</div>
+
+<div id="petPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Pet Café 🐾</p>
+  <h3 id="petName">A cat</h3>
+  <p class="lede" id="petLove" style="font-size:14px"></p>
+  <form id="petNameForm" class="hidden"><p class="fine">Nobody has named them yet — you can!</p><div class="row" style="gap:6px"><input id="petNameIn" maxlength="20" placeholder="A name" style="flex:1"><button class="btn small" type="submit">Name them</button></div></form>
+  <div class="row" style="gap:6px;margin-top:8px"><button class="btn" id="petStroke" type="button">🤚 Stroke</button><button class="btn" id="petFeed" type="button">🍽️ Give a treat</button></div>
+  <div class="error" id="petErr"></div>
+</div>
+
+<div id="partyPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">The Party Hall 🎉</p>
+  <h3>Book the hall</h3>
+  <div id="partyList" class="menu-list"></div>
+  <form id="partyForm" style="margin-top:8px">
+    <div class="chips" id="partyOcc"></div>
+    <input id="partyTitleIn" maxlength="50" placeholder="e.g. Happy Birthday Sara!" style="margin-top:6px">
+    <div class="row" style="gap:6px;margin-top:6px"><input type="date" id="partyDate" style="flex:1"><input type="time" id="partyTime" value="19:00" style="flex:1">
+      <select id="partyHours"><option value="1">1 hour</option><option value="2" selected>2 hours</option><option value="3">3 hours</option><option value="4">4 hours</option></select></div>
+    <p class="fine">Cairo time. While it’s on, the hall is decorated with your banner, the cake comes out, and anyone can come.</p>
+    <div class="error" id="partyErr"></div>
+    <button class="btn" type="submit">🗓️ Book it</button>
+  </form>
+  <button class="btn ghost" id="partyConfetti" type="button" style="margin-top:8px">🎊 Confetti for everyone!</button>
 </div>
 
 <div id="moviePanel" class="panel card hidden">

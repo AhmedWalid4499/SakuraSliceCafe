@@ -34,6 +34,7 @@ const BODY_TYPES = ['person', 'fox', 'rabbit', 'owl', 'cat'];
 const GENDERS = ['he', 'she'];
 const BOTTOMS = ['trousers', 'skirt'];
 const PJ_PATTERNS = ['stripes', 'dots', 'stars', 'hearts', 'checks', 'plain'];
+const SWIM_STYLES = ['trunks', 'swimsuit', 'full'];
 const AVATAR_DEFAULTS = {
   body: 'person', skin: '#e0b48c', hair: '#3b2a22', hairStyle: 'short',
   outfit: '#7aab7a', accent: '#fef9f5', accessory: 'none', gender: 'she', bottom: 'trousers',
@@ -58,6 +59,11 @@ function cleanAvatar(a) {
       pattern: PJ_PATTERNS.includes(a.pj.pattern) ? a.pj.pattern : 'stripes',
       cap: !!a.pj.cap,
     } : { on: false, color: '#9fb8d6', pattern: 'stripes', cap: false },
+    // swimwear, worn at the pool and the onsen (none chosen: trunks or a swimsuit)
+    swim: a.swim && typeof a.swim === 'object' && SWIM_STYLES.includes(a.swim.style) ? {
+      style: a.swim.style,
+      color: isHexColor(a.swim.color) ? a.swim.color : '#2f8ab0',
+    } : null,
   };
 }
 
@@ -505,6 +511,7 @@ api.use(groups.router);
 api.use(require('./garden').router);
 api.use(require('./homes').router);
 api.use(require('./rooms').router);
+api.use(require('./upstairs').router);
 api.use(require('./media').router);
 api.use(npc);
 api.use('/admin', admin);
