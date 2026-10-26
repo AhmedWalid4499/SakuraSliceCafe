@@ -1165,7 +1165,7 @@ function buildAvatarParts(avatar, extra) {
       rig.rotation.x = 1.32 * sb;
       rig.rotation.y = heading * sb;
       const back = -0.72 * sb;                            // (so the body, not the feet, is over the spot)
-      rig.position.set(Math.sin(heading) * back, (0.64 + Math.sin(stroke * 2) * 0.025) * sb + rig.position.y * (1 - sb), lap * 0.9 * sb + Math.cos(heading) * back);
+      rig.position.set(Math.sin(heading) * back, (0.74 + Math.sin(stroke * 2) * 0.025) * sb + rig.position.y * (1 - sb), lap * 0.9 * sb + Math.cos(heading) * back);
       parts.armL.rotation.x = parts.armL.rotation.x * (1 - sb) - (stroke % (Math.PI * 2)) * sb;
       parts.armR.rotation.x = parts.armR.rotation.x * (1 - sb) - ((stroke + Math.PI) % (Math.PI * 2)) * sb;
       parts.armL.rotation.z *= 1 - sb; parts.armR.rotation.z *= 1 - sb;
