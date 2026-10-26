@@ -55,6 +55,25 @@ export const LANDING3_DOORS = [
     lines: [{ text: '⬆ Rooftop Pool', size: 104, weight: '700' }, { text: 'swim · sun · city views 🌴', size: 58 }] },
   { room: 'observatory', x: 4.4, side: 1, color: '#1b2240', glass: '#c9d2f0', bg: '#1b2240', label: 'Up the stairs to the observatory — the telescope, the moon and the stars 🔭',
     lines: [{ text: '⬆ Observatory', size: 104, weight: '700', color: '#ffe7a0' }, { text: 'telescope · tonight’s sky', size: 58, color: '#c9d2f0' }] },
+  { room: 'landing4', x: 7.6, side: -1, color: '#b0607a', glass: '#ffe0ea', bg: '#fbeef2', label: 'Up the stairs to the fourth floor — writers, pottery, flowers, the onsen, pets and parties',
+    lines: [{ text: '⬆ Fourth floor', size: 104, weight: '700' }, { text: 'write · make · grow · soak · play', size: 52 }] },
+];
+// …and the fourth floor's
+export const LANDING4_DOORS = [
+  { room: 'writers', x: -6.4, side: -1, color: '#4a3a2e', glass: '#ffe9c4', bg: '#f3e1d0', label: 'The Writer’s Room — quiet desks, typewriters, the fire and the stories board ✍️',
+    lines: [{ text: 'Writer’s Room', size: 104, weight: '700' }, { text: 'write · read · sprint ✍️', size: 60 }] },
+  { room: 'pottery', x: -2.4, side: -1, color: '#b0643a', glass: '#fbe6d4', bg: '#f6e6d8', label: 'The Pottery Studio — shape a cup, glaze it, fire it in the kiln 🏺',
+    lines: [{ text: 'Pottery Studio', size: 100, weight: '700' }, { text: 'shape · glaze · fire 🏺', size: 60 }] },
+  { room: 'greenhouse', x: 1.6, side: -1, color: '#4f7a5a', glass: '#e4f6e0', bg: '#eef6ea', label: 'The Flower Shop & Greenhouse — grow flowers and pick bouquets 💐',
+    lines: [{ text: 'Flowers & Greenhouse', size: 92, weight: '700' }, { text: 'plant · water · pick 🌷', size: 60 }] },
+  { room: 'haunted', x: 5.6, side: -1, color: '#2a2238', glass: '#ffb03a', bg: '#1d1830', label: 'The Haunted Library — floating books, candles, and pumpkins to find 🎃',
+    lines: [{ text: 'Haunted Library', size: 100, weight: '700', color: '#ffb03a' }, { text: 'if you dare… 🎃👻', size: 60, color: '#e8e0ff' }] },
+  { room: 'onsen', x: -5.0, side: 1, color: '#8a3a2e', glass: '#fff1e0', bg: '#f4ecd8', label: 'Up the stairs to the Onsen Garden — open-air hot springs under the sky ♨️',
+    lines: [{ text: '⬆ 温泉 Onsen', size: 104, weight: '700' }, { text: 'hot springs · lanterns ♨️', size: 58 }] },
+  { room: 'petcafe', x: -0.8, side: 1, color: '#e2a04a', glass: '#fff6e6', bg: '#fffaf0', label: 'The Pet Café — cats and bunnies to stroke, feed and name 🐱🐰',
+    lines: [{ text: 'Pet Café', size: 110, weight: '700' }, { text: 'cats · bunnies 🐾', size: 62 }] },
+  { room: 'party', x: 3.4, side: 1, color: '#c94a8a', glass: '#ffe0f0', bg: '#fff0f8', label: 'The Party Hall — book it for birthdays and celebrations 🎉',
+    lines: [{ text: 'Party Hall', size: 110, weight: '700', color: '#c94a8a' }, { text: 'cake · confetti · dancing 🎉', size: 56 }] },
 ];
 
 export const buildLanding = args => makeLanding({
@@ -66,6 +85,12 @@ export const buildLanding3 = args => makeLanding({
   ...args, doors: LANDING3_DOORS, prefix: 'landing3', runner: ['#2f6b8a', '#9fd0e0'], lowColor: '#2f6b8a',
   down: { to: 'landing', label: 'Down the stairs to the second floor', sign: 'the second floor' },
   title: [{ text: 'The third floor', size: 110, weight: '700' }, { text: 'sing · solve · swim · stargaze ✨', font: 'Dancing Script, cursive', size: 70, color: '#2f6b8a' }],
+});
+
+export const buildLanding4 = args => makeLanding({
+  ...args, doors: LANDING4_DOORS, prefix: 'landing4', runner: ['#b0607a', '#f2c6d0'], lowColor: '#b0607a',
+  down: { to: 'landing3', label: 'Down the stairs to the third floor', sign: 'the third floor' },
+  title: [{ text: 'The fourth floor', size: 110, weight: '700' }, { text: 'write · make · grow · soak · play 🌸', font: 'Dancing Script, cursive', size: 66, color: '#b0607a' }],
 });
 
 function makeLanding({ floor, makeSign, doors, down, title, prefix, runner: RUN = ['#7c5aa0', '#c9b2e0'], lowColor = '#c4627f' }) {

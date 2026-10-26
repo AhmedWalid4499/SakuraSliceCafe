@@ -78,8 +78,9 @@ export function buildPool({ floor, makeSign, animate }) {
   // the places to be in the water: swimming (your legs and arms go), and the ring
   const swim = [];
   for (let i = 0; i < 8; i++) {
-    const x = BASIN.minX + 1.0 + (i % 4) * 2.8, z = i < 4 ? BASIN.minZ + 1.2 : BASIN.maxZ - 1.2;
-    const s = { id: `pool-swim-${i}`, label: 'the pool', x, z, y: fy - 1.05, h: 0, ry: i % 2 ? Math.PI / 2 : -Math.PI / 2, run: true };
+    // (each swimmer does lengths of a lane, ±0.9 m either side of their spot — avatar.js)
+    const x = BASIN.minX + 1.8 + (i % 4) * 2.8, z = i < 4 ? BASIN.minZ + 1.0 : BASIN.maxZ - 1.0;
+    const s = { id: `pool-swim-${i}`, label: 'the pool', x, z, y: fy - 1.05, h: 0, ry: i % 2 ? Math.PI / 2 : -Math.PI / 2, swim: true };
     seats.push(s); swim.push(s);
   }
   const ring = new THREE.Group();
