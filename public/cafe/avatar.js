@@ -350,6 +350,7 @@ function buildAvatarParts(avatar, extra) {
   const pawM = isFox ? mat('#3b2722', { roughness: 0.95 }) : skinM; // foxes wear dark "socks"
   const parts = {};
   const blinkers = [];
+  const face = { smile: null, mouth: null, blush: [] }; // what the expressions move
 
   const HIP = 0.56, TORSO = 0.5, SHOULDER = 0.92, HEAD = furry ? 1.39 : 1.43;
 
@@ -702,6 +703,7 @@ function buildAvatarParts(avatar, extra) {
     blush.position.set((eyeX + (person ? 0.05 : 0.065)) * side, eyeY - (person ? 0.06 : 0.07), eyeZ - (person ? 0.02 : 0.035));
     blush.lookAt(blush.position.clone().multiplyScalar(3));
     head.add(blush);
+    face.blush.push(blush.material);
   }
   // a small smile
   if (!isOwl) {
@@ -711,6 +713,13 @@ function buildAvatarParts(avatar, extra) {
     smile.position.set(0, isFox ? -0.115 : isRabbit ? -0.105 : -0.095, mz);
     smile.rotation.x = isFox ? -0.25 : -0.15;
     head.add(smile);
+    // …and an open mouth for laughing, singing or a little "oh!" (hidden till then)
+    const mouth = sphere(person ? 0.026 : 0.022, null, mat('#6a2a32', { roughness: 0.6 }));
+    mouth.scale.set(1, 0.7, 0.35);
+    mouth.position.set(smile.position.x, smile.position.y - 0.006, mz - 0.004);
+    mouth.visible = false;
+    head.add(mouth);
+    Object.assign(face, { smile, mouth });
   }
 
   // ears
@@ -998,7 +1007,7 @@ function buildAvatarParts(avatar, extra) {
   }
 
   root.scale.setScalar(extra.scale || 1);
-  bundle(root, new Set([torso]));
+  bundle(root, new Set([torso, face.smile, face.mouth].filter(Boolean)));
 
   // ── a drink in the right hand
   let cup = null, cupColor = null;
@@ -1036,7 +1045,16 @@ function buildAvatarParts(avatar, extra) {
   let nextBlink = 1 + Math.random() * 3;
   // a sip or a bite: the hand comes up to the mouth and back (about a second)
   let gesture = null, gestureT = 0;
-  function play(kind) { if (!isOwl) { gesture = kind; gestureT = 0; } }
+  // Gestures: a sip or a bite, and the social ones — dance, jump, clap, cheer,
+  // laugh, hug, high five, bow, a surprised "oh!", love, a think — and the
+  // little things people do when they're idle (stretch, look around, nod).
+  const GESTURES = { sip: 1.1, bite: 1.1, dance: 4.2, jump: 0.9, clap: 1.8, cheer: 1.8, laugh: 1.9, hug: 2.2, highfive: 1.3, bow: 1.6, surprise: 1.3, love: 2.0, think: 2.6, stretch: 2.2, lookaround: 2.8, nod: 1.0 };
+  function play(kind) {
+    if (!GESTURES[kind] || (isOwl && (kind === 'sip' || kind === 'bite'))) return;
+    gesture = kind; gestureT = 0; idleFor = 0;
+  }
+  let idleFor = 0, nextFidget = 9 + Math.random() * 12, headYaw = 0;
+  const lookTmp = new THREE.Vector3();
   let sitDrop = 0.13;
 
   // Asleep: little Zzz drift up from the head, one after another, and fade.
@@ -1082,7 +1100,7 @@ function buildAvatarParts(avatar, extra) {
   // sitH: how high the seat's cushion is, so you sit on it rather than in it
   // asleep: eyes closed, very still. typing: hands forward on a keyboard.
   let swimBlend = 0, swimT = Math.random() * 20, heading = 0;
-  function update(dt, { moving = false, sitting = false, sitH = 0.54, waving = 0, asleep = false, typing = false, swimming = false } = {}) {
+  function update(dt, { moving = false, sitting = false, sitH = 0.54, waving = 0, asleep = false, typing = false, swimming = false, look = null, fidget = true } = {}) {
     t += dt;
     swimBlend += ((swimming ? 1 : 0) - swimBlend) * Math.min(1, dt * 4);
     if (swimming) { swimT += dt; sitting = false; moving = false; }
@@ -1093,8 +1111,23 @@ function buildAvatarParts(avatar, extra) {
 
     const breathe = asleep ? Math.sin(t * 0.9) * 0.018 : Math.sin(t * 1.6) * 0.012;
     rig.position.y = breathe + (moving ? Math.abs(Math.sin(walkPhase)) * 0.04 : 0) - sitBlend * sitDrop;
-    head.rotation.y = moving || asleep || typing ? 0 : Math.sin(t * 0.35) * 0.25;
+    // turn to look at someone close by (or just look about a little)
+    let wantYaw = moving || asleep || typing ? 0 : Math.sin(t * 0.35) * 0.25;
+    if (look && !asleep && !typing) {
+      root.getWorldPosition(lookTmp);
+      const a = Math.atan2(look.x - lookTmp.x, look.z - lookTmp.z) - root.rotation.y;
+      const d = Math.atan2(Math.sin(a), Math.cos(a));
+      if (Math.abs(d) < 1.9) wantYaw = Math.max(-1.0, Math.min(1.0, d));
+    }
+    headYaw += (wantYaw - headYaw) * Math.min(1, dt * 5);
+    head.rotation.y = headYaw;
     head.rotation.z = asleep ? 0 : Math.sin(t * 0.5) * 0.04;
+    // standing about: a gentle shift of weight, and now and then a stretch or a look round
+    if (!moving && !sitting && !asleep && !swimming) {
+      if (!gesture) rig.rotation.z = Math.sin(t * 0.7) * 0.018;
+      idleFor += dt;
+      if (fidget && !gesture && idleFor > nextFidget && !isOwl) { play(Math.random() < 0.45 ? 'lookaround' : Math.random() < 0.5 ? 'stretch' : 'nod'); nextFidget = 14 + Math.random() * 18; }
+    } else { idleFor = 0; if (!gesture) rig.rotation.z *= 0.9; }
     if (!gesture) head.rotation.x = typing ? 0.22 : 0; // looking down at the screen
 
     // blink every few seconds (Me3temed blinks slowly, on purpose)
@@ -1102,7 +1135,7 @@ function buildAvatarParts(avatar, extra) {
     const blinkLen = isOwl ? 0.45 : 0.14;
     const closed = nextBlink < 0 && nextBlink > -blinkLen;
     const lid = asleep ? 0.07 : closed ? Math.max(0.08, Math.abs(Math.cos((-nextBlink / blinkLen) * Math.PI))) : 1;
-    for (const e of blinkers) e.scale.y = lid;
+    for (const e of blinkers) { e.scale.y = lid; e.scale.x = 1; }
     if (nextBlink < -blinkLen) nextBlink = 2 + Math.random() * 4;
     updateZzz(dt, asleep);
 
@@ -1128,19 +1161,100 @@ function buildAvatarParts(avatar, extra) {
         } else parts.armL.rotation.z = 0;
       }
     }
+    if (face.mouth) { face.mouth.visible = false; face.smile.visible = true; }
+    for (const m of face.blush) m.opacity = furry ? 0.18 : 0.38;
     if (gesture) {
-      gestureT += dt / 1.1;
-      const k = Math.sin(Math.min(1, gestureT) * Math.PI); // up, then down
-      if (gesture === 'sip' && parts.armR) {
-        parts.armR.rotation.x = parts.armR.rotation.x * (1 - k) - 2.25 * k;
-        parts.armR.rotation.z = -0.09 + 0.45 * k;
+      gestureT += dt / GESTURES[gesture];
+      const p = Math.min(1, gestureT), k = Math.sin(p * Math.PI); // up, then down
+      const hold = Math.min(1, p * 6, (1 - p) * 6);              // in quickly, hold, out quickly
+      const g = gesture, L = parts.armL, Rr = parts.armR, gt = gestureT * GESTURES[g];
+      const mouth = (open, round = false) => { if (!face.mouth || !open) return; face.mouth.visible = true; face.smile.visible = false; face.mouth.scale.set(round ? 0.6 : 1, (round ? 0.9 : 0.75) * open, 0.35); };
+      if (g === 'sip' && Rr) {
+        Rr.rotation.x = Rr.rotation.x * (1 - k) - 2.25 * k;
+        Rr.rotation.z = -0.09 + 0.45 * k;
         if (cup) cup.rotation.x = 0.9 * k;
-      } else if (gesture === 'bite' && parts.armL) {
-        parts.armL.rotation.x = parts.armL.rotation.x * (1 - k) - 1.75 * k;
-        parts.armL.rotation.z = -0.45 * k;
+        head.rotation.x = 0.12 * k;
+      } else if (g === 'bite' && L) {
+        L.rotation.x = L.rotation.x * (1 - k) - 1.75 * k;
+        L.rotation.z = -0.45 * k;
+        head.rotation.x = 0.12 * k;
+      } else if (isOwl) {
+        // an owl flaps and hops for anything happy
+        const flap = Math.sin(gt * 16) * 0.6 * hold;
+        L.rotation.z = -0.1 - flap; Rr.rotation.z = 0.1 + flap;
+        rig.position.y += Math.abs(Math.sin(gt * 7)) * 0.08 * hold;
+      } else if (g === 'dance') {
+        const ph = gt * 7.5;
+        Rr.rotation.x = -0.3 * hold; L.rotation.x = -0.3 * hold;
+        Rr.rotation.z = (1.3 + Math.sin(ph) * 1.1) * hold;
+        L.rotation.z = -(1.3 + Math.sin(ph + Math.PI) * 1.1) * hold;
+        rig.position.y += Math.abs(Math.sin(ph)) * 0.07 * hold;
+        rig.rotation.z = Math.sin(ph) * 0.12 * hold;
+        rig.rotation.y = Math.sin(ph / 2) * 0.35 * hold;
+        if (!sitting && parts.legL) { parts.legL.rotation.x = Math.sin(ph) * 0.35 * hold; parts.legR.rotation.x = -Math.sin(ph) * 0.35 * hold; }
+        head.rotation.z = Math.sin(ph + 0.6) * 0.16 * hold;
+        mouth(Math.sin(ph * 0.5) > 0.3 ? 0.8 : 0);
+      } else if (g === 'jump') {
+        rig.position.y += Math.sin(p * Math.PI) * 0.38;
+        Rr.rotation.z = 2.3 * k; L.rotation.z = -2.3 * k;
+        if (parts.legL) { parts.legL.rotation.x = -0.6 * k; parts.legR.rotation.x = -0.6 * k; }
+        mouth(k);
+      } else if (g === 'clap') {
+        const c = 0.32 + Math.sin(gt * 22) * 0.18;
+        L.rotation.x = -1.25 * hold; Rr.rotation.x = -1.25 * hold;
+        L.rotation.z = c * hold; Rr.rotation.z = -c * hold;
+        head.rotation.x = -0.08 * hold;
+      } else if (g === 'cheer') {
+        Rr.rotation.z = (2.7 + Math.sin(gt * 12) * 0.15) * hold; L.rotation.z = -(2.7 + Math.sin(gt * 12 + 1) * 0.15) * hold;
+        Rr.rotation.x = 0; L.rotation.x = 0;
+        if (!sitting) rig.position.y += Math.abs(Math.sin(gt * 9)) * 0.08 * hold;
+        head.rotation.x = -0.18 * hold;
+        mouth(hold);
+      } else if (g === 'laugh') {
+        head.rotation.x = (-0.28 + Math.sin(gt * 24) * 0.05) * hold;
+        rig.position.y += Math.abs(Math.sin(gt * 18)) * 0.02 * hold;
+        L.rotation.x = -0.65 * hold; Rr.rotation.x = -0.65 * hold; L.rotation.z = 0.3 * hold; Rr.rotation.z = -0.3 * hold;
+        mouth(0.75 + Math.abs(Math.sin(gt * 18)) * 0.35);
+        for (const m of face.blush) m.opacity = 0.38 + 0.25 * hold;
+      } else if (g === 'hug') {
+        L.rotation.x = -1.35 * hold; Rr.rotation.x = -1.35 * hold;
+        L.rotation.z = 0.7 * hold; Rr.rotation.z = -0.7 * hold;
+        head.rotation.z = 0.2 * hold;
+        for (const m of face.blush) m.opacity = 0.38 + 0.25 * hold;
+      } else if (g === 'highfive') {
+        Rr.rotation.x = -2.5 * k; Rr.rotation.z = 0.25 * k;
+        if (!sitting) rig.position.y += Math.max(0, Math.sin(p * Math.PI * 2)) * 0.05;
+        mouth(p > 0.4 && p < 0.8 ? 0.8 : 0);
+      } else if (g === 'bow') {
+        if (!sitting) rig.rotation.x = 0.5 * hold;
+        head.rotation.x = 0.25 * hold;
+        L.rotation.x = -0.2 * hold; Rr.rotation.x = -0.2 * hold;
+      } else if (g === 'surprise') {
+        L.rotation.z = -1.1 * hold; Rr.rotation.z = 1.1 * hold;
+        if (!sitting) rig.position.y += Math.max(0, Math.sin(p * Math.PI * 3)) * 0.06 * (1 - p);
+        head.rotation.x = -0.12 * hold;
+        mouth(hold, true);
+        for (const e of blinkers) e.scale.set(1 + 0.22 * hold, (e.scale.y || 1) * (1 + 0.22 * hold), 1);
+      } else if (g === 'love') {
+        L.rotation.x = -1.15 * hold; Rr.rotation.x = -1.15 * hold; L.rotation.z = 0.55 * hold; Rr.rotation.z = -0.55 * hold;
+        head.rotation.z = Math.sin(gt * 3) * 0.14 * hold;
+        for (const m of face.blush) m.opacity = 0.38 + 0.35 * hold;
+      } else if (g === 'think') {
+        Rr.rotation.x = -1.95 * hold; Rr.rotation.z = -0.5 * hold;
+        L.rotation.x = -0.6 * hold; L.rotation.z = 0.45 * hold;
+        head.rotation.z = 0.18 * hold; head.rotation.x = -0.12 * hold;
+        head.rotation.y = headYaw + 0.25 * hold;
+      } else if (g === 'stretch') {
+        Rr.rotation.z = 2.85 * k; L.rotation.z = -2.85 * k;
+        rig.position.y += 0.03 * k;
+        head.rotation.x = -0.2 * k;
+        mouth(p > 0.3 && p < 0.7 ? 0.9 : 0, true); // a little yawn
+      } else if (g === 'lookaround') {
+        head.rotation.y = headYaw + Math.sin(p * Math.PI * 2) * 0.85;
+      } else if (g === 'nod') {
+        head.rotation.x = Math.max(0, Math.sin(p * Math.PI * 4)) * 0.22;
       }
-      head.rotation.x = 0.12 * k;
-      if (gestureT >= 1) { gesture = null; head.rotation.x = 0; if (cup) cup.rotation.x = 0; }
+      if (gestureT >= 1) { gesture = null; head.rotation.x = 0; if (cup) cup.rotation.x = 0; if (!swimBlend) rig.rotation.set(0, 0, 0); }
     }
     if (plate) plate.rotation.x = -parts.armL.rotation.x; // keep the plate level
     if (parts.tail) {
@@ -1175,7 +1289,7 @@ function buildAvatarParts(avatar, extra) {
       }
       head.rotation.x = head.rotation.x * (1 - sb) - 1.0 * sb;
       head.rotation.y = head.rotation.y * (1 - sb) + Math.sin(stroke / 2) * 0.45 * sb;
-    } else if (rig.rotation.x || rig.rotation.y || rig.position.x || rig.position.z) {
+    } else if (!gesture && (rig.rotation.x || rig.rotation.y || rig.position.x || rig.position.z)) {
       rig.rotation.x = rig.rotation.y = 0; rig.position.x = rig.position.z = 0;
     }
   }

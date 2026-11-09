@@ -150,6 +150,16 @@
   }
   .icon:hover { background: var(--glass-strong); }
 
+  #storyCard { left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 62px); transform: translateX(-50%); width: min(430px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 18px; z-index: 30; }
+  #storyCard b.who { color: var(--sakura-dark); }
+  #storyButtons .btn { font-size: 13px; padding: 7px 12px; }
+  .stickers { display: flex; flex-wrap: wrap; gap: 8px; font-size: 28px; margin: 6px 0 10px; }
+  .stickers span { opacity: .25; filter: grayscale(1); }
+  .stickers span.got { opacity: 1; filter: none; }
+  #emoteBar { z-index: 25; left: 50%; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 64px); transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 8px; border-radius: 22px; max-width: min(560px, calc(100vw - 32px)); }
+  #emoteBar button { border: 0; background: transparent; border-radius: 14px; padding: 6px 9px; font-size: 12.5px; font-weight: 700; color: var(--text-dark); display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 54px; }
+  #emoteBar button span { font-size: 22px; line-height: 1; }
+  #emoteBar button:hover { background: var(--sakura-light); }
   #actions { left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; padding: 8px; border-radius: 999px; }
   #actions button { border: 0; background: transparent; border-radius: 999px; padding: 10px 15px; font-weight: 700; font-size: 13.5px; color: var(--text-dark); white-space: nowrap; }
   #actions button:hover, #actions button.on { background: var(--sakura-light); color: var(--sakura-dark); }
@@ -567,6 +577,13 @@
   </div>
 </div>
 
+<div id="emoteBar" class="hud card hidden" role="menu" aria-label="Do something"></div>
+<div id="storyCard" class="hud card hidden" aria-live="polite">
+  <div class="row" style="justify-content:space-between;align-items:center;gap:8px"><p class="eyebrow" id="storyTitle" style="margin:0"></p><button class="x" id="storyStop" type="button" aria-label="Stop the story" title="Stop the story" style="position:static">✕</button></div>
+  <p id="storyText" style="margin:6px 0 0;white-space:pre-wrap;font-size:14.5px;line-height:1.5"></p>
+  <p class="fine" id="storyHint" style="margin:6px 0 0"></p>
+  <div id="storyButtons" class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+</div>
 <div id="actions" class="hud card hidden">
   <button id="noteAct" title="Leave a note"><span>📌</span> <span class="t">Leave a note</span></button>
   <button id="orderAct" title="Order a drink or a dessert"><span>☕</span> <span class="t">Order</span></button>
@@ -883,6 +900,7 @@
     <input type="text" id="talkInput" maxlength="600" placeholder="Say something…" autocomplete="off">
     <button class="btn" type="submit" id="talkSend">Send</button>
   </form>
+  <button class="btn ghost hidden" id="talkStory" type="button" style="margin-top:8px">📖 Go on a little story with Yuto</button>
   <p class="fine" id="talkFine">They remember what you like, across visits. Be kind — they are.</p>
 </div>
 
@@ -1411,6 +1429,15 @@
   <form id="petNameForm" class="hidden"><p class="fine">Nobody has named them yet — you can!</p><div class="row" style="gap:6px"><input id="petNameIn" maxlength="20" placeholder="A name" style="flex:1"><button class="btn small" type="submit">Name them</button></div></form>
   <div class="row" style="gap:6px;margin-top:8px"><button class="btn" id="petStroke" type="button">🤚 Stroke</button><button class="btn" id="petFeed" type="button">🍽️ Give a treat</button></div>
   <div class="error" id="petErr"></div>
+</div>
+
+<div id="storyPickPanel" class="panel card hidden">
+  <button class="x" data-close aria-label="Close">✕</button>
+  <p class="eyebrow">Little stories with Yuto 📖</p>
+  <h3>Where shall we go?</h3>
+  <p class="fine">Yuto walks with you, talks as you go, and asks you things. Each story ends with a sticker.</p>
+  <div class="stickers" id="storyStickers"></div>
+  <div id="storyList" class="menu-list"></div>
 </div>
 
 <div id="partyPanel" class="panel card hidden">

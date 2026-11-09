@@ -10,7 +10,21 @@ import * as THREE from 'three';
 const CELL = 0.2;
 const R = 0.3; // how much room a person needs
 
-export function createStaff(world, { say } = {}) {
+// Greetings when you come close (they look up and turn to you), and how they
+// answer what you do: wave back, dance along, clap, laugh with you.
+const HELLO = {
+  yuto: ['Ahlan, {n}! Good to see you 🌸', 'Got a minute, {n}? I’ve a little story for us — talk to me 📖', 'Hey {n} — fancy an adventure? Ask me for a story 📖', 'Welcome back, {n}.', '{n}! Sit wherever you like.', 'Oh — hi, {n}! How’s your day going?', 'There you are, {n} 😊'],
+  hana: ['Hi {n}! The usual? ☕', 'Ahlan ya {n}!', 'Hey {n} — I’ve got a fresh pot on.', '{n}! You look like you need a hojicha.'],
+  yuki: ['Hi {n}! The cakes are still warm 🍰', '{n}! Taste this — no, wait, it’s hot.', 'Hello hello, {n}! 🌸', 'Oh! {n}! Hi!'],
+};
+const ANSWER = { wave: 'wave', dance: 'dance', jump: 'cheer', clap: 'clap', cheer: 'clap', laugh: 'laugh', hug: 'love', love: 'love', highfive: 'cheer', bow: 'bow', surprise: 'surprise', think: 'think' };
+const ANSWER_LINE = {
+  dance: ['Yalla, dance! 💃', 'Okay okay, I’m in! 🎶', 'Look at those moves!'], cheer: ['Yaaay! 🎉', 'Woo!'], clap: ['Bravo! 👏', 'Encore!'],
+  laugh: ['Hahaha 😂', 'Stop it, I’m working! 😂'], love: ['Aww 💗', 'You’re sweet 💗'], bow: ['(bows back) 🙇', 'Douzo yoroshiku 🙇'],
+  surprise: ['Oh! What? 😮'], think: ['Hmm… 🤔'], wave: ['👋', 'Hiii 👋', 'Hello! 👋'],
+};
+
+export function createStaff(world, { say, player = () => null } = {}) {
   const main = world.floors.main;
   const rects = world.walk;
   const minX = Math.min(...rects.map(r => r.minX)), maxX = Math.max(...rects.map(r => r.maxX));
@@ -128,6 +142,7 @@ export function createStaff(world, { say } = {}) {
       n, g, id: n.id, home: { x: g.position.x, y: g.position.y, z: g.position.z, ry: g.rotation.y },
       path: [], wait: 1 + Math.random() * 4, face: null, task: null, onArrive: null, moving: false,
       flight: null, perch: null, speed: n.id === 'yuto' ? 1.1 : 1.35,
+      helloAt: -1e9, waveT: 0,
     };
     n.controlled = true;
     team.set(n.id, s);
@@ -278,7 +293,37 @@ export function createStaff(world, { say } = {}) {
           else nextIdle(s);
         }
       }
-      s.n.av.update(dt, { moving });
+      // someone you know is close: look at them, and say hello now and then
+      const you = player();
+      let look = null;
+      if (you && !s.flight) {
+        const d = Math.hypot(you.pos.x - g.position.x, you.pos.z - g.position.z);
+        if (d < 3.6) {
+          look = you.pos;
+          if (!moving && !s.task && d < 2.6 && performance.now() - s.helloAt > 120e3 && performance.now() - lastHello > 25e3 && HELLO[s.id]) {
+            s.helloAt = lastHello = performance.now();
+            s.waveT = 1.8;
+            if (say) say(s.n, pick(HELLO[s.id]).replace('{n}', you.name || 'friend'));
+          }
+        }
+      }
+      if (s.waveT > 0) s.waveT -= dt;
+      s.n.av.update(dt, { moving, look, waving: s.waveT > 0 ? 1 : 0 });
+    }
+  }
+  let lastHello = -1e9;
+
+  // someone did something near the team: they answer it (wave back, dance along…)
+  function react(kind, at, who) {
+    const k = ANSWER[kind];
+    if (!k) return;
+    for (const s of team.values()) {
+      if (s.id === 'me3temed') { if (Math.hypot(at.x - s.g.position.x, at.z - s.g.position.z) < 6) { s.n.av.play('cheer'); } continue; }
+      if (s.task || Math.hypot(at.x - s.g.position.x, at.z - s.g.position.z) > 5) continue;
+      setTimeout(() => {
+        if (k === 'wave') s.waveT = 1.6; else s.n.av.play(k);
+        if (say && Math.random() < 0.6) say(s.n, pick(ANSWER_LINE[k] || ANSWER_LINE.wave).replace('{n}', who || ''));
+      }, 300 + Math.random() * 700);
     }
   }
 
@@ -291,7 +336,7 @@ export function createStaff(world, { say } = {}) {
   }
 
   return {
-    update, deliver, clear, findPath, attend,
+    update, deliver, clear, findPath, attend, react,
     busy: id => !!(team.get(id) && team.get(id).task),
     positions: () => [...team.values()].filter(s => s.id !== 'me3temed').map(s => s.g.position),
     grid: { staffFree, guestFree, nx, nz, minX, minZ, CELL },
