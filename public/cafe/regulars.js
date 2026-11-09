@@ -48,7 +48,10 @@ const NAMES = {
   he: ['Omar', 'Karim', 'Youssef', 'Ziad', 'Adam', 'Ren', 'Haruto', 'Ali', 'Hassan', 'Mostafa', 'Kenji', 'Sam', 'Tarek', 'Kai'],
 };
 
-export function createRegulars({ world, staff, sound, menu, pastries = () => [], takenBy, say, callOut = () => {}, now = () => Date.now(), hour }) {
+const HI = ['hi 🌸', 'hello!', '👋', 'ahlan!', 'hey 😊', 'good to see you'];
+const ANSWER = { wave: 'wave', dance: 'clap', jump: 'clap', clap: 'clap', cheer: 'cheer', laugh: 'laugh', hug: 'love', love: 'love', highfive: 'cheer', bow: 'nod', surprise: 'surprise' };
+
+export function createRegulars({ world, staff, sound, menu, pastries = () => [], takenBy, say, callOut = () => {}, now = () => Date.now(), hour, player = () => null }) {
   const main = world.floors.main;
   const group = new THREE.Group();
   main.group.add(group);
@@ -398,12 +401,38 @@ export function createRegulars({ world, staff, sound, menu, pastries = () => [],
       }
       g.av.group.position.copy(g.pos);
       g.av.group.rotation.y = g.ry;
-      g.av.update(dt, { moving, sitting: g.phase === 'seated', sitH: g.seat ? g.seat.h : 0.54 });
+      // they notice you: look up as you pass, sometimes a little wave and a hello;
+      // and on their own, a laugh at something on the phone, a nod at the book
+      const you = player();
+      let look = null;
+      if (you && g.phase !== 'leaving') {
+        const d = Math.hypot(you.pos.x - g.pos.x, you.pos.z - g.pos.z);
+        if (d < 3) {
+          look = you.pos;
+          if (d < 2 && !g.saidHi && Math.random() < dt * 0.6) { g.saidHi = true; if (Math.random() < 0.55) { g.waveT = 1.5; say(g.av.group, pick(Math.random, HI)); } }
+        }
+      }
+      if (g.phase === 'seated') {
+        g.fidgetIn = (g.fidgetIn ?? 15 + Math.random() * 40) - dt;
+        if (g.fidgetIn <= 0) { g.fidgetIn = 25 + Math.random() * 50; g.av.play(g.v.thing === 'phone' ? 'laugh' : pick(Math.random, ['nod', 'think', 'stretch', 'nod'])); }
+      }
+      if (g.waveT > 0) g.waveT -= dt;
+      g.av.update(dt, { moving, sitting: g.phase === 'seated', sitH: g.seat ? g.seat.h : 0.54, look, waving: g.waveT > 0 ? 1 : 0 });
+    }
+  }
+
+  // something happened near them (you danced, waved…): those close by answer it
+  function react(kind, at) {
+    const k = ANSWER[kind];
+    if (!k) return;
+    for (const g of live.values()) {
+      if (g.phase === 'leaving' || Math.hypot(at.x - g.pos.x, at.z - g.pos.z) > 4.5 || Math.random() < 0.3) continue;
+      setTimeout(() => { if (k === 'wave') g.waveT = 1.5; else g.av.play(k); }, 300 + Math.random() * 900);
     }
   }
 
   return {
-    update,
+    update, react,
     setCap(n) { cap = Math.max(0, n); },
     seatTaken: seat => [...live.values()].some(g => g.seat && g.seat.id === seat.id && g.phase !== 'leaving'),
     positions: () => [...live.values()].map(g => g.pos),

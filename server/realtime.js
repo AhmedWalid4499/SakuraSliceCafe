@@ -8,6 +8,9 @@
 // broadcasts only reach people in the same room.
 
 const { WebSocketServer } = require('ws');
+// what someone can do for everyone in the room to see (avatar.js plays them)
+const ACTIONS = ['wave', 'dance', 'jump', 'clap', 'cheer', 'laugh', 'hug', 'highfive', 'bow', 'surprise', 'love', 'think'];
+const EMOJI_RE = /^[\p{Extended_Pictographic}\u200d\ufe0f\u{1F3FB}-\u{1F3FF}]{1,8}$/u;
 const { userFromCookieHeader, publicUser } = require('./auth');
 const { clamp } = require('./util');
 
@@ -239,8 +242,10 @@ function attach(server, opts = {}) {
         entry.state = cleanState(m);
         broadcast({ t: 'move', id: entry.user.id, state: entry.state }, ws, entry.room);
       } else if (m.t === 'wave' || m.t === 'emote') {
-        const e = ['wave', '🌸', '☕', '💗', '✨', '😴', '🌱', '💧', '🌿', '🧺'].includes(m.e) ? m.e : 'wave';
-        broadcast({ t: 'emote', id: entry.user.id, e }, ws, entry.room);
+        // a move (dance, hug…) or a little emoji — at someone, for a hug or a high five
+        const e = ACTIONS.includes(m.e) || EMOJI_RE.test(String(m.e || '')) ? m.e : 'wave';
+        const to = Number.isInteger(m.to) && m.to > 0 ? m.to : undefined;
+        broadcast({ t: 'emote', id: entry.user.id, e, to }, ws, entry.room);
       }
     });
 

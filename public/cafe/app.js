@@ -31,6 +31,7 @@ import { BB_BOOKS, coverDataURL } from './bookbeans.js';
 import { GLAZES, PATTERNS, drawCupProfile } from './pottery.js';
 import { FLOWERS } from './greenhouse.js';
 import { PETS } from './petcafe.js';
+import { createStories } from './stories.js';
 
 // The rooms everyone shares on the second floor (off its landing) and the
 // cinema on the roof — each built by its own module into world.rooms[name].
@@ -210,7 +211,7 @@ await Promise.all([
 const world = buildWorld(renderer);
 makePost();
 // the team walks about, and brings orders to your table (see staff.js)
-const staff = createStaff(world, { say: (n, line) => bubble(n.av.group, line, 'npc') });
+const staff = createStaff(world, { say: (n, line) => bubble(n.av.group, line, 'npc'), player: () => (world.floor === 'main' && player.av ? { pos: player.pos, name: state.me && state.me.displayName } : null) });
 world.onThunder = () => sound.thunder();
 const scene = world.scene;
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -837,7 +838,7 @@ function updatePlayer(dt) {
   const lying = !!player.seat?.lie;
   player.av.group.rotation.order = 'YXZ';
   player.av.group.rotation.x = lying ? -Math.PI / 2 : 0;
-  player.av.update(dt, { moving: moving || !!player.seat?.run, sitting: !!player.seat && !lying && !player.seat.run && !player.seat.swim, sitH: player.seat?.h ?? 0.54, waving: player.waving, asleep: lying, typing: !!player.seat?.work, swimming: !!player.seat?.swim });
+  player.av.update(dt, { look: moving ? null : lookFor(player.pos, null), moving: moving || !!player.seat?.run, sitting: !!player.seat && !lying && !player.seat.run && !player.seat.swim, sitH: player.seat?.h ?? 0.54, waving: player.waving, asleep: lying, typing: !!player.seat?.work, swimming: !!player.seat?.swim });
   if (moving) sendMove();
 }
 
@@ -947,6 +948,17 @@ function setPersonDrink(p) {
   if (pl) p.placedMesh = drinkMesh(pl, false, p.displayName);
 }
 
+// who someone standing or sitting about would look at: the nearest person
+// within a few steps (another guest, you, or one of the team)
+function lookFor(pos, self) {
+  let best = null, bd = 3.2;
+  const consider = q => { if (!q) return; const d = Math.hypot(q.x - pos.x, q.z - pos.z); if (d > 0.3 && d < bd) { bd = d; best = q; } };
+  if (self) consider(player.pos);
+  for (const p of state.people.values()) if (p !== self) consider(p.pos);
+  if (world.floor === 'main') for (const q of staff.positions()) consider(q);
+  return best;
+}
+
 function updatePeople(dt) {
   for (const p of state.people.values()) {
     const s = p.state;
@@ -966,7 +978,7 @@ function updatePeople(dt) {
     p.av.group.rotation.order = 'YXZ';
     p.av.group.rotation.x = seat?.lie ? -Math.PI / 2 : 0;
     if (p.waving > 0) p.waving -= dt;
-    p.av.update(dt, { moving: moving || !!seat?.run, sitting: !!seat && !seat.lie && !seat.run && !seat.swim, sitH: seat?.h ?? 0.54, waving: p.waving || 0, asleep: !!seat?.lie, typing: !!seat?.work, swimming: !!seat?.swim });
+    p.av.update(dt, { look: moving ? null : lookFor(p.pos, p), moving: moving || !!seat?.run, sitting: !!seat && !seat.lie && !seat.run && !seat.swim, sitH: seat?.h ?? 0.54, waving: p.waving || 0, asleep: !!seat?.lie, typing: !!seat?.work, swimming: !!seat?.swim });
   }
 }
 
@@ -1152,7 +1164,16 @@ function handle(m) {
       const p = state.people.get(m.id);
       if (!p) break;
       if (m.e === 'wave') { p.waving = 2; bubble(p.av.group, '👋', 'emote'); }
-      else bubble(p.av.group, m.e, 'emote');
+      else if (MOVE_EMOJI[m.e]) {
+        p.av.play(m.e); bubble(p.av.group, MOVE_EMOJI[m.e], 'emote');
+        // a hug or a high five, at you: you do it back
+        if (m.to && state.me && m.to === state.me.id && player.av) {
+          player.ry = Math.atan2(p.pos.x - player.pos.x, p.pos.z - player.pos.z); sendMove(true);
+          setTimeout(() => player.av && player.av.play(m.e), 250);
+          toast(m.e === 'hug' ? `🤗 ${p.displayName} gives you a big hug!` : `✋ ${p.displayName} high-fives you!`);
+        }
+        if (world.floor === 'main') { staff.react(m.e, p.pos, p.displayName); regulars.react(m.e, p.pos); }
+      } else bubble(p.av.group, m.e, 'emote');
       break;
     }
     case 'chat':
@@ -1833,6 +1854,7 @@ function click(x, y) {
   const h = pickInteractive(x, y);
   if (!h) return;
   const d = h.object.userData;
+  stories.onThing(d.kind);
   if (d.kind === 'note') return openNote(d.note.id);
   if (d.kind === 'seat') return goSit(d.seat);
   if (d.kind === 'cup') {
@@ -2050,7 +2072,7 @@ window.addEventListener('blur', () => keys.clear());
 
 // ───────────────────────────────────────── panels & toasts
 
-const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel', 'recPanel', 'teaPanel', 'storyPanel', 'postPanel', 'partnerPanel', 'escapePanel', 'scopePanel', 'storiesPanel', 'sprintPanel', 'bbPanel', 'potteryPanel', 'flowerPanel', 'handPanel', 'petPanel', 'partyPanel'];
+const PANELS = ['doorsPanel', 'kosharyPanel', 'pianoPanel', 'guitarPanel', 'composePanel', 'readPanel', 'menuPanel', 'soundPanel', 'infoPanel', 'helpPanel', 'talkPanel', 'upPanel', 'wxPanel', 'shelfPanel', 'bookPanel', 'photoPanel', 'eventsPanel', 'cardPanel', 'gamePanel', 'sharePanel', 'ctvPanel', 'gardenPanel', 'decorPanel', 'roomPanel', 'studyPanel', 'sleepPanel', 'framePanel', 'snackPanel', 'moviePanel', 'giftPanel', 'giftOpenPanel', 'arcadePanel', 'authorPanel', 'writePanel', 'cinemaPanel', 'bakePanel', 'stretchPanel', 'paintPanel', 'ahwaPanel', 'gramoPanel', 'tentPanel', 'recPanel', 'teaPanel', 'storyPanel', 'postPanel', 'partnerPanel', 'escapePanel', 'scopePanel', 'storiesPanel', 'sprintPanel', 'bbPanel', 'potteryPanel', 'flowerPanel', 'handPanel', 'petPanel', 'partyPanel', 'storyPickPanel'];
 function openPanel(id) {
   PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id));
 }
@@ -2754,15 +2776,48 @@ $('waveAct').onclick = () => {
   player.waving = 2;
   bubble(player.av.group, '👋', 'emote');
   send({ t: 'emote', e: 'wave' });
+  if (world.floor === 'main') { staff.react('wave', player.pos, state.me && state.me.displayName); regulars.react('wave', player.pos); }
 };
-const EMOTES = ['🌸', '☕', '💗', '✨', '😴'];
-let emoteIdx = 0;
-$('emoteAct').onclick = () => {
-  const e = EMOTES[emoteIdx++ % EMOTES.length];
-  $('emoteAct').firstElementChild.textContent = EMOTES[emoteIdx % EMOTES.length];
-  bubble(player.av.group, e, 'emote');
-  send({ t: 'emote', e });
-};
+// ── doing something: the 🌸 button opens a little bar of moves and emoji.
+// A move plays on your character for everyone in the room; a hug or a high
+// five goes to whoever is right next to you (and they do it back).
+const MOVES = [['dance', '💃', 'Dance'], ['jump', '🦘', 'Jump'], ['clap', '👏', 'Clap'], ['cheer', '🎉', 'Cheer'], ['laugh', '😂', 'Laugh'], ['hug', '🤗', 'Hug'], ['highfive', '✋', 'High five'], ['bow', '🙇', 'Bow'], ['surprise', '😮', 'Oh!'], ['love', '💗', 'Love'], ['think', '🤔', 'Think']];
+const MOVE_EMOJI = Object.fromEntries(MOVES.map(([k, e]) => [k, e]));
+const EMOTES = ['🌸', '☕', '✨', '😴'];
+const STANDING_MOVES = new Set(['dance', 'jump', 'bow']);
+function nearestPerson(maxD = 1.8) {
+  let best = null, bd = maxD;
+  for (const p of state.people.values()) { const d = p.pos.distanceTo(player.pos); if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+function doMove(kind) {
+  $('emoteBar').classList.add('hidden');
+  if (!player.av) return;
+  if (!MOVE_EMOJI[kind]) { bubble(player.av.group, kind, 'emote'); send({ t: 'emote', e: kind }); return; }
+  if (STANDING_MOVES.has(kind) && player.seat && !player.seat.swim) standUp();
+  let to;
+  if (kind === 'hug' || kind === 'highfive') {
+    const p = nearestPerson();
+    if (p) { to = p.id; player.ry = Math.atan2(p.pos.x - player.pos.x, p.pos.z - player.pos.z); sendMove(true); }
+    else toast(kind === 'hug' ? '🤗 A hug for the room! (Stand right next to someone to hug them.)' : '✋ Up high! (Stand next to someone for a real high five.)');
+  }
+  player.av.play(kind);
+  bubble(player.av.group, MOVE_EMOJI[kind], 'emote');
+  send({ t: 'emote', e: kind, to });
+  stories.onMove(kind);
+  if (world.floor === 'main') { staff.react(kind, player.pos, state.me && state.me.displayName); regulars.react(kind, player.pos); }
+}
+{
+  const bar = $('emoteBar');
+  for (const [k, e, name] of [...MOVES, ...EMOTES.map(e => [e, e, ''])]) {
+    const b = document.createElement('button'); b.type = 'button';
+    b.innerHTML = `<span>${e}</span>${name}`;
+    b.title = name || 'Send ' + e;
+    b.onclick = () => doMove(k);
+    bar.appendChild(b);
+  }
+}
+$('emoteAct').onclick = () => $('emoteBar').classList.toggle('hidden');
 $('chatAct').onclick = () => showChat($('chat').classList.contains('hidden'));
 $('chatClose').onclick = () => showChat(false);
 $('outBtn').onclick = async () => {
@@ -3275,6 +3330,7 @@ async function openTalk(id) {
     return b;
   }));
   $('talkLog').replaceChildren();
+  $('talkStory').classList.toggle('hidden', id !== 'yuto');
   openPanel('talkPanel');
   staff.attend(id, player.pos, 40); // they stop and turn to you
   setTimeout(() => $('talkInput').focus(), 50);
@@ -3622,6 +3678,7 @@ async function goToRoom(room, group = null) {
       : `You knock, and step into ${homeData.room.ownerName}'s room.`)
     : up ? `You climb the spiral stairs to ${group.name}'s room.` : from === 'bookbeans' ? 'You step back next door into Sakura Slice. The bell chimes.' : from === 'felucca' ? 'You step off onto the landing and stroll back up the street to the café. The bell chimes.' : from === 'koshari' || from === 'ahwa' ? 'You cross back over the road and in at the café door. The bell chimes.' : 'You come back down into the café.');
   if (isHome && homeData.focus) offerFocus(homeData.focus, homeData.now);
+  stories.onRoom(room);
   updateOnline();
   await wait(120);
   $('fade').classList.remove('on');
@@ -5860,6 +5917,7 @@ const regulars = createRegulars({
   say: (obj, text) => bubble(obj, text),
   callOut: (name, drink) => { const hana = world.npcs.find(n => n.id === 'hana'); if (hana && world.floor === 'main') bubble(hana.av.group, `${drink} for ${name}! 🌸`, 'npc'); },
   hour: cairoHour,
+  player: () => (world.floor === 'main' && player.av ? { pos: player.pos } : null),
 });
 let roomTick = 0;
 function listenRoom(dt) {
@@ -5886,6 +5944,7 @@ function frame() {
   if (state.started) {
     rideFelucca();
     updatePlayer(dt);
+    stories.update(dt);
     updatePeople(dt);
     staff.update(dt);
     regulars.update(dt);
@@ -6412,7 +6471,48 @@ function cutCake() {
   toast('🎂 A slice of party cake, candle and all. Make a wish! (B for a bite)');
 }
 
-if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie, openTent, openTea, openStory, openLetter, openPostHole, takeSteam, openRecorder, openScope, openEscape, startEscape, openStories, openSprint, openBBCounter, openBlindDate, openBrowse, openPottery, openPots, openFlowerShop, openPet, openParty, findPumpkin, cutCake, throwConfetti, openHand };
+
+// ── little stories with Yuto (stories.js): he walks round the building with you
+const stories = createStories({
+  scene, buildAvatar, disposeTree, world, player, state, sound,
+  ui: {
+    bubble: (obj, text) => bubble(obj, text, 'npc'),
+    npcName: id => (world.npcs.find(n => n.id === id) || {}).name || 'Yuto',
+    npcSay: (id, text) => { const n = world.npcs.find(x => x.id === id); if (n && world.floor === 'main') bubble(n.av.group, text, 'npc'); },
+    fill: k => (k === 'moon' ? moonTonight().name.toLowerCase() : ''),
+    card(c) {
+      $('storyCard').classList.toggle('hidden', !c);
+      if (!c) return;
+      $('storyTitle').textContent = c.title;
+      const who = document.createElement('b'); who.className = 'who'; who.textContent = c.who + ': ';
+      $('storyText').replaceChildren(who, document.createTextNode(c.text));
+      $('storyHint').textContent = c.hint ? '👉 ' + c.hint : '';
+      $('storyButtons').replaceChildren(...(c.buttons || []).map(b => { const el = document.createElement('button'); el.type = 'button'; el.className = 'btn'; el.textContent = b.label; el.onclick = b.act; return el; }));
+    },
+    done(story, sticker) {
+      sound.cue('heart');
+      sysChat(`${sticker} You and Yuto finished “${story.title}”. A new sticker for your collection!`);
+      toast(`${sticker} Sticker collected: ${story.title}`);
+    },
+  },
+});
+function openStories2() {
+  const done = new Set(stories.done());
+  $('storyStickers').replaceChildren(...stories.STORIES.map(s => { const e = document.createElement('span'); e.textContent = s.emoji; e.title = s.title; if (done.has(s.id)) e.className = 'got'; return e; }));
+  $('storyList').replaceChildren(...stories.STORIES.map(s => {
+    const b = document.createElement('button'); b.type = 'button';
+    const t = document.createElement('span'); t.className = 'txt';
+    const n = document.createElement('b'); n.textContent = `${s.emoji} ${s.title}${done.has(s.id) ? '  ✓' : ''}`;
+    const sm = document.createElement('small'); sm.textContent = s.blurb;
+    t.append(n, sm); b.append(t);
+    b.onclick = () => { closePanels(); stories.start(s.id); };
+    return b;
+  }));
+  openPanel('storyPickPanel');
+}
+$('talkStory').onclick = openStories2;
+$('storyStop').onclick = () => { if (confirm('Stop the story? You can start it again any time.')) stories.stop(); };
+if (new URLSearchParams(location.search).has('debug')) window.__cafe = { games, tour, invite, takePhoto, openShare, player, cam, state, world, camera, staff, goToRoom, openCommonTV, openPiano, openGuitar, goSit, openKoshari, toggleBalconyDoor, radio, post, openShelf, openBook, openPhoto, regulars, sound, openEvents, openSpecials, calendar, refreshBoards, refreshEvents, get arcade() { return arcade; }, openAuthorShelf, openWriting, openCinema, openMenu, standUp, openBaking, openStretch, openPaint, startMachine, openAhwa, playRecords, setMovie, openTent, openTea, openStory, openLetter, openPostHole, takeSteam, openRecorder, openScope, openEscape, startEscape, openStories, openSprint, openBBCounter, openBlindDate, openBrowse, openPottery, openPots, openFlowerShop, openPet, openParty, findPumpkin, cutCake, throwConfetti, openHand, stories, openStories2, doMove };
 
 // ───────────────────────────────────────── start
 

@@ -29,6 +29,7 @@ import { buildHaunted } from './haunted.js';
 import { buildOnsen } from './onsen.js';
 import { buildPetCafe } from './petcafe.js';
 import { buildParty } from './party.js';
+import { buildWindowView } from './windowview.js';
 import { buildGameRoom } from './gameroom.js';
 import { buildLibrary } from './library.js';
 import { buildCinema } from './cinema.js';
@@ -389,6 +390,7 @@ export function buildWorld(renderer) {
     onsen: buildOnsen, petcafe: buildPetCafe, party: buildParty, bookbeans: buildBookbeans };
   // (the cinema and the tent are on the roof; the pool, the observatory, the onsen and the greenhouse up on top,
   // under the open sky; BookBeans Corner is next door, on the street)
+  const OPEN_AIR = new Set(['main', 'garden', 'koshari', 'ahwa', 'felucca', 'bookbeans', 'pool', 'observatory', 'onsen', 'greenhouse', 'cinema', 'tent']);
   const ROOM_Y = name => (['pool', 'observatory', 'onsen', 'greenhouse'].includes(name) ? FLOOR3_Y + 3.6 : name === 'cinema' || name === 'tent' ? FLOOR3_Y : name === 'bookbeans' ? 0 : FLOOR2_Y);
   for (const k of Object.keys(ROOM_BUILDERS)) { floors[k] = mkFloor(); scene.add(floors[k].group); floors[k].group.position.y = ROOM_Y(k); floors[k].group.visible = false; }
   scene.add(floors.main.group, floors.up.group, floors.garden.group, floors.home.group, floors.hall.group, floors.common.group, floors.music.group, floors.prayer.group, floors.koshari.group, floors.hall2.group, floors.sleepover.group, floors.ahwa.group, floors.felucca.group);
@@ -2504,6 +2506,9 @@ export function buildWorld(renderer) {
 
   // ── outside: Cairo
   const outside = buildCairo(scene, { kosharyFloor: floors.koshari, ahwaFloor: floors.ahwa, feluccaFloor: floors.felucca });
+  // the view from the windows upstairs (windowview.js), instead of the real street
+  const windowView = buildWindowView();
+  scene.add(windowView.group);
   // from inside the café, through the front windows: the koshari shop across the road
   floors.main.interactables.push(outside.koshari.goIn, outside.ahwa.goIn);
   // by the front door, inside: the sign for the felucca on the Nile (felucca.js)
@@ -3015,6 +3020,7 @@ export function buildWorld(renderer) {
     if (home) { home.ceilingLight.intensity = 2.2 + night * 2.6; home.sideLights.forEach(l => { l.intensity = 1.6 + night * 1.8; }); }
     for (const h of [hall, hall2]) if (h) h.lights.forEach(l => { l.intensity = 2.4 + night * 2.2; });
     outside.setSky(hour, day, dusk, night);
+    windowView.setSky(day, dusk, night);
     return { day, night, open };
   }
   let baseHemi = 0.9;
@@ -3621,12 +3627,19 @@ export function buildWorld(renderer) {
     // (in the koshari shop the café is still there across the road)
     for (const [k, f] of Object.entries(floors)) f.group.visible = k === name || (['koshari', 'ahwa', 'felucca'].includes(name) && k === 'main');
     const f = floors[name];
+    // Out in the open (the café, the street, the roof, the pool and the
+    // terraces up top) you see the real city; inside the building upstairs the
+    // windows look out on the painted view at the right height instead.
+    const indoors = !OPEN_AIR.has(name);
+    outside.city.visible = !indoors;
+    windowView.group.visible = indoors;
     Object.assign(api, {
       floor: name,
       floorY: name === 'felucca' ? FELUCCA.deckY : ROOM_BUILDERS[name] ? ROOM_Y(name) : ['up', 'home', 'hall', 'hall2', 'common', 'music', 'prayer', 'sleepover'].includes(name) ? FLOOR2_Y : name === 'garden' ? FLOOR3_Y : 0,
       floorH: name === 'felucca' ? FELUCCA.h : ROOM_BUILDERS[name] ? rooms[name].bounds.h : name === 'up' ? FLOOR2_H : name === 'home' ? HOME_SIZE.h : name === 'hall' || name === 'hall2' ? HALL.h : name === 'common' ? COMMON.h : name === 'music' ? MUSIC.h : name === 'prayer' ? PRAYER.h : name === 'sleepover' ? SLEEPOVER.h : name === 'koshari' ? KOSHARI.h : name === 'ahwa' ? AHWA.h : name === 'garden' ? 7 : ROOM.h,
       colliders: f.colliders, seats: f.seats, surfaces: f.surfaces, interactables: f.interactables, floorMesh: f.floorMesh,
     });
+    if (indoors) windowView.place(api.floorY);
   }
   setFloor('main');
   return api;
@@ -3656,7 +3669,11 @@ function softTexture(size, draw) {
   return t;
 }
 
-function buildCairo(scene, { kosharyFloor, ahwaFloor, feluccaFloor } = {}) {
+function buildCairo(world, { kosharyFloor, ahwaFloor, feluccaFloor } = {}) {
+  // everything outside goes in one group, so it can be hidden while you're in
+  // a room upstairs (where the painted view in the windows takes over)
+  const scene = new THREE.Group();
+  world.add(scene);
   const animated = [];
   const nightMats = [];     // emissive things that glow after dark
   const lampGlows = [];
@@ -3677,7 +3694,7 @@ function buildCairo(scene, { kosharyFloor, ahwaFloor, feluccaFloor } = {}) {
   }));
   scene.add(sky);
   // a soft haze so the city fades into the distance instead of stopping
-  scene.fog = new THREE.Fog('#f3e2c8', 80, 260);
+  world.fog = new THREE.Fog('#f3e2c8', 80, 260);
 
   // stars (soft round sprites, only at night)
   const starTex = softTexture(64, (ctx) => {
@@ -4473,10 +4490,10 @@ function buildCairo(scene, { kosharyFloor, ahwaFloor, feluccaFloor } = {}) {
     skyU.bottom.value.copy(hor.clone().multiplyScalar(0.85));
     // haze, mist or dust close in the distance
     const fogC = wx.fogColor ? hor.clone().lerp(new THREE.Color(wx.fogColor).multiplyScalar(0.3 + 0.7 * day), wx.fog) : hor;
-    scene.fog.color.copy(fogC);
+    world.fog.color.copy(fogC);
     // (the inside of the café doesn't fog up — see noFog)
-    scene.fog.near = 80 * (1 - wx.fog) ** 2 + 1;
-    scene.fog.far = 260 * (1 - wx.fog) ** 1.5 + 35 * wx.fog;
+    world.fog.near = 80 * (1 - wx.fog) ** 2 + 1;
+    world.fog.far = 260 * (1 - wx.fog) ** 1.5 + 35 * wx.fog;
     stars.material.opacity = Math.max(0, night - 0.3);
     const a = ((hour - 6) / 12.5) * Math.PI;
     sunDisc.position.set(Math.cos(a) * -170 - 40, Math.max(-20, Math.sin(a) * 190), -160);
@@ -4553,7 +4570,7 @@ function buildCairo(scene, { kosharyFloor, ahwaFloor, feluccaFloor } = {}) {
     });
   }
 
-  return { setSky, setWeather, setFlash, update, setClock, faceTex, life, koshari, ahwa, felucca, adhan() { adhanK = 1; } };
+  return { city: scene, setSky, setWeather, setFlash, update, setClock, faceTex, life, koshari, ahwa, felucca, adhan() { adhanK = 1; } };
 }
 
 function lerpAngleW(a, b, t) {
